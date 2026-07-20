@@ -45,8 +45,8 @@ export default function PlatformSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSettings = async () => {
-    setIsLoading(true);
+  const fetchSettings = async (showLoading = true) => {
+    if (showLoading) setIsLoading(true);
     setError(null);
     try {
       const res = await api.get('/admin/settings');
@@ -55,9 +55,14 @@ export default function PlatformSettingsPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const err = error as any;
       console.error("Failed to load settings", err);
-      setError(err.response?.data?.message || "Failed to load platform settings.");
+      const errMsg = err.response?.data?.message || "Failed to load platform settings.";
+      if (showLoading) {
+        setError(errMsg);
+      } else {
+        toast.error(errMsg);
+      }
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   };
 
@@ -70,17 +75,81 @@ export default function PlatformSettingsPage() {
     if (!settings) return;
     setSettings({
       ...settings,
-      [field]: parseFloat(value) || 0,
-    });
+      [field]: value,
+    } as unknown as PlatformSettings);
   };
 
   const handleSave = async () => {
     if (!settings) return;
+
+    const percentageFields = [
+      'daily_roi_pct', 'withdrawal_fee_pct', 
+      'ref_reward_l1_pct', 'ref_reward_l2_pct', 'ref_reward_l3_pct',
+      'level_income_l1_pct', 'level_income_l2_pct', 'level_income_l3_pct',
+      'level_income_l4_to_l10_pct', 'level_income_l11_to_l15_pct'
+    ];
+    const directCountFields = [
+      'level1_to_5_directs', 'level1_to_10_directs', 'level1_to_15_directs'
+    ];
+
+    const payload: Record<string, number> = { id: settings.id as number };
+
+    for (const [key, val] of Object.entries(settings)) {
+      if (key === 'id') continue;
+      
+      const strVal = String(val).trim();
+      if (strVal === '') {
+        toast.error(`Invalid value for ${key.replace(/_/g, ' ')}`);
+        return;
+      }
+
+      const num = Number(strVal);
+      if (!Number.isFinite(num) || num < 0) {
+        toast.error(`Invalid value for ${key.replace(/_/g, ' ')}`);
+        return;
+      }
+      
+      if (directCountFields.includes(key) && !Number.isInteger(num)) {
+        toast.error(`Invalid value for ${key.replace(/_/g, ' ')}`);
+        return;
+      }
+      
+      if (percentageFields.includes(key) && num > 100) {
+        toast.error(`${key.replace(/_/g, ' ')} cannot exceed 100%`);
+        return;
+      }
+
+      if (key === 'daily_roi_pct') {
+        const decimals = strVal.split('.')[1];
+        if (decimals && decimals.length > 4) {
+          toast.error(`Invalid value for ${key.replace(/_/g, ' ')}`);
+          return;
+        }
+      }
+      
+      payload[key] = num;
+    }
+    
+    if (payload.non_working_cap_multiplier < 1 || payload.working_cap_multiplier < 1) {
+      toast.error("Cap multipliers must be at least 1");
+      return;
+    }
+    
+    if (payload.level1_to_10_directs < payload.level1_to_5_directs || payload.level1_to_15_directs < payload.level1_to_10_directs) {
+      toast.error("Direct referral requirements must be ordered (L5 <= L10 <= L15)");
+      return;
+    }
+    
+    if (payload.level1_to_10_business < payload.level1_to_5_business || payload.level1_to_15_business < payload.level1_to_10_business) {
+      toast.error("Business thresholds must be ordered (L5 <= L10 <= L15)");
+      return;
+    }
+
     setIsSaving(true);
     try {
-      await api.put('/admin/settings', settings);
+      await api.put('/admin/settings', payload);
       toast.success("Settings updated successfully");
-      fetchSettings();
+      await fetchSettings(false);
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const err = error as any;
@@ -103,7 +172,7 @@ export default function PlatformSettingsPage() {
     return (
       <div className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center space-y-4">
         <div className="text-destructive font-semibold">{error}</div>
-        <Button onClick={fetchSettings} variant="outline">
+        <Button onClick={() => fetchSettings(true)} variant="outline">
           Retry
         </Button>
       </div>

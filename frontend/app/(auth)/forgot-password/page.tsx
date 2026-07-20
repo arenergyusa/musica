@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: `Forgot Password | ${APP.NAME}`,
-  description: "Reset your password for your Musica RBF account.",
+  description: "Reset your password for your account.",
 };
 
 export default function ForgotPasswordPage() {
@@ -25,7 +25,7 @@ export default function ForgotPasswordPage() {
           <div className="mb-8 text-center">
             <h2 className="text-3xl font-bold mb-2">Forgot Password</h2>
             <p className="text-muted-foreground">
-              Enter your email to reset your password.
+              Password reset assistance.
             </p>
           </div>
           

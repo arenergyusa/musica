@@ -13,7 +13,7 @@ export default function PrivacyPage() {
           
           <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none space-y-6">
             <p className="text-muted-foreground">
-              Last updated: {LAST_UPDATED.toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}
+              Last updated: {LAST_UPDATED.toLocaleDateString("en-IN", { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" })}
             </p>
 
             <section className="space-y-4">

@@ -4,7 +4,11 @@ import { toast } from 'sonner';
 // The base URL depends on where the Nginx gateway or backend is running.
 // Since Next.js and Backend might run on different ports in development,
 // we default to /api/v1 which will be proxied or directly accessed.
-const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost/api/v1';
+let baseURL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+if (typeof window === 'undefined' && baseURL.startsWith('/')) {
+  // On the server (SSR), we need an absolute URL. Route to backend container internally.
+  baseURL = 'http://backend:8080/api/v1';
+}
 
 export const api = axios.create({
   baseURL,

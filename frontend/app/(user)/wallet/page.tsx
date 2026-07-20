@@ -71,12 +71,18 @@ export default function WalletPage() {
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [settings, setSettings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [historyType, setHistoryType] = useState("daily_rewards");
 
   useEffect(() => {
     async function fetchData() {
       try {
+        // Start non-blocking settings request
+        api.get("/settings")
+          .then(res => setSettings(res.data.data))
+          .catch(() => setSettings(null));
+
         const [balRes, txRes, wdRes] = await Promise.all([
           api.get("/wallet/balance"),
           api.get("/wallet/transactions"),
@@ -241,7 +247,7 @@ export default function WalletPage() {
                     <TableHead className="pl-6">Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right hidden sm:table-cell">Amount</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Fee (5%)</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">TDS</TableHead>
                     <TableHead className="text-right pr-6">Net Credit</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -256,6 +262,11 @@ export default function WalletPage() {
                         </TableCell>
                         <TableCell className="text-right text-destructive hidden sm:table-cell">
                           -{formatCurrency(tx.tds_amount || 0)}
+                          <span className="text-xs opacity-70 ml-1">
+                            {((tx as any).withdrawal_fee_pct ?? settings?.withdrawal_fee_pct) != null
+                              ? `(${((tx as any).withdrawal_fee_pct ?? settings?.withdrawal_fee_pct)}%)`
+                              : '(N/A)'}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right pr-6 font-semibold text-foreground">
                           {formatCurrency(tx.net_amount || 0)}
