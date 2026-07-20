@@ -1,0 +1,23 @@
+DROP TABLE IF EXISTS downline_volume_cache CASCADE;
+DROP TABLE IF EXISTS income_cap_tracker CASCADE;
+DROP TABLE IF EXISTS withdrawals CASCADE;
+DROP TABLE IF EXISTS referral_reward_log CASCADE;
+DROP TABLE IF EXISTS level_income_log CASCADE;
+DROP TABLE IF EXISTS daily_roi_log CASCADE;
+DROP TABLE IF EXISTS referral_tree CASCADE;
+DROP TABLE IF EXISTS transactions CASCADE;
+DROP TABLE IF EXISTS reward_wallet CASCADE;
+DROP TABLE IF EXISTS investments CASCADE;
+DROP TABLE IF EXISTS investment_plans CASCADE;
+DROP TABLE IF EXISTS kyc_documents CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+DROP TYPE IF EXISTS investment_status;
+DROP TYPE IF EXISTS withdrawal_status;
+DROP TYPE IF EXISTS transaction_source;
+DROP TYPE IF EXISTS transaction_type;
+DROP TYPE IF EXISTS kyc_status;
+DROP TYPE IF EXISTS user_status;
+
+DROP EXTENSION IF EXISTS "ltree";
+DROP EXTENSION IF EXISTS "uuid-ossp";
