@@ -7,10 +7,13 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       network: host
+      args:
+        - NEXT_PUBLIC_API_URL=/api/v1
     ports:
       - "127.0.0.1:3000:3000"
     environment:
       - NODE_ENV=production
+      - API_URL_INTERNAL=http://backend:8080
     depends_on:
       - backend
     networks:
