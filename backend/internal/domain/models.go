@@ -28,12 +28,14 @@ type User struct {
 }
 
 type InvestmentPlan struct {
-	ID             uuid.UUID `json:"id" db:"id"`
-	Name           string    `json:"name" db:"name"`
-	MinAmount      float64   `json:"min_amount" db:"min_amount"`
-	DailyRatePct   float64   `json:"daily_rate_pct" db:"daily_rate_pct"`
-	Description    string    `json:"description" db:"description"`
-	IsActive       bool      `json:"is_active" db:"is_active"`
+	ID                      uuid.UUID `json:"id" db:"id"`
+	Name                    string    `json:"name" db:"name"`
+	MinAmount               float64   `json:"min_amount" db:"min_amount"`
+	DailyRatePct            float64   `json:"daily_rate_pct" db:"daily_rate_pct"`
+	Description             string    `json:"description" db:"description"`
+	IsActive                bool      `json:"is_active" db:"is_active"`
+	NonWorkingCapMultiplier float64   `json:"non_working_cap_multiplier"`
+	WorkingCapMultiplier    float64   `json:"working_cap_multiplier"`
 }
 
 type Investment struct {
@@ -80,4 +82,28 @@ type Withdrawal struct {
 	ProcessedAt     *time.Time `json:"processed_at,omitempty" db:"processed_at"`
 	AdminNote       string     `json:"admin_note,omitempty" db:"admin_note"`
 	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+}
+
+type PlatformSettings struct {
+	ID                         int       `json:"id" db:"id"`
+	DailyROIPct                float64   `json:"daily_roi_pct" db:"daily_roi_pct"`
+	WithdrawalFeePct           float64   `json:"withdrawal_fee_pct" db:"withdrawal_fee_pct"`
+	WithdrawalMinAmount        float64   `json:"withdrawal_min_amount" db:"withdrawal_min_amount"`
+	Level1To5Directs           int       `json:"level1_to_5_directs" db:"level1_to_5_directs"`
+	Level1To5Business          float64   `json:"level1_to_5_business" db:"level1_to_5_business"`
+	Level1To10Directs          int       `json:"level1_to_10_directs" db:"level1_to_10_directs"`
+	Level1To10Business         float64   `json:"level1_to_10_business" db:"level1_to_10_business"`
+	Level1To15Directs          int       `json:"level1_to_15_directs" db:"level1_to_15_directs"`
+	Level1To15Business         float64   `json:"level1_to_15_business" db:"level1_to_15_business"`
+	RefRewardL1Pct             float64   `json:"ref_reward_l1_pct" db:"ref_reward_l1_pct"`
+	RefRewardL2Pct             float64   `json:"ref_reward_l2_pct" db:"ref_reward_l2_pct"`
+	RefRewardL3Pct             float64   `json:"ref_reward_l3_pct" db:"ref_reward_l3_pct"`
+	LevelIncomeL1Pct           float64   `json:"level_income_l1_pct" db:"level_income_l1_pct"`
+	LevelIncomeL2Pct           float64   `json:"level_income_l2_pct" db:"level_income_l2_pct"`
+	LevelIncomeL3Pct           float64   `json:"level_income_l3_pct" db:"level_income_l3_pct"`
+	LevelIncomeL4ToL10Pct      float64   `json:"level_income_l4_to_l10_pct" db:"level_income_l4_to_l10_pct"`
+	LevelIncomeL11ToL15Pct     float64   `json:"level_income_l11_to_l15_pct" db:"level_income_l11_to_l15_pct"`
+	NonWorkingCapMultiplier    float64   `json:"non_working_cap_multiplier" db:"non_working_cap_multiplier"`
+	WorkingCapMultiplier       float64   `json:"working_cap_multiplier" db:"working_cap_multiplier"`
+	UpdatedAt                  time.Time `json:"updated_at" db:"updated_at"`
 }

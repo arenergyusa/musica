@@ -1,12 +1,9 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { HeroSection } from "@/components/sections/HeroSection";
-import { StatsBar } from "@/components/sections/StatsBar";
 import { HowItWorks } from "@/components/sections/HowItWorks";
-import { PlansSection } from "@/components/sections/PlansSection";
-import { IncomeTypesSection } from "@/components/sections/IncomeTypesSection";
-import { LevelIncomeTable } from "@/components/sections/LevelIncomeTable";
 import { WhyMusica } from "@/components/sections/WhyMusica";
+import { VideoShowcase } from "@/components/sections/VideoShowcase";
 import { FaqSection } from "@/components/sections/FaqSection";
 import { CtaBanner } from "@/components/sections/CtaBanner";
 
@@ -19,11 +16,8 @@ export default function LandingPage() {
       <Navbar />
       <main id="main-content" className="flex-grow">
         <HeroSection />
-        <StatsBar />
+        <VideoShowcase />
         <HowItWorks />
-        <PlansSection />
-        <IncomeTypesSection />
-        <LevelIncomeTable />
         <WhyMusica />
         <FaqSection />
         <CtaBanner />

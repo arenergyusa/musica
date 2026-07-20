@@ -21,23 +21,27 @@ type AdminService interface {
 	ApproveKYC(ctx context.Context, userID uuid.UUID) error
 	RejectKYC(ctx context.Context, userID uuid.UUID, reason string) error
 	GetAllWithdrawals(ctx context.Context, limit, offset int) ([]*domain.Withdrawal, error)
+	GetSettings(ctx context.Context) (*domain.PlatformSettings, error)
+	UpdateSettings(ctx context.Context, settings *domain.PlatformSettings) error
 }
 
 type adminService struct {
-	dbPool     *pgxpool.Pool
-	invRepo    repository.InvestmentRepository
-	wdRepo     repository.WithdrawalRepository
-	userRepo   repository.UserRepository
-	walletRepo repository.WalletRepository
+	dbPool       *pgxpool.Pool
+	invRepo      repository.InvestmentRepository
+	wdRepo       repository.WithdrawalRepository
+	userRepo     repository.UserRepository
+	walletRepo   repository.WalletRepository
+	settingsRepo repository.SettingsRepository
 }
 
-func NewAdminService(dbPool *pgxpool.Pool, invRepo repository.InvestmentRepository, wdRepo repository.WithdrawalRepository, userRepo repository.UserRepository, walletRepo repository.WalletRepository) AdminService {
+func NewAdminService(dbPool *pgxpool.Pool, invRepo repository.InvestmentRepository, wdRepo repository.WithdrawalRepository, userRepo repository.UserRepository, walletRepo repository.WalletRepository, settingsRepo repository.SettingsRepository) AdminService {
 	return &adminService{
-		dbPool:     dbPool,
-		invRepo:    invRepo,
-		wdRepo:     wdRepo,
-		userRepo:   userRepo,
-		walletRepo: walletRepo,
+		dbPool:       dbPool,
+		invRepo:      invRepo,
+		wdRepo:       wdRepo,
+		userRepo:     userRepo,
+		walletRepo:   walletRepo,
+		settingsRepo: settingsRepo,
 	}
 }
 
@@ -173,3 +177,10 @@ func (s *adminService) GetAllWithdrawals(ctx context.Context, limit, offset int)
 	return s.wdRepo.GetAll(ctx, limit, offset)
 }
 
+func (s *adminService) GetSettings(ctx context.Context) (*domain.PlatformSettings, error) {
+	return s.settingsRepo.GetSettings(ctx)
+}
+
+func (s *adminService) UpdateSettings(ctx context.Context, settings *domain.PlatformSettings) error {
+	return s.settingsRepo.UpdateSettings(ctx, settings)
+}

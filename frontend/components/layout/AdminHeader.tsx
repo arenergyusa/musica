@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuthStore } from "@/lib/store/useAuthStore";
 
 const navItems = [
   { title: "Overview", href: "/admin/dashboard" },
@@ -27,6 +28,9 @@ const navItems = [
 
 export function AdminHeader() {
   const pathname = usePathname();
+  const { user, logout } = useAuthStore();
+  
+  const userInitials = user?.name ? user.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : "AD";
 
   return (
     <header className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b lg:border-none lg:bg-transparent">
@@ -98,22 +102,22 @@ export function AdminHeader() {
             >
               <Avatar className="h-8 w-8 border border-primary/20">
                 <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                  SA
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">Super Admin</p>
-                  <p className="text-xs leading-none text-muted-foreground">admin@musica.com</p>
+                  <p className="text-sm font-medium leading-none">{user?.name || "Admin"}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{user?.email || "admin"}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem render={<Link href="/dashboard" />}>
+              <DropdownMenuItem render={<Link href="/dashboard" className="cursor-pointer w-full" />}>
                 Switch to User View
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive focus:text-destructive">
+              <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">
                 Log out
               </DropdownMenuItem>
             </DropdownMenuContent>

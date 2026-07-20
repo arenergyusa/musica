@@ -36,6 +36,11 @@ const navItems = [
     href: "/admin/kyc",
     icon: FileCheck,
   },
+  {
+    title: "Platform Settings",
+    href: "/admin/settings",
+    icon: Settings,
+  },
 ];
 
 export function AdminSidebar() {

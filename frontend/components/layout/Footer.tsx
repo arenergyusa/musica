@@ -1,4 +1,3 @@
-/* eslint-disable */
 import Link from "next/link";
 import { Music, Mail, MapPin } from "lucide-react";
 import { APP, NAV_LINKS } from "@/lib/constants";
@@ -19,8 +18,8 @@ export function Footer() {
               <span className="font-bold text-xl tracking-tight">{APP.NAME}</span>
             </Link>
             <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-              India's premier RBF Agreement-based Entertainment Production
-              Investment Platform. Empowering creators and investors.
+              Premium Haryanvi Music & Entertainment Platform. 
+              Discover exclusive music videos, web series, and blockbuster entertainment.
             </p>
           </div>
 
@@ -52,16 +51,6 @@ export function Footer() {
                   Privacy Policy
                 </Link>
               </li>
-              <li>
-                <Link href="/rbf-agreement" className="hover:text-primary transition-colors">
-                  RBF Agreement
-                </Link>
-              </li>
-              <li>
-                <Link href="/kyc-policy" className="hover:text-primary transition-colors">
-                  KYC & AML Policy
-                </Link>
-              </li>
             </ul>
           </div>
 
@@ -71,13 +60,13 @@ export function Footer() {
             <ul className="space-y-4 text-sm text-muted-foreground">
               <li className="flex items-start space-x-3">
                 <Mail className="h-4 w-4 mt-0.5 text-primary" />
-                <span>support@musica.in</span>
+                <span>hello@themusica.in</span>
               </li>
               <li className="flex items-start space-x-3">
                 <MapPin className="h-4 w-4 mt-0.5 text-primary" />
                 <span>
-                  Musica Entertainment Pvt. Ltd.<br />
-                  Mumbai, Maharashtra 400053<br />
+                  223, Sector 20, Huda<br />
+                  Sirsa, Haryana<br />
                   India
                 </span>
               </li>
@@ -86,9 +75,14 @@ export function Footer() {
         </div>
 
         <div className="border-t border-border/40 pt-8 flex flex-col md:flex-row items-center justify-between text-sm text-muted-foreground">
-          <p>© {currentYear} {APP.NAME}. All rights reserved.</p>
-          <p className="mt-2 md:mt-0 text-xs">
-            Investment in production is subject to market risks. Read all scheme related documents carefully.
+          <div className="flex flex-col space-y-1 text-center md:text-left">
+            <p>© {currentYear} Pure Desi Music (OPC) Private Limited. All rights reserved.</p>
+            <p className="text-xs text-muted-foreground/70">
+              CIN: U92490HR2020OPC091236 | PAN: AALCP6210F
+            </p>
+          </div>
+          <p className="mt-4 md:mt-0 text-xs">
+            Powered by Pure Desi Haryanvi.
           </p>
         </div>
       </div>

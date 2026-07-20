@@ -209,7 +209,7 @@ export function RegisterForm() {
                   />
                 </FormControl>
                 <div className="space-y-1 leading-none">
-                  <FormLabel className="cursor-pointer text-sm font-medium leading-relaxed">
+                  <FormLabel className="cursor-pointer text-sm font-medium leading-snug">
                     I agree to the{" "}
                     <button
                       type="button"
@@ -219,9 +219,8 @@ export function RegisterForm() {
                       }}
                       className="text-primary hover:underline font-semibold"
                     >
-                      RBF Agreement
+                      Terms & Conditions
                     </button>
-                    {" "}and acknowledge that my principal investment is non-refundable.
                   </FormLabel>
                   <FormMessage />
                 </div>

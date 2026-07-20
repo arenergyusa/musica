@@ -1,17 +1,15 @@
-/* eslint-disable */
 "use client";
 
 import { motion } from "framer-motion";
 import { CheckCircle } from "lucide-react";
-import Image from "next/image";
 
 const features = [
-  "Non-dilutive funding for content creators",
-  "Guaranteed daily returns for investors",
-  "Complete transparency on production status",
-  "Automated daily payouts to your Reward Wallet",
-  "Strict KYC verification for all participants",
-  "Bank-grade security and encryption",
+  "Premium high-quality music videos",
+  "Exclusive web series and short films",
+  "Direct support for local artists and creators",
+  "Cultural preservation of Haryanvi traditions",
+  "Seamless streaming experience",
+  "Curated playlists for every mood",
 ];
 
 export function WhyMusica() {
@@ -26,10 +24,10 @@ export function WhyMusica() {
             transition={{ duration: 0.5 }}
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Why Invest with <span className="text-primary">Musica?</span>
+              Why Choose <span className="text-primary">Musica?</span>
             </h2>
             <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-              Musica bridges the gap between entertainment creators needing capital and investors seeking high-yield passive income. Our Revenue-Based Financing (RBF) model ensures creators get funded without giving up equity, while investors earn a guaranteed percentage of revenues daily.
+              Musica is your ultimate destination for everything Haryanvi. From the latest chart-topping music videos to compelling web series, we bring the best of regional entertainment directly to your screens. Experience the vibrant culture and storytelling of Haryana like never before.
             </p>
             
             <ul className="space-y-4">

@@ -57,7 +57,7 @@ func (j *JobRunner) distributeDailyROI() {
 
 	var processed int
 	for _, inv := range investments {
-		roiAmount := inv.Amount * inv.DailyRatePct
+		roiAmount := service.CalculateDailyROI(inv.Amount, inv.DailyRatePct)
 		if roiAmount <= 0 {
 			continue
 		}

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Investment } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowRight, Calendar, Activity, Lock, Wallet, PlusCircle } from "lucide-react";
 import Link from "next/link";
 
@@ -119,19 +120,27 @@ export default function InvestmentsPage() {
         </Card>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-none w-full">
-        {["ALL", "ACTIVE", "CAPPED", "CLOSED"].map((f) => (
-          <Button
-            key={f}
-            variant={filter === f ? "default" : "outline"}
-            size="sm"
-            className="rounded-full shrink-0 px-5"
-            onClick={() => setFilter(f)}
-          >
-            {f === "ALL" ? "All Plans" : f.charAt(0) + f.slice(1).toLowerCase()}
-          </Button>
-        ))}
+      {/* Filter Dropdown */}
+      <div className="flex justify-between items-center w-full pb-4">
+        <h3 className="font-semibold text-lg">My Plans</h3>
+        <Select value={filter} onValueChange={(val) => val && setFilter(val)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Plans">
+              {{
+                ALL: "All Plans",
+                ACTIVE: "Active",
+                CAPPED: "Capped",
+                CLOSED: "Closed"
+              }[filter]}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All Plans</SelectItem>
+            <SelectItem value="ACTIVE">Active</SelectItem>
+            <SelectItem value="CAPPED">Capped</SelectItem>
+            <SelectItem value="CLOSED">Closed</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="w-full">
@@ -160,7 +169,7 @@ export default function InvestmentsPage() {
                         <p className="text-xl font-bold">{formatCurrency(inv.amount)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-muted-foreground mb-1">Daily ROI</p>
+                        <p className="text-xs text-muted-foreground mb-1">Interest</p>
                         <p className="text-xl font-bold text-emerald-500">+{formatCurrency(inv.dailyRoi)}</p>
                       </div>
                     </div>
@@ -181,7 +190,7 @@ export default function InvestmentsPage() {
                   <CardFooter className="pt-4 border-t bg-muted/10">
                     <Link href="/wallet" className="w-full">
                       <Button variant="ghost" className="w-full text-primary justify-between">
-                        View ROI History <ArrowRight className="h-4 w-4 ml-2" />
+                        View Interest History <ArrowRight className="h-4 w-4 ml-2" />
                       </Button>
                     </Link>
                   </CardFooter>

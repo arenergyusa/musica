@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strconv"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/arenergyusa/musica/backend/internal/repository"
@@ -11,71 +12,68 @@ import (
 
 // MLM & Investment Core Logic as specified in the plan
 
-func CalculateNetWithdrawal(amount float64) (float64, float64, error) {
-	if amount < 1000 {
-		return 0, 0, errors.New("minimum withdrawal amount is ₹1,000")
+func CalculateNetWithdrawal(amount float64, s *domain.PlatformSettings) (float64, float64, error) {
+	if amount < s.WithdrawalMinAmount {
+		return 0, 0, errors.New("minimum withdrawal amount is ₹" + strconv.FormatFloat(s.WithdrawalMinAmount, 'f', 2, 64))
 	}
-	tdsAmount := amount * 0.10 // 10% TDS
+	tdsAmount := amount * (s.WithdrawalFeePct / 100.0)
 	netAmount := amount - tdsAmount
 	return math.Round(tdsAmount*100)/100, math.Round(netAmount*100)/100, nil
 }
 
-func GetIncomeCap(isWorking bool) float64 {
-	// Non-Working -> 2x
-	// Working -> 3x
+func GetIncomeCap(isWorking bool, s *domain.PlatformSettings) float64 {
 	if isWorking {
-		return 3.0
+		return s.WorkingCapMultiplier
 	}
-	return 2.0
+	return s.NonWorkingCapMultiplier
 }
 
-func CalculateDailyROI(investedAmount float64) float64 {
-	// 0.3333% daily
-	roi := investedAmount * (10.0 / 30.0 / 100.0)
+func CalculateDailyROI(investedAmount float64, ratePct float64) float64 {
+	roi := investedAmount * (ratePct / 100.0)
 	return math.Round(roi*100) / 100
 }
 
-func GetReferralRewardPercentage(level int) float64 {
+func GetReferralRewardPercentage(level int, s *domain.PlatformSettings) float64 {
 	switch level {
 	case 1:
-		return 4.0
+		return s.RefRewardL1Pct
 	case 2:
-		return 1.0
+		return s.RefRewardL2Pct
 	case 3:
-		return 1.0
+		return s.RefRewardL3Pct
 	default:
 		return 0.0
 	}
 }
 
-func GetLevelIncomePercentage(level int) float64 {
+func GetLevelIncomePercentage(level int, s *domain.PlatformSettings) float64 {
 	if level == 1 {
-		return 15.0
+		return s.LevelIncomeL1Pct
 	}
 	if level == 2 {
-		return 10.0
+		return s.LevelIncomeL2Pct
 	}
 	if level == 3 {
-		return 5.0
+		return s.LevelIncomeL3Pct
 	}
 	if level >= 4 && level <= 10 {
-		return 2.5
+		return s.LevelIncomeL4ToL10Pct
 	}
 	if level >= 11 && level <= 15 {
-		return 3.0
+		return s.LevelIncomeL11ToL15Pct
 	}
 	return 0.0
 }
 
-func GetUnlockedLevels(activeVolume float64) int {
-	if activeVolume < 100000 {
-		return 0 // No level income
-	} else if activeVolume < 200000 {
-		return 5 // L1 - L5
-	} else if activeVolume < 300000 {
-		return 10 // L1 - L10
+func GetUnlockedLevels(directsCount int, directBusiness float64, s *domain.PlatformSettings) int {
+	if directsCount >= s.Level1To15Directs && directBusiness >= s.Level1To15Business {
+		return 15
+	} else if directsCount >= s.Level1To10Directs && directBusiness >= s.Level1To10Business {
+		return 10
+	} else if directsCount >= s.Level1To5Directs && directBusiness >= s.Level1To5Business {
+		return 5
 	}
-	return 15 // L1 - L15
+	return 0
 }
 
 func EvaluateCapStatus(ctx context.Context, invRepo repository.InvestmentRepository, investment *domain.Investment) bool {

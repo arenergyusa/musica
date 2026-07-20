@@ -36,6 +36,8 @@ export default function InvestPage() {
   const [amount, setAmount] = useState<number>(MIN_AMOUNT);
   const [activeInvestments, setActiveInvestments] = useState<Investment[]>([]);
   const [dailyRatePct, setDailyRatePct] = useState<number>(0.3333);
+  const [nonWorkingCap, setNonWorkingCap] = useState<number>(2);
+  const [workingCap, setWorkingCap] = useState<number>(3);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -50,6 +52,8 @@ export default function InvestPage() {
         
         if (plansRes.data.data && plansRes.data.data.length > 0) {
           setDailyRatePct(plansRes.data.data[0].daily_rate_pct || 0.3333);
+          setNonWorkingCap(plansRes.data.data[0].non_working_cap_multiplier || 2);
+          setWorkingCap(plansRes.data.data[0].working_cap_multiplier || 3);
         }
       } catch (error) {
         console.error("Failed to load investment data", error);
@@ -78,12 +82,12 @@ export default function InvestPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <PageHeader 
-        title="RBF Investment Pool" 
-        description="Contribute in multiples of ₹10,000 to an RBF pool and receive daily revenue share credits."
+        title="Musica Premium Plan" 
+        description="Subscribe in multiples of ₹10,000 to a premium plan and receive daily reward credits."
         action={
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground bg-muted/50 px-4 py-2 rounded-full border">
             <ShieldCheck className="h-4 w-4 text-emerald-500" />
-            <span>Governed by RBF Contribution Agreement</span>
+            <span>Governed by Platform Terms & Conditions</span>
           </div>
         }
       />
@@ -92,7 +96,7 @@ export default function InvestPage() {
         <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
           <AlertTitle className="text-red-600 dark:text-red-400 font-bold">KYC Verification Required</AlertTitle>
           <AlertDescription className="text-red-600/90 dark:text-red-400/90">
-            You must complete your KYC verification before you can participate in any investment pools. 
+            You must complete your KYC verification before you can participate in any plans. 
             Please visit the KYC portal to submit your documents.
           </AlertDescription>
         </Alert>
@@ -101,12 +105,12 @@ export default function InvestPage() {
       {/* Interactive Calculator Card */}
       <Card className="relative overflow-hidden border-2 bg-gradient-to-b from-primary/5 to-transparent border-primary/20 shadow-lg">
         <div className="absolute top-0 right-0 bg-primary py-1 px-4 text-xs font-bold text-primary-foreground uppercase tracking-wider rounded-bl-lg flex items-center">
-          <Zap className="h-3 w-3 mr-1" fill="currentColor" /> Dynamic Pool
+          <Zap className="h-3 w-3 mr-1" fill="currentColor" /> Dynamic Plan
         </div>
         <CardHeader className="pt-8 text-center pb-2">
-          <CardTitle className="text-2xl font-bold">Choose Investment Amount</CardTitle>
+          <CardTitle className="text-2xl font-bold">Choose Plan Amount</CardTitle>
           <CardDescription>
-            Adjust the slider or use buttons to select your desired contribution.
+            Adjust the slider or use buttons to select your desired subscription.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-8 mt-4">
@@ -155,7 +159,7 @@ export default function InvestPage() {
             <div className="bg-background rounded-xl p-4 border flex items-center justify-between shadow-sm">
               <div className="flex items-center text-muted-foreground">
                 <TrendingUp className="h-5 w-5 mr-2 text-emerald-500" />
-                <span className="font-medium text-sm">Daily Revenue Share</span>
+                <span className="font-medium text-sm">Daily Reward Share</span>
               </div>
               <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
                 {formatCurrency(dailyReturn)} <span className="text-xs text-muted-foreground font-normal">/ day</span>
@@ -175,8 +179,8 @@ export default function InvestPage() {
           <div className="flex items-start justify-center text-xs text-muted-foreground max-w-xl mx-auto bg-muted/30 p-3 rounded-md">
             <Info className="h-4 w-4 mr-2 shrink-0 mt-0.5" />
             <p>
-              Your contribution receives a daily revenue share credit of <strong>{dailyRatePct}%</strong> of the contributed amount.
-              Total credits are capped at <strong>2x</strong> (Non-Working) or <strong>3x</strong> (Working) of your contribution.
+              Your subscription receives a daily reward credit of <strong>{dailyRatePct}%</strong> of the subscribed amount.
+              Total credits are capped at <strong>{nonWorkingCap}x</strong> (Non-Working) or <strong>{workingCap}x</strong> (Working) of your subscription.
             </p>
           </div>
         </CardContent>
@@ -189,15 +193,15 @@ export default function InvestPage() {
                     size="lg" 
                     className="w-full max-w-sm text-lg h-14 font-bold shadow-xl shadow-primary/20"
                   >
-                    Proceed to Invest {formatCurrency(amount)}
+                    Proceed to Subscribe {formatCurrency(amount)}
                   </Button>
                 }
               />
               <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
                 <DialogHeader className="px-6 py-4 bg-muted/30 border-b">
-                  <DialogTitle className="text-xl">Complete Your RBF Contribution</DialogTitle>
+                  <DialogTitle className="text-xl">Complete Your Subscription</DialogTitle>
                   <DialogDescription>
-                    Make the payment for your RBF Pool participation and submit the UTR/reference number below.
+                    Make the payment for your plan participation and submit the UTR/reference number below.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="px-6 pb-6 pt-2 overflow-y-auto max-h-[70vh]">
@@ -219,7 +223,7 @@ export default function InvestPage() {
       </Card>
 
       <div className="mt-12 space-y-6">
-        <h2 className="text-xl font-bold tracking-tight">Active Investments</h2>
+        <h2 className="text-xl font-bold tracking-tight">Active Subscriptions</h2>
         
         {isLoading ? (
           <Skeleton className="h-32 w-full rounded-xl" />
@@ -235,7 +239,7 @@ export default function InvestPage() {
                     <div>
                       <p className="font-semibold text-lg">{formatCurrency(inv.amount)}</p>
                       <p className="text-sm text-muted-foreground">
-                        {inv.status === "PENDING" ? "Pending Approval" : "Active Pool Contribution"}
+                        {inv.status === "PENDING" ? "Pending Approval" : "Active Plan Subscription"}
                       </p>
                     </div>
                   </div>
@@ -254,8 +258,8 @@ export default function InvestPage() {
         ) : (
           <EmptyState 
             icon={Zap}
-            title="No Active Investments"
-            description="You haven't participated in any RBF pools yet. Use the calculator above to estimate your revenue share."
+            title="No Active Subscriptions"
+            description="You haven't subscribed to any plans yet. Use the calculator above to estimate your rewards."
           />
         )}
       </div>

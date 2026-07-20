@@ -81,8 +81,11 @@ export function LoginForm() {
       });
       
       await fetchUser(); // Hydrate the store
-      window.location.assign("/dashboard");
-     
+      if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+        window.location.assign("/admin/dashboard");
+      } else {
+        window.location.assign("/dashboard");
+      }
     } catch (error: any) {
       // Error is also handled by api interceptor which triggers toast
       const message = error.response?.data?.message || "Invalid email or password";

@@ -39,14 +39,15 @@ func main() {
 	walletRepo := repository.NewWalletRepository(dbPool)
 	invRepo := repository.NewInvestmentRepository(dbPool)
 	withdrawalRepo := repository.NewWithdrawalRepository(dbPool)
+	settingsRepo := repository.NewSettingsRepository(dbPool)
 
 	// Initialize Services
 	authSvc := service.NewAuthService(userRepo, mlmRepo, cfg.JWTSecret)
-	invSvc := service.NewInvestmentService(invRepo, userRepo, mlmRepo)
+	invSvc := service.NewInvestmentService(invRepo, userRepo, mlmRepo, settingsRepo)
 	walletSvc := service.NewWalletService(walletRepo)
-	wdSvc := service.NewWithdrawalService(dbPool, withdrawalRepo, walletRepo, userRepo)
-	teamSvc := service.NewTeamService(mlmRepo)
-	adminSvc := service.NewAdminService(dbPool, invRepo, withdrawalRepo, userRepo, walletRepo)
+	wdSvc := service.NewWithdrawalService(dbPool, withdrawalRepo, walletRepo, userRepo, settingsRepo)
+	teamSvc := service.NewTeamService(mlmRepo, settingsRepo)
+	adminSvc := service.NewAdminService(dbPool, invRepo, withdrawalRepo, userRepo, walletRepo, settingsRepo)
 	userSvc := service.NewUserService(userRepo, walletRepo, invRepo, mlmRepo)
 
 	// Initialize Handlers
@@ -75,6 +76,15 @@ func main() {
 
 	api := router.Group("/api/v1")
 	{
+		api.GET("/settings", func(c *gin.Context) {
+			settings, err := settingsRepo.GetSettings(c.Request.Context())
+			if err != nil {
+				log.Printf("Failed to get settings: %v", err)
+				response.Error(c, 500, "Failed to get settings", nil)
+				return
+			}
+			response.Success(c, 200, "Settings retrieved", settings)
+		})
 		auth := api.Group("/auth")
 		{
 			auth.POST("/register", authH.Register)
@@ -138,6 +148,8 @@ func main() {
 			admin.GET("/withdrawals", adminH.GetAllWithdrawals)
 			admin.PUT("/withdrawals/:id/approve", adminH.ApproveWithdrawal)
 			admin.PUT("/withdrawals/:id/reject", adminH.RejectWithdrawal)
+			admin.GET("/settings", adminH.GetSettings)
+			admin.PUT("/settings", adminH.UpdateSettings)
 		}
 	}
 

@@ -15,12 +15,14 @@ type TeamService interface {
 }
 
 type teamService struct {
-	mlmRepo repository.MLMRepository
+	mlmRepo      repository.MLMRepository
+	settingsRepo repository.SettingsRepository
 }
 
-func NewTeamService(mlmRepo repository.MLMRepository) TeamService {
+func NewTeamService(mlmRepo repository.MLMRepository, settingsRepo repository.SettingsRepository) TeamService {
 	return &teamService{
-		mlmRepo: mlmRepo,
+		mlmRepo:      mlmRepo,
+		settingsRepo: settingsRepo,
 	}
 }
 
@@ -34,10 +36,17 @@ func (s *teamService) GetTeamStats(ctx context.Context, userID uuid.UUID) (map[s
 		return nil, err
 	}
 
-	levels, err := s.mlmRepo.CalculateLevelsUnlocked(ctx, userID)
+	directVolume, directCount, err := s.mlmRepo.GetDirectVolumeAndCount(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
+
+	settings, err := s.settingsRepo.GetSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	levels := GetUnlockedLevels(directCount, directVolume, settings)
 
 	hasActiveDirect, err := s.mlmRepo.HasActiveDirectReferral(ctx, userID)
 	if err != nil {

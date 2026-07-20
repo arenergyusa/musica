@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 };
 
 const benefits = [
-  "Track your daily ROI payouts",
-  "Manage active investments",
+  "Track your revenue share credits",
+  "Manage RBF pool contributions",
   "Monitor your team downline",
   "Seamless one-click withdrawals"
 ];

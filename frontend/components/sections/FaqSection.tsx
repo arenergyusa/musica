@@ -4,28 +4,27 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { CAP_MULTIPLIER } from "@/lib/constants";
 
 const faqs = [
   {
-    question: "What is Revenue-Based Financing (RBF)?",
-    answer: "RBF is an alternative investment model where you provide capital to entertainment production houses. In return, instead of equity, you receive a fixed percentage of ongoing revenues (Daily ROI) until a pre-agreed cap is reached.",
+    question: "What kind of content does Musica offer?",
+    answer: "Musica exclusively offers Pure Desi Haryanvi content, including high-quality music videos, web series, short films, and exclusive behind-the-scenes footage from your favorite creators.",
   },
   {
-    question: "Is my principal amount refundable?",
-    answer: "No. In the RBF model, the principal amount is directly invested into production and is non-refundable. You earn your returns purely through the daily rewards, which are capped at 2x (for passive investors) or 3x (if you build a team).",
+    question: "Do I need an account to watch?",
+    answer: "While some trailers and teasers are publicly available, you'll need to create a free account to get personalized recommendations and unlock access to our full library.",
   },
   {
-    question: "How do the income caps work?",
-    answer: `Passive (Non-Working) investors can earn up to ${CAP_MULTIPLIER.NON_WORKING}x their investment. Working investors (who build teams) can earn up to ${CAP_MULTIPLIER.WORKING}x their investment. Once the cap is reached, the investment plan closes automatically.`,
+    question: "Can I share videos with my friends?",
+    answer: "Yes! You can easily share links to your favorite music videos and shows across social media platforms directly from the video player.",
   },
   {
-    question: "When can I withdraw my rewards?",
-    answer: "Withdrawals are processed three times a month: on the 10th, 20th, and 30th. You must submit your withdrawal request before these dates. A minimum balance of ₹1,000 is required, and a 10% TDS deduction applies to all withdrawals.",
+    question: "How often is new content added?",
+    answer: "We partner directly with top production houses like Pure Desi Haryanvi to bring you new releases every week. You'll always have something fresh to watch.",
   },
   {
-    question: "Is KYC mandatory?",
-    answer: "Yes. As per regulatory requirements, you must complete your KYC (Aadhaar and PAN verification) before you can make any investments on the platform.",
+    question: "Is the platform mobile-friendly?",
+    answer: "Absolutely. Musica is designed to work seamlessly across all devices, so you can enjoy high-quality entertainment whether you're at home on a desktop or on the go with your mobile device.",
   },
 ];
 
@@ -36,7 +35,7 @@ export function FaqSection() {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
           <p className="text-lg text-muted-foreground">
-            Everything you need to know about investing with Musica.
+            Everything you need to know about streaming with Musica.
           </p>
         </div>
 

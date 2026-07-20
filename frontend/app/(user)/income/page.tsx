@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { Coins, Users, Network, TrendingUp, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -61,7 +62,7 @@ export default function IncomeHistoryPage() {
   const getTypeBadge = (type: string) => {
     switch (type) {
       case "DAILY_ROI":
-        return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Daily ROI</Badge>;
+        return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Interest</Badge>;
       case "REFERRAL":
         return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">Referral</Badge>;
       case "LEVEL_INCOME":
@@ -86,7 +87,7 @@ export default function IncomeHistoryPage() {
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex justify-between items-center">
-              Total Daily ROI
+              Total Interest
               <Coins className="h-4 w-4 text-emerald-500" />
             </CardTitle>
           </CardHeader>
@@ -129,36 +130,34 @@ export default function IncomeHistoryPage() {
         <div className="p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-muted/10">
           <CardTitle className="text-lg">Detailed Statement</CardTitle>
           
-          <div className="flex flex-col lg:flex-row gap-3 w-full lg:w-auto items-start lg:items-center justify-between">
-            {/* Pill Filters */}
-            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2 lg:pb-0 w-full lg:w-auto">
-              {[
-                { id: "ALL", label: "All" }, 
-                { id: "DAILY_ROI", label: "Daily ROI" }, 
-                { id: "REFERRAL", label: "Referral" }, 
-                { id: "LEVEL_INCOME", label: "Level Income" }
-              ].map((f) => (
-                <Button
-                  key={f.id}
-                  variant={typeFilter === f.id ? "default" : "outline"}
-                  size="sm"
-                  className="rounded-full shrink-0"
-                  onClick={() => setTypeFilter(f.id)}
-                >
-                  {f.label}
-                </Button>
-              ))}
-            </div>
-
-            <div className="relative w-full lg:w-64">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search source..."
-                className="pl-9 w-full rounded-full bg-background"
+                className="pl-9 w-full sm:w-[200px]"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            <Select value={typeFilter} onValueChange={(val) => setTypeFilter(val || "ALL")}>
+              <SelectTrigger className="w-full sm:w-[150px]">
+                <SelectValue placeholder="All Sources">
+                  {{
+                    ALL: "All Sources",
+                    DAILY_ROI: "Interest",
+                    REFERRAL: "Referral",
+                    LEVEL_INCOME: "Level Income"
+                  }[typeFilter]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Sources</SelectItem>
+                <SelectItem value="DAILY_ROI">Interest</SelectItem>
+                <SelectItem value="REFERRAL">Referral</SelectItem>
+                <SelectItem value="LEVEL_INCOME">Level Income</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         

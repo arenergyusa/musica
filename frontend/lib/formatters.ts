@@ -75,7 +75,7 @@ export const getNextWithdrawalDates = (): string[] => {
   return dates;
 };
 
-// Calculate daily ROI
+// Calculate Interest
 export const calcDailyROI = (amount: number): number =>
   (amount * 0.3333) / 100;
 

@@ -6,7 +6,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, ArrowDownRight, ArrowUpRight, Clock, CheckCircle2, XCircle, HandCoins } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -24,7 +24,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { WithdrawForm } from "@/components/forms/WithdrawForm";
-import { Card, CardContent } from "@/components/ui/card";
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
 import { Transaction, Withdrawal } from "@/lib/types";
 
 
@@ -67,6 +72,7 @@ export default function WalletPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [historyType, setHistoryType] = useState("daily_rewards");
 
   useEffect(() => {
     async function fetchData() {
@@ -136,136 +142,139 @@ export default function WalletPage() {
         </div>
       </div>
 
-      {/* Transaction Tabs */}
-      <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
-        <Tabs defaultValue="daily_rewards" className="w-full">
-          <div className="p-4 border-b bg-muted/20 overflow-x-auto scrollbar-none w-full">
-            <TabsList className="w-max sm:min-w-[400px] justify-start inline-flex bg-muted/50 h-auto p-1">
-              <TabsTrigger value="daily_rewards" className="whitespace-nowrap px-4 py-2">Daily Rewards</TabsTrigger>
-              <TabsTrigger value="level_income" className="whitespace-nowrap px-4 py-2">Level Income</TabsTrigger>
-              <TabsTrigger value="withdrawals" className="whitespace-nowrap px-4 py-2">Withdrawals</TabsTrigger>
-            </TabsList>
+      {/* Transaction History Section */}
+      <Card className="shadow-sm border">
+        <div className="p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-muted/10">
+          <CardTitle className="text-lg">Transaction History</CardTitle>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={historyType} onValueChange={(val) => val && setHistoryType(val)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Select type">
+                  {{
+                    daily_rewards: "Interest",
+                    level_income: "Level Income",
+                    withdrawals: "Withdrawals"
+                  }[historyType]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily_rewards">Interest</SelectItem>
+                <SelectItem value="level_income">Level Income</SelectItem>
+                <SelectItem value="withdrawals">Withdrawals</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+        </div>
 
-          <CardContent className="p-0">
-            
-            {/* Daily Rewards Tab */}
-            <TabsContent value="daily_rewards" className="m-0 border-none outline-none">
-              <div className="overflow-x-auto w-full pb-4">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Source Pool</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {dailyRewards.length > 0 ? (
-                      dailyRewards.map((tx) => (
-                        <TableRow key={tx.id} className="hover:bg-muted/10">
-                          <TableCell className="font-medium whitespace-nowrap">{new Date(tx.created_at || '').toLocaleString()}</TableCell>
-                          <TableCell>{tx.source}</TableCell>
-                          <TableCell>{renderStatusBadge(tx.type)}</TableCell>
-                          <TableCell className="text-right font-semibold text-emerald-500">
-                            +{formatCurrency(tx.amount)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                          {isLoading ? "Loading..." : "No daily rewards found."}
+        <CardContent className="p-0">
+          <div className="overflow-x-auto w-full">
+            {historyType === "daily_rewards" && (
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="pl-6">Date</TableHead>
+                    <TableHead>Source Pool</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right pr-6">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dailyRewards.length > 0 ? (
+                    dailyRewards.map((tx) => (
+                      <TableRow key={tx.id} className="hover:bg-muted/10">
+                        <TableCell className="pl-6 font-medium whitespace-nowrap">{new Date(tx.created_at || '').toLocaleString()}</TableCell>
+                        <TableCell>{tx.source}</TableCell>
+                        <TableCell>{renderStatusBadge(tx.type)}</TableCell>
+                        <TableCell className="text-right pr-6 font-semibold text-emerald-500">
+                          +{formatCurrency(tx.amount)}
                         </TableCell>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-
-            {/* Level Income Tab */}
-            <TabsContent value="level_income" className="m-0 border-none outline-none">
-              <div className="overflow-x-auto w-full pb-4">
-                <Table>
-                  <TableHeader className="bg-muted/30">
+                    ))
+                  ) : (
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>From Member / Source</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                        {isLoading ? "Loading..." : "No interest history found."}
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {levelIncome.length > 0 ? (
-                      levelIncome.map((tx) => (
-                        <TableRow key={tx.id} className="hover:bg-muted/10">
-                          <TableCell className="font-medium whitespace-nowrap">{new Date(tx.created_at || '').toLocaleString()}</TableCell>
-                          <TableCell>{tx.description || tx.source}</TableCell>
-                          <TableCell>{renderStatusBadge(tx.type)}</TableCell>
-                          <TableCell className="text-right font-semibold text-emerald-500">
-                            +{formatCurrency(tx.amount)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                          {isLoading ? "Loading..." : "No level income found."}
+                  )}
+                </TableBody>
+              </Table>
+            )}
+
+            {historyType === "level_income" && (
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="pl-6">Date</TableHead>
+                    <TableHead>From Member / Source</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right pr-6">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {levelIncome.length > 0 ? (
+                    levelIncome.map((tx) => (
+                      <TableRow key={tx.id} className="hover:bg-muted/10">
+                        <TableCell className="pl-6 font-medium whitespace-nowrap">{new Date(tx.created_at || '').toLocaleString()}</TableCell>
+                        <TableCell>{tx.description || tx.source}</TableCell>
+                        <TableCell>{renderStatusBadge(tx.type)}</TableCell>
+                        <TableCell className="text-right pr-6 font-semibold text-emerald-500">
+                          +{formatCurrency(tx.amount)}
                         </TableCell>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-
-            {/* Withdrawals Tab */}
-            <TabsContent value="withdrawals" className="m-0 border-none outline-none">
-              <div className="overflow-x-auto w-full pb-4">
-                <Table>
-                  <TableHeader className="bg-muted/30">
+                    ))
+                  ) : (
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">Amount</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">Fee (5%)</TableHead>
-                      <TableHead className="text-right">Net Credit</TableHead>
+                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                        {isLoading ? "Loading..." : "No level income found."}
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {withdrawals.length > 0 ? (
-                      withdrawals.map((tx) => (
-                        <TableRow key={tx.id} className="hover:bg-muted/10">
-                          <TableCell className="font-medium whitespace-nowrap">{new Date(tx.created_at || '').toLocaleString()}</TableCell>
-                          <TableCell>{renderStatusBadge(tx.status)}</TableCell>
-                          <TableCell className="text-right text-muted-foreground hidden sm:table-cell">
-                            {formatCurrency((tx.amount_requested as number) || tx.amount || 0)}
-                          </TableCell>
-                          <TableCell className="text-right text-destructive hidden sm:table-cell">
-                            -{formatCurrency(tx.tds_amount || 0)}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-foreground">
-                            {formatCurrency(tx.net_amount || 0)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                          {isLoading ? "Loading..." : "No withdrawal history found."}
+                  )}
+                </TableBody>
+              </Table>
+            )}
+
+            {historyType === "withdrawals" && (
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="pl-6">Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">Amount</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">Fee (5%)</TableHead>
+                    <TableHead className="text-right pr-6">Net Credit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {withdrawals.length > 0 ? (
+                    withdrawals.map((tx) => (
+                      <TableRow key={tx.id} className="hover:bg-muted/10">
+                        <TableCell className="pl-6 font-medium whitespace-nowrap">{new Date(tx.created_at || '').toLocaleString()}</TableCell>
+                        <TableCell>{renderStatusBadge(tx.status)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground hidden sm:table-cell">
+                          {formatCurrency((tx.amount_requested as number) || tx.amount || 0)}
+                        </TableCell>
+                        <TableCell className="text-right text-destructive hidden sm:table-cell">
+                          -{formatCurrency(tx.tds_amount || 0)}
+                        </TableCell>
+                        <TableCell className="text-right pr-6 font-semibold text-foreground">
+                          {formatCurrency(tx.net_amount || 0)}
                         </TableCell>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-
-          </CardContent>
-        </Tabs>
-      </div>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                        {isLoading ? "Loading..." : "No withdrawal history found."}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
     </div>
   );

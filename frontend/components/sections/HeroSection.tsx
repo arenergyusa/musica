@@ -1,10 +1,9 @@
-/* eslint-disable */
 "use client";
 
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, PlayCircle } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 
 export function HeroSection() {
   return (
@@ -24,28 +23,27 @@ export function HeroSection() {
           className="max-w-4xl mx-auto"
         >
           <span className="inline-block py-1 px-3 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-6 border border-primary/20">
-            India's First RBF Entertainment Platform
+            Premium Haryanvi Music & Entertainment Platform
           </span>
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-8 leading-tight">
-            Invest in Entertainment. <br className="hidden md:block" />
-            <span className="gradient-text">Earn Daily Rewards.</span>
+            Experience the Best of Entertainment. <br className="hidden md:block" />
+            <span className="gradient-text">Stream Popular Hits.</span>
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
-            Partner with top production houses through Revenue-Based Financing. 
-            Your investment powers the entertainment industry, while you earn up to 3x guaranteed returns through daily payouts.
+            Discover exclusive music videos, web series, and blockbuster entertainment directly from top creators. Your ultimate destination for Pure Desi Haryanvi content.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/register" className={buttonVariants({ size: "lg", className: "w-full sm:w-auto text-lg h-14 px-8 rounded-full shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all" })}>
-              Start Investing <ArrowRight className="ml-2 h-5 w-5" />
+              Join Now <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
-            <Link href="/#plans" className={buttonVariants({ variant: "outline", size: "lg", className: "w-full sm:w-auto text-lg h-14 px-8 rounded-full border-border/60 hover:bg-muted/50 backdrop-blur-sm" })}>
-              <PlayCircle className="mr-2 h-5 w-5" /> Calculate Returns
-            </Link>
+            <a href="https://www.youtube.com/@puredesiharyanvi" target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: "outline", size: "lg", className: "w-full sm:w-auto text-lg h-14 px-8 rounded-full border-border/60 hover:bg-muted/50 backdrop-blur-sm" })}>
+              <PlayCircle className="mr-2 h-5 w-5" /> Watch on YouTube
+            </a>
           </div>
           
           <p className="mt-6 text-sm text-muted-foreground">
-            Fast setup • Daily payouts • Transparent tracking
+            Exclusive Content • High Quality • Pure Entertainment
           </p>
         </motion.div>
       </div>

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { toast } from 'sonner';
 
 // The base URL depends on where the Nginx gateway or backend is running.
@@ -16,7 +16,7 @@ export const api = axios.create({
 
 // Request Interceptor to attach JWT token
 api.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     // We only access localStorage in the browser
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token');
@@ -26,17 +26,17 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
+  (error: AxiosError) => {
     return Promise.reject(error);
   }
 );
 
 // Response Interceptor for global error handling
 api.interceptors.response.use(
-  (response) => {
+  (response: AxiosResponse) => {
     return response;
   },
-  (error) => {
+  (error: AxiosError<{ message?: string }>) => {
     if (error.response) {
       const status = error.response.status;
       const message = error.response.data?.message || 'Something went wrong';

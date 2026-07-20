@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/arenergyusa/musica/backend/internal/service"
 	"github.com/arenergyusa/musica/backend/pkg/response"
 	"github.com/gin-gonic/gin"
@@ -182,4 +183,79 @@ func (h *AdminHandler) BlockUser(c *gin.Context) {
 	response.Success(c, http.StatusOK, "User blocked successfully", nil)
 }
 
+func (h *AdminHandler) GetSettings(c *gin.Context) {
+	settings, err := h.adminService.GetSettings(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Failed to get settings", err.Error())
+		return
+	}
+	response.Success(c, http.StatusOK, "Settings retrieved", settings)
+}
 
+type UpdateSettingsRequest struct {
+	DailyROIPct             *float64 `json:"daily_roi_pct" binding:"required,min=0,max=100"`
+	WithdrawalFeePct        *float64 `json:"withdrawal_fee_pct" binding:"required,min=0,max=100"`
+	WithdrawalMinAmount     *float64 `json:"withdrawal_min_amount" binding:"required,min=0"`
+	Level1To5Directs        *int     `json:"level1_to_5_directs" binding:"required,min=0"`
+	Level1To5Business       *float64 `json:"level1_to_5_business" binding:"required,min=0"`
+	Level1To10Directs       *int     `json:"level1_to_10_directs" binding:"required,min=0"`
+	Level1To10Business      *float64 `json:"level1_to_10_business" binding:"required,min=0"`
+	Level1To15Directs       *int     `json:"level1_to_15_directs" binding:"required,min=0"`
+	Level1To15Business      *float64 `json:"level1_to_15_business" binding:"required,min=0"`
+	RefRewardL1Pct          *float64 `json:"ref_reward_l1_pct" binding:"required,min=0,max=100"`
+	RefRewardL2Pct          *float64 `json:"ref_reward_l2_pct" binding:"required,min=0,max=100"`
+	RefRewardL3Pct          *float64 `json:"ref_reward_l3_pct" binding:"required,min=0,max=100"`
+	LevelIncomeL1Pct        *float64 `json:"level_income_l1_pct" binding:"required,min=0,max=100"`
+	LevelIncomeL2Pct        *float64 `json:"level_income_l2_pct" binding:"required,min=0,max=100"`
+	LevelIncomeL3Pct        *float64 `json:"level_income_l3_pct" binding:"required,min=0,max=100"`
+	LevelIncomeL4ToL10Pct   *float64 `json:"level_income_l4_to_l10_pct" binding:"required,min=0,max=100"`
+	LevelIncomeL11ToL15Pct  *float64 `json:"level_income_l11_to_l15_pct" binding:"required,min=0,max=100"`
+	NonWorkingCapMultiplier *float64 `json:"non_working_cap_multiplier" binding:"required,min=1"`
+	WorkingCapMultiplier    *float64 `json:"working_cap_multiplier" binding:"required,min=1"`
+}
+
+func (h *AdminHandler) UpdateSettings(c *gin.Context) {
+	var req UpdateSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid request payload or failed validation", err.Error())
+		return
+	}
+
+	// Validate tier ordering
+	if *req.Level1To10Directs < *req.Level1To5Directs || *req.Level1To15Directs < *req.Level1To10Directs {
+		response.Error(c, http.StatusBadRequest, "Direct counts must be monotonically ordered (L5 <= L10 <= L15)", nil)
+		return
+	}
+	if *req.Level1To10Business < *req.Level1To5Business || *req.Level1To15Business < *req.Level1To10Business {
+		response.Error(c, http.StatusBadRequest, "Business thresholds must be monotonically ordered (L5 <= L10 <= L15)", nil)
+		return
+	}
+
+	settings := &domain.PlatformSettings{
+		DailyROIPct:             *req.DailyROIPct,
+		WithdrawalFeePct:        *req.WithdrawalFeePct,
+		WithdrawalMinAmount:     *req.WithdrawalMinAmount,
+		Level1To5Directs:        *req.Level1To5Directs,
+		Level1To5Business:       *req.Level1To5Business,
+		Level1To10Directs:       *req.Level1To10Directs,
+		Level1To10Business:      *req.Level1To10Business,
+		Level1To15Directs:       *req.Level1To15Directs,
+		Level1To15Business:      *req.Level1To15Business,
+		RefRewardL1Pct:          *req.RefRewardL1Pct,
+		RefRewardL2Pct:          *req.RefRewardL2Pct,
+		RefRewardL3Pct:          *req.RefRewardL3Pct,
+		LevelIncomeL1Pct:        *req.LevelIncomeL1Pct,
+		LevelIncomeL2Pct:        *req.LevelIncomeL2Pct,
+		LevelIncomeL3Pct:        *req.LevelIncomeL3Pct,
+		LevelIncomeL4ToL10Pct:   *req.LevelIncomeL4ToL10Pct,
+		LevelIncomeL11ToL15Pct:  *req.LevelIncomeL11ToL15Pct,
+		NonWorkingCapMultiplier: *req.NonWorkingCapMultiplier,
+		WorkingCapMultiplier:    *req.WorkingCapMultiplier,
+	}
+
+	if err := h.adminService.UpdateSettings(c.Request.Context(), settings); err != nil {
+		handleServiceError(c, err, "Failed to update settings")
+		return
+	}
+	response.Success(c, http.StatusOK, "Settings updated successfully", nil)
+}

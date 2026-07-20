@@ -59,7 +59,7 @@ export const REFERRAL_REWARDS: Record<number, number> = {
 };
 
 // ============================================================
-// Level Income Percentages (% of downline's daily ROI)
+// Level Income Percentages (% of downline's interest)
 // ============================================================
 export const LEVEL_INCOME: Record<number, number> = {
   1: 15,
@@ -149,8 +149,8 @@ export const INCOME_TYPE = {
 // ============================================================
 export const APP = {
   NAME: "Musica",
-  TAGLINE: "Invest in Entertainment. Earn Daily Rewards.",
-  DESCRIPTION: "India's premier RBF Agreement-based Entertainment Production Investment Platform. Earn daily rewards up to 3x your investment.",
+  TAGLINE: "Experience the Best of Entertainment.",
+  DESCRIPTION: "Premium Haryanvi Music & Entertainment Platform. Discover exclusive music videos, web series, and blockbuster entertainment.",
   URL: "https://musica.in",
   CURRENCY: "INR",
   LOCALE: "en-IN",
@@ -161,9 +161,7 @@ export const APP = {
 // ============================================================
 export const NAV_LINKS = [
   { label: "Home", href: "/" },
-  { label: "Investment Plans", href: "/#plans" },
   { label: "How It Works", href: "/#how-it-works" },
-  { label: "Income Structure", href: "/#income" },
   { label: "FAQ", href: "/#faq" },
 ] as const;
 

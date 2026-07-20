@@ -25,9 +25,6 @@ import { Badge } from "@/components/ui/badge";
 import { RewardWalletCard } from "@/components/shared/RewardWalletCard";
 import { StatCard } from "@/components/shared/StatCard";
 import { Transaction } from "@/lib/types";
-import dynamic from "next/dynamic";
-const IncomeChartWrapper = dynamic(() => import("@/components/charts/IncomeChartWrapper").then(mod => mod.IncomeChartWrapper), { ssr: false, loading: () => <Skeleton className="h-[300px] w-full rounded-xl" /> });
-
 export default function DashboardPage() {
   const { user, fetchUser } = useAuthStore();
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -135,16 +132,6 @@ export default function DashboardPage() {
         />
       </div>
       
-      {/* Income Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Income Overview (Last 30 Days)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <IncomeChartWrapper data={chartData} />
-        </CardContent>
-      </Card>
-
       {/* Team Summary & Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           

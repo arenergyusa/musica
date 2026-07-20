@@ -16,21 +16,39 @@ type InvestmentService interface {
 }
 
 type investmentService struct {
-	invRepo repository.InvestmentRepository
-	userRepo repository.UserRepository
-	mlmRepo repository.MLMRepository
+	invRepo      repository.InvestmentRepository
+	userRepo     repository.UserRepository
+	mlmRepo      repository.MLMRepository
+	settingsRepo repository.SettingsRepository
 }
 
-func NewInvestmentService(invRepo repository.InvestmentRepository, userRepo repository.UserRepository, mlmRepo repository.MLMRepository) InvestmentService {
+func NewInvestmentService(invRepo repository.InvestmentRepository, userRepo repository.UserRepository, mlmRepo repository.MLMRepository, settingsRepo repository.SettingsRepository) InvestmentService {
 	return &investmentService{
-		invRepo: invRepo,
-		userRepo: userRepo,
-		mlmRepo: mlmRepo,
+		invRepo:      invRepo,
+		userRepo:     userRepo,
+		mlmRepo:      mlmRepo,
+		settingsRepo: settingsRepo,
 	}
 }
 
 func (s *investmentService) GetPlans(ctx context.Context) ([]*domain.InvestmentPlan, error) {
-	return s.invRepo.GetPlans(ctx)
+	plans, err := s.invRepo.GetPlans(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	settings, err := s.settingsRepo.GetSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, p := range plans {
+		p.DailyRatePct = settings.DailyROIPct
+		p.NonWorkingCapMultiplier = settings.NonWorkingCapMultiplier
+		p.WorkingCapMultiplier = settings.WorkingCapMultiplier
+	}
+
+	return plans, nil
 }
 
 func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UUID, req *domain.InvestRequest) (*domain.Investment, error) {
@@ -58,17 +76,18 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 		return nil, err
 	}
 
-	capMultiplier := 2.0
-	if isWorking {
-		capMultiplier = 3.0
+	settings, err := s.settingsRepo.GetSettings(ctx)
+	if err != nil {
+		return nil, err
 	}
 
+	capMultiplier := GetIncomeCap(isWorking, settings)
 	capLimit := req.Amount * capMultiplier
 
 	inv := &domain.Investment{
 		UserID:               userID,
 		Amount:               req.Amount,
-		DailyRatePct:         0.3333,
+		DailyRatePct:         settings.DailyROIPct,
 		Status:               "PENDING", // Requires admin approval for payment receipt
 		CapLimit:             capLimit,
 		WorkingCapAtCreation: isWorking,

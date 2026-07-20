@@ -18,18 +18,20 @@ type WithdrawalService interface {
 }
 
 type withdrawalService struct {
-	dbPool     *pgxpool.Pool
-	wdRepo     repository.WithdrawalRepository
-	walletRepo repository.WalletRepository
-	userRepo   repository.UserRepository
+	dbPool       *pgxpool.Pool
+	wdRepo       repository.WithdrawalRepository
+	walletRepo   repository.WalletRepository
+	userRepo     repository.UserRepository
+	settingsRepo repository.SettingsRepository
 }
 
-func NewWithdrawalService(dbPool *pgxpool.Pool, wdRepo repository.WithdrawalRepository, walletRepo repository.WalletRepository, userRepo repository.UserRepository) WithdrawalService {
+func NewWithdrawalService(dbPool *pgxpool.Pool, wdRepo repository.WithdrawalRepository, walletRepo repository.WalletRepository, userRepo repository.UserRepository, settingsRepo repository.SettingsRepository) WithdrawalService {
 	return &withdrawalService{
-		dbPool:     dbPool,
-		wdRepo:     wdRepo,
-		walletRepo: walletRepo,
-		userRepo:   userRepo,
+		dbPool:       dbPool,
+		wdRepo:       wdRepo,
+		walletRepo:   walletRepo,
+		userRepo:     userRepo,
+		settingsRepo: settingsRepo,
 	}
 }
 
@@ -81,6 +83,16 @@ func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.U
 		return nil, errors.New("bank details must be added before requesting withdrawal")
 	}
 
+	settings, err := s.settingsRepo.GetSettings(ctx)
+	if err != nil {
+		return nil, errors.New("failed to load platform settings")
+	}
+
+	tdsAmount, netAmount, err := CalculateNetWithdrawal(req.Amount, settings)
+	if err != nil {
+		return nil, err
+	}
+
 	tx, err := s.dbPool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -109,10 +121,6 @@ func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.U
 	if err != nil {
 		return nil, err
 	}
-
-	// 3. Calculate TDS and Net Amount
-	tdsAmount := req.Amount * 0.05
-	netAmount := req.Amount - tdsAmount
 
 	wd := &domain.Withdrawal{
 		UserID:          userID,

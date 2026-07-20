@@ -48,8 +48,8 @@ type MLMRepository interface {
 	InsertNode(ctx context.Context, userID uuid.UUID, uplineID uuid.UUID) error
 	GetDirectReferrals(ctx context.Context, userID uuid.UUID) ([]*domain.User, error)
 	GetDownlineVolume(ctx context.Context, userID uuid.UUID) (float64, error)
-	CalculateLevelsUnlocked(ctx context.Context, userID uuid.UUID) (int, error)
 	HasActiveDirectReferral(ctx context.Context, userID uuid.UUID) (bool, error)
+	GetDirectVolumeAndCount(ctx context.Context, userID uuid.UUID) (float64, int, error)
 }
 
 // WithdrawalRepository handles withdrawal requests
@@ -60,4 +60,10 @@ type WithdrawalRepository interface {
 	UpdateRequestStatus(ctx context.Context, id uuid.UUID, status string, adminNote string) error
 	GetPendingCount(ctx context.Context) (int, error)
 	GetAll(ctx context.Context, limit, offset int) ([]*domain.Withdrawal, error)
+}
+
+// SettingsRepository handles platform-wide configurations
+type SettingsRepository interface {
+	GetSettings(ctx context.Context) (*domain.PlatformSettings, error)
+	UpdateSettings(ctx context.Context, settings *domain.PlatformSettings) error
 }

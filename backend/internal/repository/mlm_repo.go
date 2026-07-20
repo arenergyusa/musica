@@ -96,21 +96,6 @@ func (r *mlmRepository) GetDownlineVolume(ctx context.Context, userID uuid.UUID)
 	return volume, err
 }
 
-func (r *mlmRepository) CalculateLevelsUnlocked(ctx context.Context, userID uuid.UUID) (int, error) {
-	volume, err := r.GetDownlineVolume(ctx, userID)
-	if err != nil {
-		return 0, err
-	}
-
-	if volume >= 300000 {
-		return 15, nil
-	} else if volume >= 200000 {
-		return 10, nil
-	} else if volume >= 100000 {
-		return 5, nil
-	}
-	return 0, nil
-}
 
 func (r *mlmRepository) HasActiveDirectReferral(ctx context.Context, userID uuid.UUID) (bool, error) {
 	query := `
@@ -124,4 +109,20 @@ func (r *mlmRepository) HasActiveDirectReferral(ctx context.Context, userID uuid
 	var hasActive bool
 	err := r.db.QueryRow(ctx, query, userID).Scan(&hasActive)
 	return hasActive, err
+}
+
+func (r *mlmRepository) GetDirectVolumeAndCount(ctx context.Context, userID uuid.UUID) (float64, int, error) {
+	query := `
+		SELECT 
+			COALESCE(SUM(i.amount), 0) as total_volume,
+			COUNT(DISTINCT u.id) as active_directs
+		FROM users u
+		JOIN referral_tree t ON u.id = t.user_id
+		JOIN investments i ON u.id = i.user_id
+		WHERE t.upline_id = $1 AND i.status = 'ACTIVE'
+	`
+	var volume float64
+	var count int
+	err := r.db.QueryRow(ctx, query, userID).Scan(&volume, &count)
+	return volume, count, err
 }

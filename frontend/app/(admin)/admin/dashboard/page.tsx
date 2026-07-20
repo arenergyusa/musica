@@ -200,7 +200,7 @@ export default function AdminDashboardPage() {
           <CardContent className="space-y-6">
             <div className="flex justify-between items-center">
               <div>
-                <p className="font-medium text-sm">Daily ROI Engine</p>
+                <p className="font-medium text-sm">Interest Engine</p>
                 <p className="text-xs text-muted-foreground">Runs every night at 12:00 AM</p>
               </div>
               <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">

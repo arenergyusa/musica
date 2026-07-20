@@ -58,7 +58,7 @@ export function Navbar() {
             Log in
           </Link>
           <Link href="/register" className={buttonVariants({ className: "bg-primary hover:bg-primary/90 text-primary-foreground" })}>
-            Start Investing
+            Join Now
           </Link>
         </div>
 
@@ -86,7 +86,7 @@ export function Navbar() {
                   Log in
                 </Link>
                 <Link href="/register" className={buttonVariants({ className: "w-full justify-center bg-primary" })} onClick={() => setMobileMenuOpen(false)}>
-                  Start Investing
+                  Join Now
                 </Link>
               </div>
             </SheetContent>

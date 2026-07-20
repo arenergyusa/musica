@@ -1,26 +1,26 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { UserCheck, Clapperboard, IndianRupee } from "lucide-react";
+import { UserCheck, Clapperboard, Heart } from "lucide-react";
 
 const steps = [
   {
     id: 1,
-    title: "Register & KYC",
-    description: "Sign up using a referral code and complete your Aadhaar & PAN verification to become an eligible investor.",
+    title: "Create an Account",
+    description: "Sign up quickly to get personalized recommendations and unlock exclusive Haryanvi content.",
     icon: UserCheck,
   },
   {
     id: 2,
-    title: "Choose a Plan",
-    description: "Select an RBF investment plan starting from ₹10,000. Your funds are directly allocated to active entertainment productions.",
+    title: "Watch & Enjoy",
+    description: "Dive into a vast library of Pure Desi Haryanvi music videos, web series, and exclusive releases.",
     icon: Clapperboard,
   },
   {
     id: 3,
-    title: "Earn Daily Rewards",
-    description: "Sit back and track your daily ROI payouts in your Reward Wallet. Withdraw seamlessly on the 10th, 20th, or 30th of every month.",
-    icon: IndianRupee,
+    title: "Share with Friends",
+    description: "Spread the joy of pure entertainment. Share your favorite hits with friends and family.",
+    icon: Heart,
   },
 ];
 
