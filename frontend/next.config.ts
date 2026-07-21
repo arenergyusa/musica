@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     // Proxy /api to backend container (if in docker network) or localhost (if running standalone)
-    const backendUrl = process.env.API_URL_INTERNAL || 'http://localhost:8080';
+    const backendUrl = process.env.API_URL_INTERNAL || 'http://127.0.0.1:8080';
     return [
       {
         source: "/api/v1/:path*",
