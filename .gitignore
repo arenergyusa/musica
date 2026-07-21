@@ -42,3 +42,7 @@ next-env.d.ts
 
 # database
 /database/data/
+
+# Ignore markdown files
+*.md
+!README.md
