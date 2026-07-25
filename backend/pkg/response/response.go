@@ -2,6 +2,7 @@ package response
 
 import (
 	"fmt"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,12 +22,18 @@ func Success(c *gin.Context, statusCode int, message string, data interface{}) {
 }
 
 func Error(c *gin.Context, statusCode int, message string, err interface{}) {
+	errMsg := message
 	if err != nil {
+		if e, ok := err.(error); ok && e != nil {
+			errMsg = e.Error()
+		} else if s, ok := err.(string); ok && s != "" {
+			errMsg = s
+		}
 		c.Error(fmt.Errorf("[ERROR] %s: %v", message, err))
 	}
 	c.JSON(statusCode, APIResponse{
 		Success: false,
-		Message: message,
+		Message: errMsg,
 		Error:   "ERR_API_FAILURE",
 	})
 }

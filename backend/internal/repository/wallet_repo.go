@@ -179,3 +179,40 @@ func (r *walletRepository) GetTotalPaid(ctx context.Context) (float64, error) {
 	err := r.db.QueryRow(ctx, "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type = 'CREDIT'").Scan(&total)
 	return total, err
 }
+
+// GetDailyIncomeBySource returns daily totals for a specific transaction source over the last N days (admin analytics).
+func (r *walletRepository) GetDailyIncomeBySource(ctx context.Context, source string, days int) ([]map[string]interface{}, error) {
+	query := `
+		WITH date_series AS (
+			SELECT generate_series(
+				((now() AT TIME ZONE 'Asia/Kolkata')::date - (INTERVAL '1 day' * ($2 - 1)))::date,
+				(now() AT TIME ZONE 'Asia/Kolkata')::date,
+				INTERVAL '1 day'
+			)::date AS d
+		)
+		SELECT TO_CHAR(ds.d, 'Mon DD') AS date,
+		       COALESCE(SUM(t.amount), 0) AS amount
+		FROM date_series ds
+		LEFT JOIN transactions t ON DATE(t.created_at AT TIME ZONE 'Asia/Kolkata') = ds.d
+		                        AND t.source = $1
+		                        AND t.type = 'CREDIT'
+		GROUP BY ds.d
+		ORDER BY ds.d ASC
+	`
+	rows, err := r.db.Query(ctx, query, source, days)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var data []map[string]interface{}
+	for rows.Next() {
+		var date string
+		var amount float64
+		if err := rows.Scan(&date, &amount); err != nil {
+			return nil, err
+		}
+		data = append(data, map[string]interface{}{"date": date, "amount": amount})
+	}
+	return data, rows.Err()
+}

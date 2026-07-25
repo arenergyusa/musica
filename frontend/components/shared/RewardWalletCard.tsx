@@ -24,58 +24,58 @@ export function RewardWalletCard({
   const [showBalance, setShowBalance] = useState(true);
 
   return (
-    <Card className="overflow-hidden bg-gradient-to-br from-primary/90 to-primary text-primary-foreground border-none shadow-xl relative">
-      {/* Decorative background patterns */}
-      <div className="absolute top-0 right-0 -mt-8 -mr-8 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-      <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 bg-black/10 rounded-full blur-xl pointer-events-none" />
-      
-      <CardContent className="p-6 sm:p-8 relative z-10">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <div className="flex items-center text-primary-foreground/80 mb-2">
-              <Wallet className="h-5 w-5 mr-2" />
-              <h2 className="font-medium text-lg">Reward Wallet</h2>
+    <Card className="overflow-hidden bg-white dark:bg-slate-900 text-foreground border border-slate-200/80 dark:border-slate-800 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 relative">
+      {/* Subtle Sky-Blue Depth Gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/40 via-white to-sky-50/30 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/20 pointer-events-none" />
+
+      <CardContent className="p-6 sm:p-7 relative z-10">
+        <div className="flex justify-between items-start gap-4 mb-6">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center text-blue-600 dark:text-blue-400 font-semibold mb-2 tracking-wide text-xs uppercase">
+              <Wallet className="h-4 w-4 mr-2 shrink-0" />
+              <span>Reward Wallet</span>
             </div>
-            
-            <div className="flex items-center">
-              <div className="text-4xl sm:text-5xl font-extrabold tracking-tight flex items-center">
-                <IndianRupee className="h-8 w-8 sm:h-10 sm:w-10 opacity-80" />
-                {showBalance ? balance.toLocaleString('en-IN') : "••••••"}
+
+            <div className="flex items-center flex-wrap sm:flex-nowrap gap-3">
+              <div className="text-3xl sm:text-4xl font-extrabold tracking-tight flex items-center whitespace-nowrap text-slate-900 dark:text-white">
+                <IndianRupee className="h-7 w-7 text-blue-600 dark:text-blue-400 shrink-0 mr-1" />
+                <span>{showBalance ? balance.toLocaleString('en-IN') : "••••••"}</span>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="ml-3 text-primary-foreground/70 hover:text-white hover:bg-white/20 rounded-full"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg shrink-0 h-8 w-8"
                 onClick={() => setShowBalance(!showBalance)}
+                aria-label={showBalance ? "Hide balance" : "Show balance"}
               >
-                {showBalance ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
           </div>
-          
-          <Link href="/wallet" passHref>
-            <Button 
-              className="bg-white text-primary hover:bg-white/90 shadow-lg font-semibold rounded-full px-6"
+
+          <Link href="/withdraw" passHref className="shrink-0">
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-5 py-2.5 text-sm shadow-sm hover:shadow-md transition-all border border-blue-600"
             >
-              Withdraw <ArrowRight className="ml-2 h-4 w-4" />
+              Withdraw <ArrowRight className="ml-1.5 h-4 w-4" />
             </Button>
           </Link>
         </div>
 
-        <Separator className="bg-primary-foreground/20 mb-6" />
+        <Separator className="bg-slate-200 dark:bg-slate-800 mb-5" />
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-          <div>
-            <p className="text-primary-foreground/70 text-sm font-medium mb-1">Total Earned</p>
-            <p className="text-lg font-semibold">{formatCurrency(totalEarned)}</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+          <div className="bg-slate-50/80 dark:bg-slate-800/50 p-3.5 rounded-lg border border-slate-100 dark:border-slate-800">
+            <p className="text-slate-500 dark:text-slate-400 text-[11px] font-semibold uppercase tracking-wider mb-1">Total Earned</p>
+            <p className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalEarned)}</p>
           </div>
-          <div>
-            <p className="text-primary-foreground/70 text-sm font-medium mb-1">Total Withdrawn</p>
-            <p className="text-lg font-semibold">{formatCurrency(totalWithdrawn)}</p>
+          <div className="bg-slate-50/80 dark:bg-slate-800/50 p-3.5 rounded-lg border border-slate-100 dark:border-slate-800">
+            <p className="text-slate-500 dark:text-slate-400 text-[11px] font-semibold uppercase tracking-wider mb-1">Total Withdrawn</p>
+            <p className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(totalWithdrawn)}</p>
           </div>
-          <div className="col-span-2 md:col-span-1">
-            <p className="text-primary-foreground/70 text-sm font-medium mb-1">Next Settlement</p>
-            <p className="text-lg font-semibold">
+          <div className="col-span-2 md:col-span-1 bg-slate-50/80 dark:bg-slate-800/50 p-3.5 rounded-lg border border-slate-100 dark:border-slate-800">
+            <p className="text-slate-500 dark:text-slate-400 text-[11px] font-semibold uppercase tracking-wider mb-1">Next Settlement</p>
+            <p className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">
               {nextWithdrawalDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>

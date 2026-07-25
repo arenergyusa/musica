@@ -18,10 +18,11 @@ export const registerSchema = z
     confirmPassword: z.string(),
     referralCode: z
       .string()
-      .max(20, "Invalid referral code")
-      .optional(),
+      .trim()
+      .min(1, "Invite code is required")
+      .max(30, "Invalid invite code"),
     agreedToRbf: z.boolean().refine((v) => v === true, {
-      message: "You must accept the RBF Agreement to proceed",
+      message: "You must accept the terms to proceed",
     }),
   })
   .refine((d) => d.password === d.confirmPassword, {
@@ -105,11 +106,10 @@ export const kycSchema = z.object({
   panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Enter valid PAN number (e.g., ABCDE1234F)"),
   pan: z
     .instanceof(File, { message: "PAN image is required" })
-    .refine((f) => f.size <= 5 * 1024 * 1024, "PAN: max 5MB")
-    .refine(
-      (f) => ["image/jpeg", "image/png", "application/pdf"].includes(f.type),
-      "Allowed: JPG, PNG, PDF"
-    ),
+    .refine((f) => f.size <= 5 * 1024 * 1024, "PAN: max 5MB"),
+  selfie: z
+    .instanceof(File, { message: "Live selfie / face scan photo is required" })
+    .refine((f) => f.size <= 5 * 1024 * 1024, "Selfie: max 5MB"),
 });
 
 // ============================================================

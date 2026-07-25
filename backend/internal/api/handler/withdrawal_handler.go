@@ -27,13 +27,13 @@ func (h *WithdrawalHandler) RequestWithdrawal(c *gin.Context) {
 
 	var req domain.WithdrawRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Invalid request payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "Invalid request payload", err)
 		return
 	}
 
 	wd, err := h.wdService.RequestWithdrawal(c.Request.Context(), userID, &req)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error(), nil)
+		response.Error(c, http.StatusBadRequest, "Failed to request withdrawal", err)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *WithdrawalHandler) GetHistory(c *gin.Context) {
 
 	wds, err := h.wdService.GetMyWithdrawals(c.Request.Context(), userID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get withdrawal history", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get withdrawal history", err)
 		return
 	}
 

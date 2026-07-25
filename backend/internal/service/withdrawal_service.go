@@ -39,25 +39,22 @@ func (s *withdrawalService) GetNextWithdrawalDate() time.Time {
 	now := time.Now()
 	year, month, day := now.Date()
 
+	lastDay := daysInMonth(year, month)
 	var nextDay int
+
 	if day <= 10 {
 		nextDay = 10
 	} else if day <= 20 {
 		nextDay = 20
 	} else {
-		nextDay = 30
-		// Handle February (28 or 29)
-		if month == time.February {
-			if isLeapYear(year) {
-				nextDay = 29
-			} else {
-				nextDay = 28
-			}
+		if lastDay < 30 {
+			nextDay = lastDay
+		} else {
+			nextDay = 30
 		}
 	}
 
 	if day > nextDay {
-		// Moving to next month
 		month++
 		if month > 12 {
 			month = 1
@@ -69,8 +66,8 @@ func (s *withdrawalService) GetNextWithdrawalDate() time.Time {
 	return time.Date(year, month, nextDay, 0, 0, 0, 0, now.Location())
 }
 
-func isLeapYear(year int) bool {
-	return year%400 == 0 || (year%4 == 0 && year%100 != 0)
+func daysInMonth(year int, month time.Month) int {
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
 func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.UUID, req *domain.WithdrawRequest) (*domain.Withdrawal, error) {

@@ -1,0 +1,11 @@
+CREATE TABLE otps (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) NOT NULL,
+    otp VARCHAR(10) NOT NULL,
+    purpose VARCHAR(50) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    used_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_otps_email ON otps(email);

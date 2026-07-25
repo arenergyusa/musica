@@ -2,12 +2,12 @@ package middleware
 
 import (
 	"net/http"
+	"os"
 	"strings"
 
+	"github.com/arenergyusa/musica/backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/spf13/viper"
-	"github.com/arenergyusa/musica/backend/pkg/response"
 )
 
 func AuthMiddleware() gin.HandlerFunc {
@@ -35,7 +35,13 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		secret := []byte(viper.GetString("JWT_SECRET"))
+		secretStr := os.Getenv("JWT_SECRET")
+		if secretStr == "" {
+			response.Error(c, http.StatusInternalServerError, "JWT authentication secret is not configured", nil)
+			c.Abort()
+			return
+		}
+		secret := []byte(secretStr)
 
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

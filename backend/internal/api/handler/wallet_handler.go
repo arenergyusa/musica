@@ -26,7 +26,7 @@ func (h *WalletHandler) GetBalance(c *gin.Context) {
 
 	wallet, err := h.walletService.GetBalance(c.Request.Context(), userID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to fetch wallet balance", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to fetch wallet balance", err)
 		return
 	}
 
@@ -43,7 +43,7 @@ func (h *WalletHandler) GetTransactions(c *gin.Context) {
 
 	txs, err := h.walletService.GetTransactions(c.Request.Context(), userID, limit, offset)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to fetch transactions", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to fetch transactions", err)
 		return
 	}
 

@@ -1,50 +1,38 @@
 import Link from "next/link";
-import { Music } from "lucide-react";
+import { Music, ArrowLeft, ShieldCheck } from "lucide-react";
 import { APP } from "@/lib/constants";
+import { ForgotPasswordForm } from "@/components/forms/ForgotPasswordForm";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: `Forgot Password | ${APP.NAME}`,
-  description: "Reset your password for your account.",
+  description: "Reset your password for your Musica account.",
 };
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="min-h-screen flex w-full">
-      <div className="w-full flex items-center justify-center p-6 sm:p-12 relative">
-        <div className="w-full max-w-sm relative z-10">
-          <div className="mb-8 flex justify-center">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="bg-primary p-2 rounded-lg text-primary-foreground shadow-md shadow-primary/20">
-                <Music className="h-5 w-5" />
-              </div>
-              <span className="font-bold text-xl tracking-tight">{APP.NAME}</span>
-            </Link>
-          </div>
-          
-          <div className="mb-8 text-center">
-            <h2 className="text-3xl font-bold mb-2">Forgot Password</h2>
-            <p className="text-muted-foreground">
-              Password reset assistance.
-            </p>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="text-center p-6 bg-primary/5 rounded-lg border border-primary/20 space-y-3">
-              <p className="text-sm font-medium text-foreground">
-                Self-service password reset is currently unavailable for security reasons.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Please contact your sponsor or the platform administrator to reset your password.
-              </p>
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-[#F8F9FA] dark:bg-[#0B0F19]">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6 sm:p-10">
+        
+        {/* Header Branding */}
+        <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <Link href="/" className="flex items-center space-x-2.5">
+            <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
+              <Music className="h-5 w-5 font-bold" />
             </div>
-          </div>
+            <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">{APP.NAME}</span>
+          </Link>
           
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            Remember your password?{" "}
-            <Link href="/login" className="text-primary font-semibold hover:underline">
-              Log in
-            </Link>
+          <Link href="/login" className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-blue-600 dark:text-slate-400 transition-colors">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Sign In
+          </Link>
+        </div>
+        
+        <ForgotPasswordForm />
+        
+        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
+          <p className="text-[11px] text-slate-400 font-mono">
+            Pure Desi Music (OPC) Private Limited &bull; CIN: U92490HR2020OPC091236
           </p>
         </div>
       </div>

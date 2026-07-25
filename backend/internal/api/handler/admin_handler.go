@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
@@ -54,10 +55,10 @@ func (h *AdminHandler) ApproveWithdrawal(c *gin.Context) {
 	}
 
 	var req struct {
-		AdminNote string `json:"admin_note"`
+		AdminNote string `json:"admin_note" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Invalid request payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "Invalid request payload", err)
 		return
 	}
 
@@ -77,10 +78,10 @@ func (h *AdminHandler) RejectWithdrawal(c *gin.Context) {
 	}
 
 	var req struct {
-		AdminNote string `json:"admin_note"`
+		AdminNote string `json:"admin_note" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Invalid request payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "Invalid request payload", err)
 		return
 	}
 
@@ -94,7 +95,7 @@ func (h *AdminHandler) RejectWithdrawal(c *gin.Context) {
 func (h *AdminHandler) GetDashboard(c *gin.Context) {
 	stats, err := h.adminService.GetDashboardStats(c.Request.Context())
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get dashboard stats", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get dashboard stats", err)
 		return
 	}
 	response.Success(c, http.StatusOK, "Admin dashboard stats retrieved", stats)
@@ -102,19 +103,59 @@ func (h *AdminHandler) GetDashboard(c *gin.Context) {
 
 func (h *AdminHandler) GetUsers(c *gin.Context) {
 	limit, offset := ParsePagination(c)
-	users, err := h.adminService.GetUsers(c.Request.Context(), limit, offset)
+	search := c.Query("search")
+	status := c.Query("status")
+	users, err := h.adminService.GetUsers(c.Request.Context(), limit, offset, search, status)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get users", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get users", err)
 		return
 	}
 	response.Success(c, http.StatusOK, "Users retrieved", users)
+}
+
+func (h *AdminHandler) UnblockUser(c *gin.Context) {
+	userIDStr := c.Param("id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid user ID", nil)
+		return
+	}
+	if err := h.adminService.UnblockUser(c.Request.Context(), userID); err != nil {
+		handleServiceError(c, err, "Failed to unblock user")
+		return
+	}
+	response.Success(c, http.StatusOK, "User unblocked successfully", nil)
+}
+
+func (h *AdminHandler) GetUserSummary(c *gin.Context) {
+	userIDStr := c.Param("id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid user ID", nil)
+		return
+	}
+	summary, err := h.adminService.GetUserSummary(c.Request.Context(), userID)
+	if err != nil {
+		handleServiceError(c, err, "Failed to get user summary")
+		return
+	}
+	response.Success(c, http.StatusOK, "User summary retrieved", summary)
+}
+
+func (h *AdminHandler) GetAnalytics(c *gin.Context) {
+	analytics, err := h.adminService.GetAnalytics(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Failed to get analytics", err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Analytics retrieved", analytics)
 }
 
 func (h *AdminHandler) GetPendingKYC(c *gin.Context) {
 	limit, offset := ParsePagination(c)
 	users, err := h.adminService.GetPendingKYC(c.Request.Context(), limit, offset)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get KYC requests", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get KYC requests", err)
 		return
 	}
 	response.Success(c, http.StatusOK, "Pending KYC retrieved", users)
@@ -147,7 +188,7 @@ func (h *AdminHandler) RejectKYC(c *gin.Context) {
 		Reason string `json:"reason" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Invalid request payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "Invalid request payload", err)
 		return
 	}
 
@@ -162,7 +203,7 @@ func (h *AdminHandler) GetAllWithdrawals(c *gin.Context) {
 	limit, offset := ParsePagination(c)
 	wds, err := h.adminService.GetAllWithdrawals(c.Request.Context(), limit, offset)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get withdrawals", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get withdrawals", err)
 		return
 	}
 	response.Success(c, http.StatusOK, "Withdrawals retrieved", wds)
@@ -186,14 +227,14 @@ func (h *AdminHandler) BlockUser(c *gin.Context) {
 func (h *AdminHandler) GetSettings(c *gin.Context) {
 	settings, err := h.adminService.GetSettings(c.Request.Context())
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get settings", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get settings", err)
 		return
 	}
 	response.Success(c, http.StatusOK, "Settings retrieved", settings)
 }
 
 type UpdateSettingsRequest struct {
-	DailyROIPct             *float64 `json:"daily_roi_pct" binding:"required,min=0,max=100"`
+	DailyRewardPct          *float64 `json:"daily_reward_pct" binding:"required,min=0,max=100"`
 	WithdrawalFeePct        *float64 `json:"withdrawal_fee_pct" binding:"required,min=0,max=100"`
 	WithdrawalMinAmount     *float64 `json:"withdrawal_min_amount" binding:"required,min=0"`
 	Level1To5Directs        *int     `json:"level1_to_5_directs" binding:"required,min=0"`
@@ -202,9 +243,9 @@ type UpdateSettingsRequest struct {
 	Level1To10Business      *float64 `json:"level1_to_10_business" binding:"required,min=0"`
 	Level1To15Directs       *int     `json:"level1_to_15_directs" binding:"required,min=0"`
 	Level1To15Business      *float64 `json:"level1_to_15_business" binding:"required,min=0"`
-	RefRewardL1Pct          *float64 `json:"ref_reward_l1_pct" binding:"required,min=0,max=100"`
-	RefRewardL2Pct          *float64 `json:"ref_reward_l2_pct" binding:"required,min=0,max=100"`
-	RefRewardL3Pct          *float64 `json:"ref_reward_l3_pct" binding:"required,min=0,max=100"`
+	InviteRewardL1Pct       *float64 `json:"invite_reward_l1_pct" binding:"required,min=0,max=100"`
+	InviteRewardL2Pct       *float64 `json:"invite_reward_l2_pct" binding:"required,min=0,max=100"`
+	InviteRewardL3Pct       *float64 `json:"invite_reward_l3_pct" binding:"required,min=0,max=100"`
 	LevelIncomeL1Pct        *float64 `json:"level_income_l1_pct" binding:"required,min=0,max=100"`
 	LevelIncomeL2Pct        *float64 `json:"level_income_l2_pct" binding:"required,min=0,max=100"`
 	LevelIncomeL3Pct        *float64 `json:"level_income_l3_pct" binding:"required,min=0,max=100"`
@@ -212,13 +253,41 @@ type UpdateSettingsRequest struct {
 	LevelIncomeL11ToL15Pct  *float64 `json:"level_income_l11_to_l15_pct" binding:"required,min=0,max=100"`
 	NonWorkingCapMultiplier *float64 `json:"non_working_cap_multiplier" binding:"required,min=1"`
 	WorkingCapMultiplier    *float64 `json:"working_cap_multiplier" binding:"required,min=1"`
+	PaymentUPIID            *string  `json:"payment_upi_id" binding:"required"`
+	PaymentBankName         *string  `json:"payment_bank_name" binding:"required"`
+	PaymentAccountName      *string  `json:"payment_account_name" binding:"required"`
+	PaymentAccountNumber    *string  `json:"payment_account_number" binding:"required"`
+	PaymentIFSC             *string  `json:"payment_ifsc" binding:"required"`
 }
 
 func (h *AdminHandler) UpdateSettings(c *gin.Context) {
 	var req UpdateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Invalid request payload or failed validation", err.Error())
+		response.Error(c, http.StatusBadRequest, "Invalid request payload or failed validation", err)
 		return
+	}
+
+	// Validate payment formats using regex
+	if req.PaymentUPIID != nil {
+		if matched, _ := regexp.MatchString(`^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$`, *req.PaymentUPIID); !matched {
+			response.Error(c, http.StatusBadRequest, "Invalid UPI ID format", nil)
+			return
+		}
+	}
+	if req.PaymentIFSC != nil {
+		if matched, _ := regexp.MatchString(`^[A-Z]{4}0[A-Z0-9]{6}$`, strings.ToUpper(*req.PaymentIFSC)); !matched {
+			response.Error(c, http.StatusBadRequest, "Invalid IFSC format", nil)
+			return
+		}
+		// ensure uppercase
+		upperIfsc := strings.ToUpper(*req.PaymentIFSC)
+		req.PaymentIFSC = &upperIfsc
+	}
+	if req.PaymentAccountNumber != nil {
+		if matched, _ := regexp.MatchString(`^\d{9,18}$`, *req.PaymentAccountNumber); !matched {
+			response.Error(c, http.StatusBadRequest, "Invalid Account Number format", nil)
+			return
+		}
 	}
 
 	// Validate tier ordering
@@ -232,7 +301,7 @@ func (h *AdminHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	settings := &domain.PlatformSettings{
-		DailyROIPct:             *req.DailyROIPct,
+		DailyRewardPct:          *req.DailyRewardPct,
 		WithdrawalFeePct:        *req.WithdrawalFeePct,
 		WithdrawalMinAmount:     *req.WithdrawalMinAmount,
 		Level1To5Directs:        *req.Level1To5Directs,
@@ -241,9 +310,9 @@ func (h *AdminHandler) UpdateSettings(c *gin.Context) {
 		Level1To10Business:      *req.Level1To10Business,
 		Level1To15Directs:       *req.Level1To15Directs,
 		Level1To15Business:      *req.Level1To15Business,
-		RefRewardL1Pct:          *req.RefRewardL1Pct,
-		RefRewardL2Pct:          *req.RefRewardL2Pct,
-		RefRewardL3Pct:          *req.RefRewardL3Pct,
+		InviteRewardL1Pct:       *req.InviteRewardL1Pct,
+		InviteRewardL2Pct:       *req.InviteRewardL2Pct,
+		InviteRewardL3Pct:       *req.InviteRewardL3Pct,
 		LevelIncomeL1Pct:        *req.LevelIncomeL1Pct,
 		LevelIncomeL2Pct:        *req.LevelIncomeL2Pct,
 		LevelIncomeL3Pct:        *req.LevelIncomeL3Pct,
@@ -251,6 +320,11 @@ func (h *AdminHandler) UpdateSettings(c *gin.Context) {
 		LevelIncomeL11ToL15Pct:  *req.LevelIncomeL11ToL15Pct,
 		NonWorkingCapMultiplier: *req.NonWorkingCapMultiplier,
 		WorkingCapMultiplier:    *req.WorkingCapMultiplier,
+		PaymentUPIID:            *req.PaymentUPIID,
+		PaymentBankName:         *req.PaymentBankName,
+		PaymentAccountName:      *req.PaymentAccountName,
+		PaymentAccountNumber:    *req.PaymentAccountNumber,
+		PaymentIFSC:             *req.PaymentIFSC,
 	}
 
 	if err := h.adminService.UpdateSettings(c.Request.Context(), settings); err != nil {

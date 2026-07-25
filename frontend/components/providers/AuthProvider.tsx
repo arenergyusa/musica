@@ -8,13 +8,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (token && !isAuthenticated) {
+    if (token) {
       fetchUser();
-    } else if (!token && isLoading) {
+    } else {
       // If there's no token, we are not loading the user anymore
       useAuthStore.setState({ isLoading: false });
     }
-  }, [fetchUser, isAuthenticated, isLoading]);
+  }, [fetchUser]); // Run only once on mount (fetchUser is stable)
 
   return <>{children}</>;
 }

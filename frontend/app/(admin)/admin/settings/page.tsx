@@ -37,6 +37,11 @@ interface PlatformSettings {
   level_income_l11_to_l15_pct: number;
   non_working_cap_multiplier: number;
   working_cap_multiplier: number;
+  payment_upi_id: string;
+  payment_bank_name: string;
+  payment_account_name: string;
+  payment_account_number: string;
+  payment_ifsc: string;
 }
 
 export default function PlatformSettingsPage() {
@@ -71,12 +76,33 @@ export default function PlatformSettingsPage() {
     fetchSettings();
   }, []);
 
-  const handleChange = (field: keyof PlatformSettings, value: string) => {
+  const handleChange = (field: keyof PlatformSettings, value: number | string) => {
     if (!settings) return;
     setSettings({
       ...settings,
       [field]: value,
     } as unknown as PlatformSettings);
+  };
+
+  const handleIfscBlur = async () => {
+    if (!settings || !settings.payment_ifsc) return;
+    const ifsc = settings.payment_ifsc.trim().toUpperCase();
+    
+    // Quick regex for IFSC before API call
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) return;
+
+    try {
+      const res = await fetch(`https://ifsc.razorpay.com/${ifsc}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.BANK) {
+          setSettings((prev) => prev ? { ...prev, payment_bank_name: data.BANK } as unknown as PlatformSettings : prev);
+          toast.success(`Bank found: ${data.BANK}`);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch IFSC details:", error);
+    }
   };
 
   const handleSave = async () => {
@@ -92,15 +118,44 @@ export default function PlatformSettingsPage() {
       'level1_to_5_directs', 'level1_to_10_directs', 'level1_to_15_directs'
     ];
 
-    const payload: Record<string, number> = { id: settings.id as number };
+    const paymentFields = [
+      'payment_upi_id', 'payment_bank_name', 'payment_account_name', 
+      'payment_account_number', 'payment_ifsc'
+    ];
+
+    const payload: Record<string, string | number> = { id: settings.id as number };
 
     for (const [key, val] of Object.entries(settings)) {
-      if (key === 'id') continue;
+      if (key === 'id' || key === 'updated_at' || key === 'created_at') continue;
       
-      const strVal = String(val).trim();
-      if (strVal === '') {
-        toast.error(`Invalid value for ${key.replace(/_/g, ' ')}`);
+      // Treat null or undefined as empty string
+      const strVal = val == null ? '' : String(val).trim();
+      if (strVal === '' && !paymentFields.includes(key)) {
+        toast.error(`Missing value for ${key.replace(/_/g, ' ')}`);
         return;
+      }
+
+      if (paymentFields.includes(key)) {
+        if (strVal === '') {
+          payload[key] = '';
+          continue;
+        }
+        if (key === 'payment_upi_id' && !/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(strVal)) {
+          toast.error("Invalid UPI ID format. E.g., name@bank");
+          return;
+        }
+        if (key === 'payment_ifsc' && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(strVal)) {
+          toast.error("Invalid IFSC format. E.g., HDFC0001234");
+          return;
+        }
+        if (key === 'payment_account_number' && !/^\d{9,18}$/.test(strVal)) {
+          toast.error("Account Number must be between 9 and 18 digits");
+          return;
+        }
+        
+        // uppercase IFSC on save
+        payload[key] = key === 'payment_ifsc' ? strVal.toUpperCase() : strVal;
+        continue;
       }
 
       const num = Number(strVal);
@@ -130,17 +185,17 @@ export default function PlatformSettingsPage() {
       payload[key] = num;
     }
     
-    if (payload.non_working_cap_multiplier < 1 || payload.working_cap_multiplier < 1) {
+    if ((payload.non_working_cap_multiplier as number) < 1 || (payload.working_cap_multiplier as number) < 1) {
       toast.error("Cap multipliers must be at least 1");
       return;
     }
     
-    if (payload.level1_to_10_directs < payload.level1_to_5_directs || payload.level1_to_15_directs < payload.level1_to_10_directs) {
+    if ((payload.level1_to_10_directs as number) < (payload.level1_to_5_directs as number) || (payload.level1_to_15_directs as number) < (payload.level1_to_10_directs as number)) {
       toast.error("Direct referral requirements must be ordered (L5 <= L10 <= L15)");
       return;
     }
     
-    if (payload.level1_to_10_business < payload.level1_to_5_business || payload.level1_to_15_business < payload.level1_to_10_business) {
+    if ((payload.level1_to_10_business as number) < (payload.level1_to_5_business as number) || (payload.level1_to_15_business as number) < (payload.level1_to_10_business as number)) {
       toast.error("Business thresholds must be ordered (L5 <= L10 <= L15)");
       return;
     }
@@ -392,6 +447,58 @@ export default function PlatformSettingsPage() {
                   value={settings.level_income_l11_to_l15_pct}
                   onChange={(e) => handleChange('level_income_l11_to_l15_pct', e.target.value)}
                 />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Payment Configuration</CardTitle>
+            <CardDescription>Configure bank details and UPI for user subscriptions</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>UPI ID</Label>
+                <Input 
+                  placeholder="e.g. musica@hdfcbank"
+                  value={settings.payment_upi_id || ''}
+                  onChange={(e) => handleChange('payment_upi_id', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Bank Name</Label>
+                <Input 
+                  placeholder="e.g. HDFC Bank"
+                  value={settings.payment_bank_name || ''}
+                  onChange={(e) => handleChange('payment_bank_name', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Account Name</Label>
+                <Input 
+                  placeholder="e.g. Musica RBF Solutions Pvt Ltd"
+                  value={settings.payment_account_name || ''}
+                  onChange={(e) => handleChange('payment_account_name', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Account Number</Label>
+                <Input 
+                  placeholder="e.g. 50200012345678"
+                  value={settings.payment_account_number || ''}
+                  onChange={(e) => handleChange('payment_account_number', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>IFSC Code</Label>
+                <Input 
+                  placeholder="e.g. HDFC0001234"
+                  value={settings.payment_ifsc || ''}
+                  onChange={(e) => handleChange('payment_ifsc', e.target.value.toUpperCase())}
+                  onBlur={handleIfscBlur}
+                />
+                <p className="text-xs text-muted-foreground">Bank name will be auto-filled if valid</p>
               </div>
             </div>
           </CardContent>

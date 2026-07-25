@@ -6,39 +6,46 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { APP } from "@/lib/constants";
 
 import { AuthProvider } from "@/components/providers/AuthProvider";
-
-// Font configuration removed to prevent Docker build timeout
+import { AutoLogout } from "@/components/AutoLogout";
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP.URL),
   title: {
-    default: `${APP.NAME} — RBF Investment Platform`,
-    template: `%s | ${APP.NAME}`,
+    default: "Musica — Official Haryanvi Music Videos & Song Streaming",
+    template: "%s | Musica",
   },
-  description: APP.DESCRIPTION,
+  description: "Official Musica streaming platform operated by Pure Desi Music (OPC) Private Limited. Watch trending Haryanvi music videos, audio releases, and studio tracks in high definition.",
+  manifest: "/manifest.json",
   keywords: [
-    "RBF platform India",
-    "revenue based financing",
-    "entertainment funding",
-    "music production funding",
-    "revenue sharing India",
+    "Musica",
+    "Musica Streaming",
+    "Musica Haryanvi",
+    "Musica Music Videos",
+    "The Musica",
+    "Pure Desi Music",
+    "Haryanvi Music Videos",
+    "Haryanvi Songs",
   ],
   openGraph: {
     type: "website",
     locale: "en_IN",
-    siteName: APP.NAME,
+    siteName: "Musica",
+    title: "Musica — Official Haryanvi Music Videos & Tracks",
+    description: "Stream official Haryanvi music videos & studio song releases on Musica by Pure Desi Music (OPC) Private Limited.",
+    url: "https://themusica.in",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Musica — Fund Entertainment, Earn Revenue Share",
+        alt: "Musica — Official Haryanvi Music Streaming Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    creator: "@musicainvest",
+    title: "Musica — Haryanvi Music Streaming",
+    description: "Official Haryanvi music video releases on Musica by Pure Desi Music (OPC) Private Limited.",
   },
   robots: {
     index: true,
@@ -70,6 +77,7 @@ export default function RootLayout({
               Skip to main content
             </a>
             <AuthProvider>
+              <AutoLogout />
               {children}
             </AuthProvider>
             <Toaster

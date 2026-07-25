@@ -1,72 +1,48 @@
 package middleware
 
 import (
+	"context"
+	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/arenergyusa/musica/backend/pkg/response"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
-type rateLimiter struct {
-	mu      sync.Mutex
-	clients map[string]*clientData
-}
-
-type clientData struct {
-	tokens     int
-	lastRefill time.Time
-}
-
-func RateLimiter() gin.HandlerFunc {
+func RateLimiter(rdb *redis.Client) gin.HandlerFunc {
 	const maxTokens = 100
-	const refillRate = 2 // tokens per second
-	
-	limiter := &rateLimiter{
-		clients: make(map[string]*clientData),
-	}
+	const duration = time.Minute // 100 requests per minute
 
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		
-		limiter.mu.Lock()
-		client, exists := limiter.clients[ip]
-		now := time.Now()
-		
-		if !exists {
-			client = &clientData{
-				tokens:     maxTokens - 1,
-				lastRefill: now,
-			}
-			limiter.clients[ip] = client
-			limiter.mu.Unlock()
+		key := "rate_limit:" + ip
+
+		// Wrap in bounded context
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 500*time.Millisecond)
+		defer cancel()
+
+		// Use Redis pipeline for atomic increment and expire
+		pipe := rdb.TxPipeline()
+		incr := pipe.Incr(ctx, key)
+		// Set expiration on key for rate-limiting window
+		pipe.Expire(ctx, key, duration)
+		_, err := pipe.Exec(ctx)
+
+		if err != nil {
+			log.Printf("ERROR: Rate limiter Redis failure for IP %s: %v", ip, err)
+			// If Redis fails, allow the request but log it (fail-open for availability)
 			c.Next()
 			return
 		}
-		
-		elapsed := now.Sub(client.lastRefill).Seconds()
-		if elapsed > 0 {
-			refill := int(elapsed * refillRate)
-			if refill > 0 {
-				client.tokens += refill
-				if client.tokens > maxTokens {
-					client.tokens = maxTokens
-				}
-				client.lastRefill = now
-			}
-		}
 
-		if client.tokens <= 0 {
-			limiter.mu.Unlock()
+		if incr.Val() > int64(maxTokens) {
 			response.Error(c, http.StatusTooManyRequests, "Too many requests", nil)
 			c.Abort()
 			return
 		}
-		
-		client.tokens--
-		limiter.mu.Unlock()
-		
+
 		c.Next()
 	}
 }

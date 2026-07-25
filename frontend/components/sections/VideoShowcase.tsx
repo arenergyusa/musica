@@ -1,24 +1,22 @@
-/* eslint-disable */
 "use client";
 
 import { motion } from "framer-motion";
-
-const videos = [
-  {
-    id: "vi_1",
-    title: "Pure Desi Haryanvi Hits",
-    url: "https://www.youtube.com/embed/videoseries?list=UULF5qK0J-M1Z3R_6O8bW89A", // This is a placeholder standard list format for channel uploads, actual video IDs might be better but this works as a generic showcase
-  }
-];
+import { Play, Flame, Tv } from "lucide-react";
 
 export function VideoShowcase() {
   return (
-    <section className="py-24 bg-muted/30">
+    <section id="trending-videos" className="py-20 bg-[#F8F9FA] dark:bg-[#0B0F19]">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-16 max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-5xl font-bold mb-6">Popular on Pure Desi Haryanvi</h2>
-          <p className="text-lg text-muted-foreground">
-            Watch the latest and most popular Haryanvi music videos directly from the creators.
+        <div className="text-center mb-12 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 text-xs font-bold mb-3 border border-red-200/60 dark:border-red-900">
+            <Flame className="h-3.5 w-3.5" />
+            <span>Trending Showcase</span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white mb-3">
+            Popular Hits on <span className="text-blue-600 dark:text-blue-400">Pure Desi Haryanvi</span>
+          </h2>
+          <p className="text-sm md:text-base text-slate-600 dark:text-slate-400">
+            Watch chart-busting Haryanvi music videos directly from our official production house.
           </p>
         </div>
 
@@ -28,7 +26,7 @@ export function VideoShowcase() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="w-full max-w-4xl aspect-video rounded-xl overflow-hidden shadow-2xl border border-border/50"
+            className="w-full max-w-4xl aspect-video rounded-lg overflow-hidden shadow-md border border-slate-200/80 dark:border-slate-800 bg-black relative"
           >
             <iframe
               width="100%"
@@ -43,9 +41,14 @@ export function VideoShowcase() {
           </motion.div>
         </div>
         
-        <div className="mt-12 text-center">
-          <a href="https://www.youtube.com/@puredesiharyanvi" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
-            Subscribe to Channel
+        <div className="mt-8 text-center">
+          <a 
+            href="https://www.youtube.com/@puredesiharyanvi" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="inline-flex items-center justify-center rounded-lg text-xs font-bold bg-red-600 hover:bg-red-700 text-white h-11 px-6 shadow-sm transition-all"
+          >
+            <Tv className="mr-2 h-4 w-4" /> Subscribe on YouTube Channel
           </a>
         </div>
       </div>

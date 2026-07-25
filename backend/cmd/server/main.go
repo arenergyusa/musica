@@ -2,23 +2,37 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"strings"
+	"time"
 
 	"github.com/arenergyusa/musica/backend/internal/api/handler"
 	"github.com/arenergyusa/musica/backend/internal/api/middleware"
 	"github.com/arenergyusa/musica/backend/internal/config"
 	"github.com/arenergyusa/musica/backend/internal/cron"
+	"github.com/arenergyusa/musica/backend/internal/pkg/crypto"
+	"github.com/arenergyusa/musica/backend/internal/pkg/email"
 	"github.com/arenergyusa/musica/backend/internal/repository"
 	"github.com/arenergyusa/musica/backend/internal/service"
 	"github.com/arenergyusa/musica/backend/pkg/database"
 	"github.com/arenergyusa/musica/backend/pkg/response"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Config loading error: %v", err)
+	}
+
+	// Initialize Crypto
+	if err := crypto.Init(cfg.EncryptionKey); err != nil {
+		log.Fatalf("Crypto initialization error: %v", err)
 	}
 
 	// Run Migrations
@@ -40,15 +54,19 @@ func main() {
 	invRepo := repository.NewInvestmentRepository(dbPool)
 	withdrawalRepo := repository.NewWithdrawalRepository(dbPool)
 	settingsRepo := repository.NewSettingsRepository(dbPool)
+	otpRepo := repository.NewOTPRepository(dbPool)
+
+	// Initialize Email Sender
+	emailSender := email.NewEmailSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass)
 
 	// Initialize Services
-	authSvc := service.NewAuthService(userRepo, mlmRepo, cfg.JWTSecret)
+	authSvc := service.NewAuthService(userRepo, mlmRepo, otpRepo, emailSender, cfg.JWTSecret)
 	invSvc := service.NewInvestmentService(invRepo, userRepo, mlmRepo, settingsRepo)
 	walletSvc := service.NewWalletService(walletRepo)
 	wdSvc := service.NewWithdrawalService(dbPool, withdrawalRepo, walletRepo, userRepo, settingsRepo)
 	teamSvc := service.NewTeamService(mlmRepo, settingsRepo)
-	adminSvc := service.NewAdminService(dbPool, invRepo, withdrawalRepo, userRepo, walletRepo, settingsRepo)
-	userSvc := service.NewUserService(userRepo, walletRepo, invRepo, mlmRepo)
+	adminSvc := service.NewAdminService(dbPool, invRepo, withdrawalRepo, userRepo, walletRepo, settingsRepo, mlmRepo)
+	userSvc := service.NewUserService(userRepo, walletRepo, invRepo, mlmRepo, settingsRepo)
 
 	// Initialize Handlers
 	authH := handler.NewAuthHandler(authSvc)
@@ -60,14 +78,44 @@ func main() {
 	userH := handler.NewUserHandler(userSvc)
 
 	// Initialize and Start Cron Jobs
-	jobRunner := cron.NewJobRunner(invRepo, mlmRepo, walletRepo)
+	jobRunner := cron.NewJobRunner(invRepo, mlmRepo, walletRepo, settingsRepo)
 	jobRunner.Start()
 	defer jobRunner.Stop()
 
 	router := gin.Default()
+	router.Static("/uploads", "./uploads")
+
+	// CORS Middleware
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000", "https://themusica.in", "https://www.themusica.in"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
+
+	// Redis client for Rate Limiter
+	var opt *redis.Options
+	if strings.HasPrefix(cfg.RedisURL, "redis://") || strings.HasPrefix(cfg.RedisURL, "rediss://") {
+		var err error
+		opt, err = redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			log.Fatalf("Invalid Redis URL: %v", err)
+		}
+	} else {
+		opt = &redis.Options{
+			Addr: cfg.RedisURL,
+		}
+	}
+	redisClient := redis.NewClient(opt)
+
+	// Configure trusted proxies for ingress/nginx IP resolution
+	_ = router.SetTrustedProxies([]string{"127.0.0.1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"})
 
 	// Global Middlewares
-	router.Use(middleware.RateLimiter())
+	router.Use(middleware.RateLimiter(redisClient))
 
 	// Health Check
 	router.GET("/health", func(c *gin.Context) {
@@ -88,9 +136,127 @@ func main() {
 		auth := api.Group("/auth")
 		{
 			auth.POST("/register", authH.Register)
+			auth.POST("/register/verify", authH.VerifyRegister)
 			auth.POST("/login", authH.Login)
+			auth.POST("/forgot-password", authH.ForgotPassword)
+			auth.POST("/forgot-password/verify", authH.VerifyForgotPasswordOTP)
+			auth.POST("/forgot-password/reset", authH.ResetPassword)
 			// auth.POST("/refresh-token", MockHandler)
-			// auth.POST("/logout", MockHandler)
+			auth.POST("/logout", authH.Logout)
+		}
+
+		mediaCatalog := map[string]struct {
+			VideoURL    string
+			IsExclusive bool
+		}{
+			"m1": {VideoURL: "https://www.youtube.com/embed/v91-cUp4b3A", IsExclusive: true},
+			"m2": {VideoURL: "https://www.youtube.com/embed/74_yJny-uB0", IsExclusive: false},
+			"m3": {VideoURL: "https://www.youtube.com/embed/kXYiU_JCYtU", IsExclusive: true},
+			"m4": {VideoURL: "https://www.youtube.com/embed/dQw4w9WgXcQ", IsExclusive: true},
+		}
+
+		media := api.Group("/media")
+		media.Use(middleware.AuthMiddleware())
+		{
+			media.GET("/stream/:id", func(c *gin.Context) {
+				id := c.Param("id")
+				item, exists := mediaCatalog[id]
+				if !exists {
+					response.Error(c, 404, "Media item not found", nil)
+					return
+				}
+
+				userIDVal, _ := c.Get("user_id")
+				userIDStr := fmt.Sprintf("%v", userIDVal)
+
+				if item.IsExclusive {
+					userID, _ := uuid.Parse(userIDStr)
+					activeInvs, err := invRepo.GetActiveInvestmentsByUserID(c.Request.Context(), userID)
+					if err != nil || len(activeInvs) == 0 {
+						response.Error(c, 403, "Active VIP subscription required for exclusive playback", nil)
+						return
+					}
+				}
+
+				// Issue signed JWT token containing media_id, user_id, and 5-minute expiration
+				playURL := item.VideoURL
+				if item.IsExclusive {
+					claims := jwt.MapClaims{
+						"media_id": id,
+						"user_id":  userIDStr,
+						"exp":      time.Now().Add(5 * time.Minute).Unix(),
+					}
+					token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+					tokenStr, err := token.SignedString([]byte(cfg.JWTSecret))
+					if err != nil {
+						response.Error(c, 500, "Failed to issue playback token", err)
+						return
+					}
+					playURL = fmt.Sprintf("/api/v1/media/play/%s?token=%s", id, tokenStr)
+				}
+
+				response.Success(c, 200, "Playback authorized", gin.H{
+					"id":          id,
+					"videoUrl":    playURL,
+					"isExclusive": item.IsExclusive,
+				})
+			})
+
+			media.GET("/play/:id", func(c *gin.Context) {
+				id := c.Param("id")
+				item, exists := mediaCatalog[id]
+				if !exists {
+					response.Error(c, 404, "Media item not found", nil)
+					return
+				}
+
+				if item.IsExclusive {
+					tokenStr := c.Query("token")
+					if tokenStr == "" {
+						response.Error(c, 403, "Playback token required for exclusive media", nil)
+						return
+					}
+
+					token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+						if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+							return nil, fmt.Errorf("unexpected signing method")
+						}
+						return []byte(cfg.JWTSecret), nil
+					})
+					if err != nil || !token.Valid {
+						response.Error(c, 403, "Invalid or expired playback token", nil)
+						return
+					}
+
+					claims, ok := token.Claims.(jwt.MapClaims)
+					if !ok {
+						response.Error(c, 403, "Invalid token claims", nil)
+						return
+					}
+
+					userIDVal, _ := c.Get("user_id")
+					currentUserIDStr := fmt.Sprintf("%v", userIDVal)
+
+					if fmt.Sprintf("%v", claims["media_id"]) != id || fmt.Sprintf("%v", claims["user_id"]) != currentUserIDStr {
+						response.Error(c, 403, "Playback token authorization mismatch", nil)
+						return
+					}
+
+					userID, _ := uuid.Parse(currentUserIDStr)
+					activeInvs, err := invRepo.GetActiveInvestmentsByUserID(c.Request.Context(), userID)
+					if err != nil || len(activeInvs) == 0 {
+						response.Error(c, 403, "Active VIP subscription required for exclusive playback", nil)
+						return
+					}
+
+					// Serve protected embed player without exposing raw URL redirect
+					c.Header("Content-Type", "text/html; charset=utf-8")
+					c.String(200, fmt.Sprintf(`<!DOCTYPE html><html><head><style>body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;}</style></head><body><iframe width="100%%" height="100%%" src="%s" frameborder="0" allowfullscreen></iframe></body></html>`, item.VideoURL))
+					return
+				}
+
+				c.Redirect(302, item.VideoURL)
+			})
 		}
 
 		user := api.Group("/user")
@@ -98,9 +264,18 @@ func main() {
 		{
 			user.GET("/profile", userH.GetProfile)
 			user.PUT("/profile", userH.UpdateProfile)
+			user.PUT("/password", userH.ChangePassword)
 			user.GET("/dashboard", userH.GetDashboard)
 			user.POST("/kyc", userH.SubmitKYC)
 			user.GET("/kyc/status", userH.GetKYCStatus)
+		}
+
+		sponsorship := api.Group("/sponsorship")
+		sponsorship.Use(middleware.AuthMiddleware())
+		{
+			sponsorship.GET("/plans", invH.GetPlans)
+			sponsorship.POST("/create", invH.CreateInvestment)
+			sponsorship.GET("/my", invH.GetMyInvestments)
 		}
 
 		investment := api.Group("/investment")
@@ -109,7 +284,6 @@ func main() {
 			investment.GET("/plans", invH.GetPlans)
 			investment.POST("/create", invH.CreateInvestment)
 			investment.GET("/my", invH.GetMyInvestments)
-			// investment.GET("/:id", MockHandler)
 		}
 
 		wallet := api.Group("/wallet")
@@ -117,6 +291,14 @@ func main() {
 		{
 			wallet.GET("/balance", walletH.GetBalance)
 			wallet.GET("/transactions", walletH.GetTransactions)
+		}
+
+		invites := api.Group("/invites")
+		invites.Use(middleware.AuthMiddleware())
+		{
+			invites.GET("/direct", teamH.GetDirectReferrals)
+			invites.GET("/tree", teamH.GetTree)
+			invites.GET("/stats", teamH.GetTeamStats)
 		}
 
 		team := api.Group("/team")
@@ -139,9 +321,13 @@ func main() {
 		admin.Use(middleware.AuthMiddleware(), middleware.AdminMiddleware())
 		{
 			admin.GET("/dashboard", adminH.GetDashboard)
+			admin.GET("/analytics", adminH.GetAnalytics)
 			admin.GET("/users", adminH.GetUsers)
+			admin.GET("/users/:id/summary", adminH.GetUserSummary)
 			admin.PUT("/users/:id/block", adminH.BlockUser)
+			admin.PUT("/users/:id/unblock", adminH.UnblockUser)
 			admin.POST("/investments/:id/activate", adminH.ActivateInvestment)
+			admin.POST("/sponsorships/:id/activate", adminH.ActivateInvestment)
 			admin.GET("/kyc", adminH.GetPendingKYC)
 			admin.PUT("/kyc/:id", adminH.ApproveKYC)
 			admin.PUT("/kyc/:id/reject", adminH.RejectKYC)

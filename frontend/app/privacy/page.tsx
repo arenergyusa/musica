@@ -1,91 +1,123 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { Building2, ShieldCheck, Mail } from "lucide-react";
 
-const LAST_UPDATED = new Date("2026-07-20T00:00:00Z");
+const LAST_UPDATED = new Date("2026-07-24T00:00:00Z");
 
 export default function PrivacyPage() {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-[#F8F9FA] dark:bg-[#0B0F19]">
       <Navbar />
       <main className="flex-1 flex flex-col pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-4xl">
-          <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
-          
-          <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none space-y-6">
-            <p className="text-muted-foreground">
+
+          {/* Header Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-lg p-6 md:p-8 border border-slate-200/80 dark:border-slate-800 shadow-sm mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-xs font-bold mb-4 border border-blue-200/60 dark:border-blue-900">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>Data Protection &amp; Privacy Policy</span>
+            </div>
+
+            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-3">
+              Privacy Policy
+            </h1>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono mb-4">
               Last updated: {LAST_UPDATED.toLocaleDateString("en-IN", { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" })}
             </p>
 
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold">1. Introduction</h2>
+            {/* Corporate Registration Box */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[#F8F9FA] dark:bg-slate-800/60 rounded-lg border border-slate-200/80 dark:border-slate-800 gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span className="font-bold text-slate-900 dark:text-white">Pure Desi Music (OPC) Private Limited</span>
+              </div>
+              <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400">
+                CIN: U92490HR2020OPC091236 &bull; PAN: AALCP6210F &bull; TAN: RTKP11658D
+              </div>
+            </div>
+          </div>
+
+          {/* Main Privacy Body */}
+          <div className="bg-white dark:bg-slate-900 rounded-lg p-6 md:p-10 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-8 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+
+            <section className="space-y-3">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                1. Introduction
+              </h2>
               <p>
-                Pure Desi Music (OPC) Private Limited (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) respects your privacy and is committed to protecting your personal data. This privacy policy explains how we collect, use, and safeguard your information when you visit our platform, Musica.
+                <strong>Pure Desi Music (OPC) Private Limited</strong> (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) respects your privacy and is committed to protecting your personal data. This privacy policy explains how we collect, process, and safeguard your personal information when you use our Haryanvi music streaming platform, <strong>Musica</strong> (https://themusica.in).
               </p>
             </section>
 
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold">2. Data We Collect</h2>
+            <section className="space-y-3">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                2. Information We Collect
+              </h2>
               <p>
-                We may collect and process the following data about you:
+                We collect personal information necessary to deliver seamless music video streaming services and platform functionality:
               </p>
-              <ul className="list-disc pl-6 space-y-2">
-                <li><strong>Identity Data:</strong> Name, username, or similar identifier.</li>
-                <li><strong>Contact Data:</strong> Email address and mobile number.</li>
-                <li><strong>Technical Data:</strong> IP address, browser type and version, time zone setting, browser plug-in types and versions, operating system and platform.</li>
-                <li><strong>Usage Data:</strong> Information about how you use our platform, including video views, watch history, and preferences.</li>
+              <ul className="list-disc pl-5 space-y-2 text-xs">
+                <li><strong>Account Registration Data:</strong> Name, email address, mobile number, and authentication credentials.</li>
+                <li><strong>Identity Verification Data (KYC):</strong> Government-issued tax identifiers (e.g., PAN) submitted solely for statutory compliance during account verification and payout processing.</li>
+                <li><strong>Technical &amp; Usage Data:</strong> IP address, device type, browser specifications, video watch history, and content interaction metrics.</li>
               </ul>
             </section>
 
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold">3. How We Use Your Data</h2>
+            <section className="space-y-3">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                3. Purpose of Data Processing
+              </h2>
               <p>
-                We use your personal data for the following purposes:
+                Your personal data is processed strictly for legitimate operational purposes:
               </p>
-              <ul className="list-disc pl-6 space-y-2">
-                <li>To register you as a new user and manage your account.</li>
-                <li>To deliver relevant content, personalized recommendations, and advertisements.</li>
-                <li>To improve our platform, products/services, marketing, and user experience.</li>
-                <li>To communicate with you about updates, support, and promotional offers.</li>
+              <ul className="list-disc pl-5 space-y-2 text-xs">
+                <li>To manage user accounts and provide access to Haryanvi music video streams.</li>
+                <li>To verify user identity and ensure statutory compliance for tax reporting (TDS under TAN RTKP11658D).</li>
+                <li>To improve video playback quality, mobile responsiveness, and streaming performance.</li>
+                <li>To communicate platform announcements, system updates, and customer support responses.</li>
               </ul>
             </section>
 
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold">4. Data Security</h2>
+            <section className="space-y-3">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                4. Data Security &amp; Encryption
+              </h2>
               <p>
-                We have implemented appropriate security measures to prevent your personal data from being accidentally lost, used, or accessed in an unauthorized way, altered, or disclosed. Access to your personal data is limited to those employees, agents, contractors, and other third parties who have a business need to know.
+                We implement industry-standard administrative, physical, and technical security protocols to safeguard your personal information against unauthorized access, loss, or alteration. Sensitive records (such as account credentials and tax identifiers) are transmitted using encrypted SSL protocols.
               </p>
             </section>
 
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold">5. Cookies</h2>
+            <section className="space-y-3">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                5. Third-Party Integrations &amp; Embeds
+              </h2>
               <p>
-                Our platform uses cookies to distinguish you from other users. This helps us to provide you with a good experience when you browse our platform and also allows us to improve our site. You can set your browser to refuse all or some browser cookies, but this may affect your ability to use certain features.
+                Musica may feature official third-party media embeds (such as YouTube official channel video players). Interacting with embedded players may allow third parties to record viewing metrics in accordance with their respective privacy policies.
               </p>
             </section>
 
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold">6. Third-Party Links</h2>
+            <section className="space-y-3">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                6. Data Retention &amp; Rights
+              </h2>
               <p>
-                This platform may include links to third-party websites, plug-ins, and applications (e.g., YouTube embeds). Clicking on those links or enabling those connections may allow third parties to collect or share data about you. We do not control these third-party websites and are not responsible for their privacy statements.
+                We retain personal information only for as long as necessary to fulfill service delivery and legal compliance requirements. Users have the right to request account data updates, corrections, or deletion by contacting our support desk.
               </p>
             </section>
 
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold">7. Your Rights</h2>
+            <section className="space-y-3">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
+                7. Contact Us
+              </h2>
               <p>
-                Under certain circumstances, you have rights under data protection laws in relation to your personal data, including the right to request access, correction, erasure, or restriction of processing of your personal data.
+                For privacy inquiries or data protection concerns, please contact the Data Protection Officer at:
               </p>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold">8. Contact Us</h2>
-              <p>
-                If you have any questions about this privacy policy or our privacy practices, please contact us at:
-              </p>
-              <ul className="list-disc pl-6 space-y-2">
-                <li>Email: hello@themusica.in</li>
-                <li>Address: 223, Sector 20, Huda, Sirsa, Haryana, India</li>
-              </ul>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-xs pt-2">
+                <a href="mailto:hello@themusica.in" className="inline-flex items-center gap-2 font-semibold text-blue-600 hover:text-blue-700">
+                  <Mail className="h-4 w-4" /> hello@themusica.in
+                </a>
+              </div>
             </section>
           </div>
         </div>

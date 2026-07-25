@@ -4,17 +4,23 @@ export interface User {
   email: string;
   phone?: string;
   referralCode?: string;
+  referral_code?: string;
   referredBy?: string;
   kycStatus?: string;
+  kyc_status?: string;
   status?: string;
   role?: string;
   createdAt?: string;
+  created_at?: string;
+  bank_account?: string;
+  ifsc?: string;
   [key: string]: unknown;
 }
 
 export interface Transaction {
   id: string;
   userId?: string;
+  user_id?: string;
   amount: number;
   type: string;
   source: string;
@@ -28,7 +34,9 @@ export interface Transaction {
 export interface Withdrawal {
   id: string;
   userId?: string;
+  user_id?: string;
   amount: number;
+  amount_requested?: number;
   tds_amount?: number;
   admin_charge?: number;
   net_amount?: number;
@@ -47,8 +55,10 @@ export interface Withdrawal {
 export interface Investment {
   id: string;
   userId?: string;
+  user_id?: string;
   amount: number;
   status: string;
+  daily_rate_pct?: number;
   current_roi_amount?: number;
   max_roi_amount?: number;
   total_withdrawn?: number;
@@ -66,6 +76,7 @@ export interface Investment {
 export interface KycRequest {
   id: string;
   userId?: string;
+  user_id?: string;
   status: string;
   document_type?: string;
   document_number?: string;
@@ -82,6 +93,8 @@ export interface TeamDirect {
   is_active?: boolean;
   total_investment?: number;
   joined_at?: string;
+  createdAt?: string;
+  created_at?: string;
   level?: string;
   status?: string;
   investment?: number;

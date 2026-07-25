@@ -1,57 +1,85 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle2, Video, Headphones, Disc, Sparkles } from "lucide-react";
 
 const features = [
-  "Premium high-quality music videos",
-  "Exclusive web series and short films",
-  "Direct support for local artists and creators",
-  "Cultural preservation of Haryanvi traditions",
-  "Seamless streaming experience",
-  "Curated playlists for every mood",
+  "High-Definition Video Playback",
+  "Official Studio Recording Releases",
+  "Direct Artist Song Premieres",
+  "Crisp High-Fidelity Audio Tracks",
+  "Desktop & Mobile Responsive Player",
+  "Curated Music Playlists",
 ];
 
 export function WhyMusica() {
   return (
-    <section className="py-24 bg-card">
+    <section className="py-16 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <motion.div
-            initial={{ opacity: 0, x: -50 }}
+            initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.4 }}
           >
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Why Choose <span className="text-primary">Musica?</span>
+            <div className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 text-xs font-bold mb-3 border border-blue-200/60 dark:border-blue-900">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Music Experience</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white mb-4">
+              Why Watch on <span className="text-blue-600 dark:text-blue-400">Musica?</span>
             </h2>
-            <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-              Musica is your ultimate destination for everything Haryanvi. From the latest chart-topping music videos to compelling web series, we bring the best of regional entertainment directly to your screens. Experience the vibrant culture and storytelling of Haryana like never before.
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+              Musica provides a dedicated platform for official Haryanvi music videos. Enjoy high-definition video playback, crisp studio audio, and exclusive artist song premieres.
             </p>
             
-            <ul className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {features.map((feature, idx) => (
-                <li key={idx} className="flex items-center">
-                  <CheckCircle className="h-5 w-5 text-accent mr-3 shrink-0" />
-                  <span className="font-medium">{feature}</span>
-                </li>
+                <div key={idx} className="flex items-start gap-2 text-xs font-medium text-slate-700 dark:text-slate-300">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <span>{feature}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           </motion.div>
           
           <motion.div
-            initial={{ opacity: 0, x: 50 }}
+            initial={{ opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="relative h-[400px] w-full lg:h-[500px] rounded-2xl overflow-hidden border border-border/50 shadow-2xl shadow-primary/10"
+            transition={{ duration: 0.4 }}
+            className="relative rounded-lg overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-[#F8F9FA] dark:bg-slate-800/60 p-6 shadow-sm"
           >
-            {/* Placeholder for actual image - using a stylized div for now */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 via-background to-accent/20 flex items-center justify-center">
-              <div className="text-center p-8 glass-card">
-                <h3 className="text-2xl font-bold mb-2">Music & Cinema</h3>
-                <p className="text-muted-foreground">Powering the next generation of blockbusters</p>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <div className="p-3 bg-blue-50 text-blue-600 dark:bg-blue-950/60 rounded-lg">
+                  <Video className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">High-Definition Playback</h4>
+                  <p className="text-xs text-slate-500">Stream smooth, high-quality music video releases.</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <div className="p-3 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 rounded-lg">
+                  <Headphones className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">Studio Sound Quality</h4>
+                  <p className="text-xs text-slate-500">Clear audio output for every beat and instrument track.</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 p-4 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <div className="p-3 bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 rounded-lg">
+                  <Disc className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">Exclusive Song Premieres</h4>
+                  <p className="text-xs text-slate-500">Discover new Haryanvi music video releases first.</p>
+                </div>
               </div>
             </div>
           </motion.div>

@@ -7,27 +7,28 @@ import (
 )
 
 type User struct {
-	ID           uuid.UUID `json:"id" db:"id"`
-	Name         string    `json:"name" db:"name"`
-	Email        string    `json:"email" db:"email"`
-	Phone        string    `json:"phone" db:"phone"`
-	PasswordHash string    `json:"-" db:"password_hash"`
-	ReferralCode string    `json:"referral_code" db:"referral_code"`
-	ReferredBy   *uuid.UUID `json:"referred_by,omitempty" db:"referred_by"`
-	KycStatus          string    `json:"kyc_status" db:"kyc_status"` // PENDING, APPROVED, REJECTED
-	KycRejectionReason string    `json:"kyc_rejection_reason,omitempty" db:"kyc_rejection_reason"`
-	BankAccount        string    `json:"-" db:"bank_account"`
-	IFSC         string    `json:"-" db:"ifsc"`
-	PAN          string    `json:"-" db:"pan"`
-	Aadhaar      string    `json:"-" db:"aadhaar"`
-	Status       string    `json:"status" db:"status"` // ACTIVE, BLOCKED
-	Role         string    `json:"role" db:"role"`
-	DocumentURL  string    `json:"document_url" db:"document_url"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+	ID                 uuid.UUID  `json:"id" db:"id"`
+	Name               string     `json:"name" db:"name"`
+	Email              string     `json:"email" db:"email"`
+	Phone              string     `json:"phone" db:"phone"`
+	PasswordHash       string     `json:"-" db:"password_hash"`
+	InviteCode         string     `json:"invite_code" db:"invite_code"`
+	InvitedBy          *uuid.UUID `json:"invited_by,omitempty" db:"invited_by"`
+	KycStatus          string     `json:"kyc_status" db:"kyc_status"` // PENDING, APPROVED, REJECTED
+	KycRejectionReason string     `json:"kyc_rejection_reason,omitempty" db:"kyc_rejection_reason"`
+	BankAccount        string     `json:"bank_account" db:"bank_account"`
+	BankAccountHash    string     `json:"-" db:"bank_account_hash"`
+	IFSC               string     `json:"ifsc" db:"ifsc"`
+	PAN                string     `json:"-" db:"pan"`
+	Aadhaar            string     `json:"-" db:"aadhaar"`
+	Status             string     `json:"status" db:"status"` // ACTIVE, BLOCKED
+	Role               string     `json:"role" db:"role"`
+	DocumentURL        string     `json:"document_url" db:"document_url"`
+	CreatedAt          time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at" db:"updated_at"`
 }
 
-type InvestmentPlan struct {
+type SponsorshipPlan struct {
 	ID                      uuid.UUID `json:"id" db:"id"`
 	Name                    string    `json:"name" db:"name"`
 	MinAmount               float64   `json:"min_amount" db:"min_amount"`
@@ -38,7 +39,7 @@ type InvestmentPlan struct {
 	WorkingCapMultiplier    float64   `json:"working_cap_multiplier"`
 }
 
-type Investment struct {
+type Sponsorship struct {
 	ID                   uuid.UUID  `json:"id" db:"id"`
 	UserID               uuid.UUID  `json:"user_id" db:"user_id"`
 	Amount               float64    `json:"amount" db:"amount"`
@@ -63,7 +64,7 @@ type Transaction struct {
 	ID          uuid.UUID `json:"id" db:"id"`
 	UserID      uuid.UUID `json:"user_id" db:"user_id"`
 	Type        string    `json:"type" db:"type"`     // CREDIT, DEBIT
-	Source      string    `json:"source" db:"source"` // DAILY_ROI, REFERRAL, LEVEL_INCOME, WITHDRAWAL
+	Source      string    `json:"source" db:"source"` // DAILY_REWARD, INVITE, LEVEL_INCOME, WITHDRAWAL
 	Amount      float64   `json:"amount" db:"amount"`
 	ReferenceID string    `json:"reference_id,omitempty" db:"reference_id"`
 	Description string    `json:"description,omitempty" db:"description"`
@@ -86,7 +87,7 @@ type Withdrawal struct {
 
 type PlatformSettings struct {
 	ID                         int       `json:"id" db:"id"`
-	DailyROIPct                float64   `json:"daily_roi_pct" db:"daily_roi_pct"`
+	DailyRewardPct             float64   `json:"daily_reward_pct" db:"daily_reward_pct"`
 	WithdrawalFeePct           float64   `json:"withdrawal_fee_pct" db:"withdrawal_fee_pct"`
 	WithdrawalMinAmount        float64   `json:"withdrawal_min_amount" db:"withdrawal_min_amount"`
 	Level1To5Directs           int       `json:"level1_to_5_directs" db:"level1_to_5_directs"`
@@ -95,9 +96,9 @@ type PlatformSettings struct {
 	Level1To10Business         float64   `json:"level1_to_10_business" db:"level1_to_10_business"`
 	Level1To15Directs          int       `json:"level1_to_15_directs" db:"level1_to_15_directs"`
 	Level1To15Business         float64   `json:"level1_to_15_business" db:"level1_to_15_business"`
-	RefRewardL1Pct             float64   `json:"ref_reward_l1_pct" db:"ref_reward_l1_pct"`
-	RefRewardL2Pct             float64   `json:"ref_reward_l2_pct" db:"ref_reward_l2_pct"`
-	RefRewardL3Pct             float64   `json:"ref_reward_l3_pct" db:"ref_reward_l3_pct"`
+	InviteRewardL1Pct          float64   `json:"invite_reward_l1_pct" db:"invite_reward_l1_pct"`
+	InviteRewardL2Pct          float64   `json:"invite_reward_l2_pct" db:"invite_reward_l2_pct"`
+	InviteRewardL3Pct          float64   `json:"invite_reward_l3_pct" db:"invite_reward_l3_pct"`
 	LevelIncomeL1Pct           float64   `json:"level_income_l1_pct" db:"level_income_l1_pct"`
 	LevelIncomeL2Pct           float64   `json:"level_income_l2_pct" db:"level_income_l2_pct"`
 	LevelIncomeL3Pct           float64   `json:"level_income_l3_pct" db:"level_income_l3_pct"`
@@ -105,5 +106,20 @@ type PlatformSettings struct {
 	LevelIncomeL11ToL15Pct     float64   `json:"level_income_l11_to_l15_pct" db:"level_income_l11_to_l15_pct"`
 	NonWorkingCapMultiplier    float64   `json:"non_working_cap_multiplier" db:"non_working_cap_multiplier"`
 	WorkingCapMultiplier       float64   `json:"working_cap_multiplier" db:"working_cap_multiplier"`
+	PaymentUPIID               string    `json:"payment_upi_id" db:"payment_upi_id"`
+	PaymentBankName            string    `json:"payment_bank_name" db:"payment_bank_name"`
+	PaymentAccountName         string    `json:"payment_account_name" db:"payment_account_name"`
+	PaymentAccountNumber       string    `json:"payment_account_number" db:"payment_account_number"`
+	PaymentIFSC                string    `json:"payment_ifsc" db:"payment_ifsc"`
 	UpdatedAt                  time.Time `json:"updated_at" db:"updated_at"`
+}
+
+type OTP struct {
+	ID        uuid.UUID  `json:"id" db:"id"`
+	Email     string     `json:"email" db:"email"`
+	OTP       string     `json:"otp" db:"otp"`
+	Purpose   string     `json:"purpose" db:"purpose"` // REGISTER, FORGOT_PASSWORD
+	ExpiresAt time.Time  `json:"expires_at" db:"expires_at"`
+	UsedAt    *time.Time `json:"used_at,omitempty" db:"used_at"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
 }

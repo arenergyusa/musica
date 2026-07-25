@@ -1,62 +1,60 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { UserCheck, Clapperboard, Heart } from "lucide-react";
+import { UserCheck, Clapperboard, Share2 } from "lucide-react";
 
 const steps = [
   {
     id: 1,
-    title: "Create an Account",
-    description: "Sign up quickly to get personalized recommendations and unlock exclusive Haryanvi content.",
+    title: "1. Create a Free Account",
+    description: "Sign up in seconds to access curated Haryanvi music video feeds and custom playlists.",
     icon: UserCheck,
   },
   {
     id: 2,
-    title: "Watch & Enjoy",
-    description: "Dive into a vast library of Pure Desi Haryanvi music videos, web series, and exclusive releases.",
+    title: "2. Choose Music Category",
+    description: "Select from DJ dance beats, romantic melodies, traditional folk, or studio recording specials.",
     icon: Clapperboard,
   },
   {
     id: 3,
-    title: "Share with Friends",
-    description: "Spread the joy of pure entertainment. Share your favorite hits with friends and family.",
-    icon: Heart,
+    title: "3. Watch & Share Videos",
+    description: "Stream high-definition music videos on any desktop or mobile screen and share tracks with friends.",
+    icon: Share2,
   },
 ];
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-24 bg-muted/30">
+    <section id="how-it-works" className="py-16 bg-[#F8F9FA] dark:bg-[#0B0F19]">
       <div className="container mx-auto px-4">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">How Musica Works</h2>
-          <p className="text-lg text-muted-foreground">
-            A simple, transparent, and secure way to participate in the booming Indian entertainment industry.
+        <div className="text-center max-w-3xl mx-auto mb-12">
+          <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white mb-3">
+            How Music Streaming <span className="text-blue-600 dark:text-blue-400">Works</span>
+          </h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Fast and easy access to official Haryanvi music video content.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-          {/* Connecting line for desktop */}
-          <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-border -translate-y-1/2 z-0" />
-
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative max-w-5xl mx-auto">
           {steps.map((step, index) => {
             const Icon = step.icon;
             return (
               <motion.div
                 key={step.id}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.5, delay: index * 0.2 }}
-                className="relative z-10 flex flex-col items-center text-center group"
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: index * 0.15 }}
+                className="bg-white dark:bg-slate-900 p-6 rounded-lg border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between"
               >
-                <div className="w-20 h-20 bg-background border-2 border-primary/30 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-primary/5 group-hover:border-primary transition-colors duration-300">
-                  <Icon className="h-8 w-8 text-primary" />
-                </div>
-                <div className="bg-card p-6 rounded-xl border border-border/50 shadow-sm w-full h-full">
-                  <div className="text-xs font-bold text-primary mb-2 tracking-wider">STEP {step.id}</div>
-                  <h3 className="text-xl font-bold mb-3">{step.title}</h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">
+                <div>
+                  <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-lg flex items-center justify-center mb-5 border border-blue-100 dark:border-blue-900">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{step.title}</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                     {step.description}
                   </p>
                 </div>

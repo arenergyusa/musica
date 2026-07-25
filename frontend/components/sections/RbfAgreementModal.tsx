@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { APP } from "@/lib/constants";
+import { APP, WITHDRAWAL } from "@/lib/constants";
 import { api } from "@/lib/api";
 
 interface RbfAgreementModalProps {
@@ -24,7 +24,7 @@ export function RbfAgreementModal({ open, onOpenChange, onAccept }: RbfAgreement
   const [workingCap, setWorkingCap] = useState<number>(3);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const tdsPct = 5; // Immutable TDS rule
+  const tdsPct = WITHDRAWAL.TDS_PCT;
 
   useEffect(() => {
     let isActive = true;
@@ -86,36 +86,36 @@ export function RbfAgreementModal({ open, onOpenChange, onAccept }: RbfAgreement
         <div className="flex-1 overflow-y-auto p-6 text-sm text-muted-foreground leading-relaxed">
           <div className="space-y-6">
             <section>
-              <h3 className="font-semibold text-foreground text-base mb-2">1. Nature of the Digital Subscription</h3>
+              <h3 className="font-semibold text-foreground text-base mb-2">1. Nature of Digital Project Sponsorship</h3>
               <p>
-                By subscribing to {APP.NAME}, you are purchasing a digital content and services subscription. This is strictly a digital product subscription and promotional reward program. 
-                This is <strong>not</strong> an equity purchase, financial security, investment scheme, loan, fixed deposit, or collective investment scheme under any Indian financial regulations (including SEBI or RBI guidelines). You are paying a subscription fee to access premium platform features, content, and promotional benefits.
+                By sponsoring projects on {APP.NAME}, you are providing funding support for digital music production and digital services. This is strictly a digital project sponsorship and promotional reward program. 
+                This is <strong>not</strong> an equity purchase, financial security, investment scheme, loan, fixed deposit, or collective investment scheme under any Indian financial regulations (including SEBI or RBI guidelines). You are sponsoring projects to support content creation, premium platform features, and promotional benefits.
               </p>
             </section>
 
             <section>
               <h3 className="font-semibold text-foreground text-base mb-2">2. Non-Refundable Policy</h3>
               <p>
-                Your subscription fee is immediately applied towards the provisioning of digital services and the platform&apos;s digital ecosystem. Therefore, the subscription fee is <strong>strictly non-refundable</strong>. You acknowledge that you cannot request a withdrawal, chargeback, or return of your initial subscription fee at any point after successful activation.
+                Your project sponsorship amount is immediately applied towards digital music production and the platform&apos;s digital ecosystem. Therefore, project sponsorships are <strong>generally non-refundable</strong> subject to applicable law. While payments support digital content and ecosystem provisioning, this policy does not affect statutory rights or exceptions for unauthorized or failed transactions.
               </p>
             </section>
 
             <section>
               <h3 className="font-semibold text-foreground text-base mb-2">3. Promotional Revenue Share (Rewards) and Caps</h3>
               <p>
-                As a promotional benefit to active subscribers, the platform may distribute discretionary daily reward points or revenue share credits based on platform performance. These are promotional rewards and not guaranteed financial returns.
+                As a promotional benefit to active project sponsors, the platform may distribute discretionary daily reward points or revenue share credits based on platform performance. These are promotional rewards and not guaranteed financial returns.
               </p>
               <ul className="list-disc pl-5 mt-2 space-y-1">
-                <li>For <strong>Passive (Non-Working) Subscribers</strong>, total accumulated promotional rewards from all sources (including any referral benefits) are strictly capped at <strong>{nonWorkingCap}x</strong> of the subscription value.</li>
-                <li>For <strong>Working Subscribers</strong> (who actively participate in affiliate promotions and refer others), the total promotional reward cap from all sources is extended to <strong>{workingCap}x</strong> of the subscription value.</li>
+                <li>For <strong>Passive (Non-Working) Sponsors</strong>, total accumulated promotional rewards from all sources (including any invite benefits) are strictly capped at <strong>{nonWorkingCap}x</strong> of the project sponsorship value.</li>
+                <li>For <strong>Working Sponsors</strong> (who actively participate in affiliate promotions and invite others), the total promotional reward cap from all sources is extended to <strong>{workingCap}x</strong> of the project sponsorship value.</li>
               </ul>
-              <p className="mt-2">Once the respective cap ({nonWorkingCap}x or {workingCap}x) is reached through any combination of promotional rewards, your current reward cycle is considered fully fulfilled and automatically closed. No further rewards will accrue on that subscription.</p>
+              <p className="mt-2">Once the respective cap ({nonWorkingCap}x or {workingCap}x) is reached through any combination of promotional rewards, your current reward cycle is considered fully fulfilled and automatically closed. No further rewards will accrue on that sponsorship.</p>
             </section>
 
             <section>
-              <h3 className="font-semibold text-foreground text-base mb-2">4. Affiliate and Referral Program</h3>
+              <h3 className="font-semibold text-foreground text-base mb-2">4. Affiliate and Invite Program</h3>
               <p>
-                Users may choose to participate in our optional affiliate program. Referral rewards are distributed purely as promotional incentives for bringing new active subscribers to the platform. The platform reserves the right to modify, suspend, or terminate affiliate structures at its sole discretion to maintain ecosystem health.
+                Users may choose to participate in our optional affiliate program. Invite rewards are distributed purely as promotional incentives for inviting new active members to the platform. The platform reserves the right to modify, suspend, or terminate affiliate structures at its sole discretion to maintain ecosystem health.
               </p>
             </section>
 
@@ -128,18 +128,17 @@ export function RbfAgreementModal({ open, onOpenChange, onAccept }: RbfAgreement
             </section>
 
             <section>
-              <h3 className="font-semibold text-foreground text-base mb-2">6. Withdrawals, Platform Fees, and Taxes (TDS)</h3>
+              <h3 className="font-semibold text-foreground text-base mb-2">6. Withdrawals, Platform Schedule, and Statutory Taxes (TDS)</h3>
               <p>
                 Withdrawal requests for accumulated reward points can only be initiated on designated processing dates (10th, 20th, and 30th of every month), subject to a minimum balance threshold of ₹1,000. 
-                In compliance with the Income Tax Act of India, a mandatory <strong>{tdsPct}% TDS (Tax Deducted at Source)</strong> is deducted on withdrawals. Additionally, a platform maintenance and processing fee of <strong>{adminFee}%</strong> applies to each withdrawal transaction.
+                In compliance with the Income Tax Act of India under Tax Account Number (TAN) <strong>RTKP11658D</strong>, statutory <strong>{tdsPct}% TDS (Tax Deducted at Source)</strong> is deducted on eligible payouts {adminFee > 0 ? `with a ${adminFee}% platform administration fee` : 'with 0% platform administration fee'}.
               </p>
             </section>
             
             <section>
               <h3 className="font-semibold text-foreground text-base mb-2">7. Risk Acknowledgement and Liability Disclaimer</h3>
               <p>
-                Participation in the subscription and rewards program carries inherent uncertainties. Rewards are directly tied to the platform&apos;s digital content generation and general revenues. While {APP.NAME} employs robust strategies to maintain consistency, actual daily promotional rewards can fluctuate. 
-                By proceeding, you explicitly acknowledge that <strong>no fixed or guaranteed returns are promised</strong>. {APP.NAME} and its operating entities shall not be held liable for any direct, indirect, or incidental loss of anticipated rewards. You agree to participate solely at your own discretion.
+                Participation in the subscription and rewards program carries inherent uncertainties. A Project Sponsorship is intended as a digital content funding mechanism and promotional reward program. Whether any arrangement constitutes a security, collective investment scheme, or regulated instrument depends on its actual operation under applicable financial laws. Users and sponsors should review all product flows and consult qualified legal counsel to validate regulatory compliance based on pooled contributions and performance-based reward distributions.
               </p>
             </section>
 

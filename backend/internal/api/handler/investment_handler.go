@@ -21,7 +21,7 @@ func NewInvestmentHandler(invService service.InvestmentService) *InvestmentHandl
 func (h *InvestmentHandler) GetPlans(c *gin.Context) {
 	plans, err := h.invService.GetPlans(c.Request.Context())
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get plans", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get plans", err)
 		return
 	}
 	response.Success(c, http.StatusOK, "Plans retrieved successfully", plans)
@@ -36,13 +36,13 @@ func (h *InvestmentHandler) CreateInvestment(c *gin.Context) {
 
 	var req domain.InvestRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Invalid request payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "Invalid request payload", err)
 		return
 	}
 
 	inv, err := h.invService.CreateInvestment(c.Request.Context(), userID, &req)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, err.Error(), nil)
+		response.Error(c, http.StatusBadRequest, "Failed to create investment", err)
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *InvestmentHandler) GetMyInvestments(c *gin.Context) {
 
 	invs, err := h.invService.GetMyInvestments(c.Request.Context(), userID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get investments", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get investments", err)
 		return
 	}
 	response.Success(c, http.StatusOK, "Investments retrieved successfully", invs)

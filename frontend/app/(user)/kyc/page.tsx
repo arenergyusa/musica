@@ -1,7 +1,7 @@
 /* eslint-disable */
 "use client";
 
-import { ShieldAlert, ShieldCheck, Clock } from "lucide-react";
+import { ShieldAlert, ShieldCheck, Clock, Lock } from "lucide-react";
 import { KycForm } from "@/components/forms/KycForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -29,68 +29,72 @@ export default function KycPage() {
   }, []);
 
   if (isLoading) {
-    return <div className="max-w-4xl mx-auto p-8 text-center text-muted-foreground">Loading KYC status...</div>;
+    return <div className="max-w-4xl mx-auto p-8 text-center text-slate-400 font-medium">Loading KYC verification status...</div>;
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
       
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">KYC Verification</h1>
-        <p className="text-muted-foreground">
-          Verify your identity to unlock investment features and withdrawals.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">KYC Verification</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Verify identity via Aadhaar & PAN to comply with statutory statutory TDS regulations (TAN: RTKP11658D).
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200/80 dark:border-blue-900 shrink-0">
+          <Lock className="h-3.5 w-3.5" />
+          <span>256-Bit SSL Encrypted</span>
+        </div>
       </div>
 
       {(kycStatus === "APPROVED" || kycStatus === "COMPLETED") && (
-        <Alert className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:text-emerald-400">
-          <ShieldCheck className="h-5 w-5" />
-          <AlertTitle className="text-base font-semibold">Verification Complete</AlertTitle>
-          <AlertDescription className="mt-1">
-            Your KYC documents have been successfully verified. You can now invest in all available funds.
+        <Alert className="bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-100 dark:border-emerald-900 rounded-lg shadow-sm">
+          <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+          <AlertTitle className="text-sm font-bold">Identity Verification Completed</AlertTitle>
+          <AlertDescription className="text-xs mt-1 text-emerald-800 dark:text-emerald-300">
+            Your KYC documents have been successfully verified. Unlimited withdrawals and project sponsorships are unlocked.
           </AlertDescription>
         </Alert>
       )}
 
       {kycStatus === "PENDING" && (
-        <Alert className="bg-amber-500/10 text-amber-600 border-amber-500/30 dark:text-amber-500">
-          <Clock className="h-5 w-5" />
-          <AlertTitle className="text-base font-semibold">Verification Pending</AlertTitle>
-          <AlertDescription className="mt-1">
-            Your documents are currently under review by our admin team. This process usually takes 24-48 hours.
-            You will be notified once the review is complete.
+        <Alert className="bg-blue-50 text-blue-900 border-blue-200 dark:bg-blue-950/30 dark:text-blue-100 dark:border-blue-900 rounded-lg shadow-sm">
+          <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <AlertTitle className="text-sm font-bold">Verification Under Review</AlertTitle>
+          <AlertDescription className="text-xs mt-1 text-blue-800 dark:text-blue-300">
+            Your submitted documents are currently being processed by our compliance team. Verification takes 12-24 hours.
           </AlertDescription>
         </Alert>
       )}
 
       {kycStatus === "REJECTED" && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="rounded-lg shadow-sm">
           <ShieldAlert className="h-5 w-5" />
-          <AlertTitle className="text-base font-semibold">Verification Rejected</AlertTitle>
-          <AlertDescription className="mt-1">
-            <p className="mb-2">Your KYC application was rejected for the following reason:</p>
-            <p className="font-medium bg-destructive/10 p-2 rounded-md mb-2">
-              "{rejectionReason || "Your document did not meet our verification criteria."}"
+          <AlertTitle className="text-sm font-bold">Verification Failed</AlertTitle>
+          <AlertDescription className="text-xs mt-1">
+            <p className="mb-1.5">Your submission could not be verified due to:</p>
+            <p className="font-semibold bg-red-100/50 dark:bg-red-950/50 p-2 rounded-md mb-2 text-xs">
+              "{rejectionReason || "Uploaded documents were blurry or missing required details."}"
             </p>
-            <p>Please re-submit your documents below.</p>
+            <p>Please re-upload clear government ID documents below.</p>
           </AlertDescription>
         </Alert>
       )}
 
       {(kycStatus === "UNINITIALIZED" || kycStatus === "REJECTED") && (
         <div className="space-y-6">
-          <Card className="bg-primary/5 border-primary/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-primary flex items-center">
-                <ShieldAlert className="h-5 w-5 mr-2" /> Security Guidelines
+          <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-lg shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-bold text-slate-900 dark:text-white flex items-center">
+                <Lock className="h-4 w-4 mr-2 text-blue-600" /> Verification Requirements
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-2">
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Ensure all corners of the document are visible.</li>
-                <li>Avoid glare and shadows on the document.</li>
-                <li>The name on your documents must exactly match the name on your Musica profile.</li>
-                <li>Allowed file types: JPG, PNG, PDF (Max 5MB per file).</li>
+            <CardContent className="text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
+              <ul className="list-disc pl-4 space-y-1">
+                <li>Provide valid 12-digit Aadhaar number and 10-character PAN number.</li>
+                <li>Ensure document photos are clear, legible, and uncropped.</li>
+                <li>Accepted file formats: JPG, PNG, PDF (Max file size: 5MB).</li>
               </ul>
             </CardContent>
           </Card>

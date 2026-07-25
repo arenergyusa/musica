@@ -1,17 +1,18 @@
-/* eslint-disable */
 "use client";
 
 import { useState, useEffect } from "react";
-import { ShieldCheck, Zap, Minus, Plus, TrendingUp, Info } from "lucide-react";
+import { ShieldCheck, Zap, Minus, Plus, Clock, FileCheck, Landmark } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/store/useAuthStore";
+import { PDFReceipt } from "@/components/shared/PDFReceipt";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -26,19 +27,28 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Investment } from "@/lib/types";
 
 const MIN_AMOUNT = 10000;
-const MAX_AMOUNT = 1000000; // 10 Lakhs max per single transaction (can adjust)
+const MAX_AMOUNT = 1000000;
 const STEP_AMOUNT = 10000;
+
+const PRESET_AMOUNTS = [10000, 20000, 50000, 100000, 250000];
 
 export default function InvestPage() {
   const { user, fetchUser } = useAuthStore();
   const isKycApproved = user?.kycStatus === "APPROVED";
-  
+
   const [amount, setAmount] = useState<number>(MIN_AMOUNT);
   const [activeInvestments, setActiveInvestments] = useState<Investment[]>([]);
   const [dailyRatePct, setDailyRatePct] = useState<number>(0.3333);
-  const [nonWorkingCap, setNonWorkingCap] = useState<number>(2);
-  const [workingCap, setWorkingCap] = useState<number>(3);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedReceipt, setSelectedReceipt] = useState<{
+    id: string;
+    amount: number;
+    created_at: string;
+    status: string;
+    user_name?: string;
+    user_email?: string;
+    referral_code?: string;
+  } | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -49,20 +59,18 @@ export default function InvestPage() {
           api.get("/investment/plans")
         ]);
         setActiveInvestments(myInvsRes.data.data || []);
-        
+
         if (plansRes.data.data && plansRes.data.data.length > 0) {
           setDailyRatePct(plansRes.data.data[0].daily_rate_pct || 0.3333);
-          setNonWorkingCap(plansRes.data.data[0].non_working_cap_multiplier || 2);
-          setWorkingCap(plansRes.data.data[0].working_cap_multiplier || 3);
         }
       } catch (error) {
-        console.error("Failed to load investment data", error);
+        console.error("Failed to load sponsorship data", error);
       } finally {
         setIsLoading(false);
       }
     }
     fetchData();
-  }, []);
+  }, [fetchUser]);
 
   const handleDecrease = () => {
     if (amount > MIN_AMOUNT) {
@@ -80,189 +88,261 @@ export default function InvestPage() {
   const monthlyReturn = dailyReturn * 30;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <PageHeader 
-        title="Musica Premium Plan" 
-        description="Subscribe in multiples of ₹10,000 to a premium plan and receive daily reward credits."
-        action={
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground bg-muted/50 px-4 py-2 rounded-full border">
-            <ShieldCheck className="h-4 w-4 text-emerald-500" />
-            <span>Governed by Platform Terms & Conditions</span>
-          </div>
-        }
+    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <PageHeader
+        title="Project Sponsorship"
+        description="Sponsor Haryanvi music video projects in multiples of ₹10,000 and receive daily revenue share rewards."
       />
 
       {!isKycApproved && (
-        <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
-          <AlertTitle className="text-red-600 dark:text-red-400 font-bold">KYC Verification Required</AlertTitle>
-          <AlertDescription className="text-red-600/90 dark:text-red-400/90">
-            You must complete your KYC verification before you can participate in any plans. 
-            Please visit the KYC portal to submit your documents.
+        <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-300 rounded-xl">
+          <AlertTitle className="text-amber-800 dark:text-amber-200 font-bold text-xs">KYC Verification Required</AlertTitle>
+          <AlertDescription className="text-amber-700/90 dark:text-amber-300/90 text-xs">
+            Complete your KYC verification in Profile settings to enable project sponsorship and payouts.
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Interactive Calculator Card */}
-      <Card className="relative overflow-hidden border-2 bg-gradient-to-b from-primary/5 to-transparent border-primary/20 shadow-lg">
-        <div className="absolute top-0 right-0 bg-primary py-1 px-4 text-xs font-bold text-primary-foreground uppercase tracking-wider rounded-bl-lg flex items-center">
-          <Zap className="h-3 w-3 mr-1" fill="currentColor" /> Dynamic Plan
+      {/* Interactive Sponsorship Calculator Card */}
+      <Card className="relative overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl shadow-sm">
+        <div className="absolute top-0 right-0 bg-blue-600 py-1 px-3 text-[10px] font-bold text-white uppercase tracking-wider rounded-bl-lg flex items-center">
+          <Zap className="h-3 w-3 mr-1" /> Project Sponsorship
         </div>
-        <CardHeader className="pt-8 text-center pb-2">
-          <CardTitle className="text-2xl font-bold">Choose Plan Amount</CardTitle>
-          <CardDescription>
-            Adjust the slider or use buttons to select your desired subscription.
+
+        <CardHeader className="pt-6 text-center pb-2">
+          <CardTitle className="text-xl font-extrabold text-slate-900 dark:text-white">Select Sponsorship Contribution</CardTitle>
+          <CardDescription className="text-xs text-slate-500">
+            Choose your contribution amount (Multiples of ₹10,000).
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-8 mt-4">
+
+        <CardContent className="space-y-6 mt-2">
           <div className="flex flex-col items-center justify-center space-y-6">
+
+            {/* Amount Stepper */}
             <div className="flex items-center justify-center space-x-4">
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-12 w-12 rounded-full border-primary/30 hover:bg-primary/10 hover:text-primary"
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-11 w-11 rounded-xl border-slate-200 dark:border-slate-800 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/50 transition-all"
                 onClick={handleDecrease}
                 disabled={amount <= MIN_AMOUNT}
               >
                 <Minus className="h-5 w-5" />
               </Button>
-              <div className="text-5xl font-extrabold tracking-tighter text-primary tabular-nums min-w-[200px] text-center">
+              <div className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white tabular-nums min-w-[220px] text-center">
                 {formatCurrency(amount)}
               </div>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-12 w-12 rounded-full border-primary/30 hover:bg-primary/10 hover:text-primary"
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-11 w-11 rounded-xl border-slate-200 dark:border-slate-800 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/50 transition-all"
                 onClick={handleIncrease}
                 disabled={amount >= MAX_AMOUNT}
               >
                 <Plus className="h-5 w-5" />
               </Button>
             </div>
-            
-            <div className="w-full max-w-lg px-4">
+
+            {/* Preset Amount Chips */}
+            <div className="flex flex-wrap justify-center gap-2">
+              {PRESET_AMOUNTS.map((preset) => (
+                <Button
+                  key={preset}
+                  type="button"
+                  variant={amount === preset ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAmount(preset)}
+                  className={`h-8 text-xs font-bold rounded-lg transition-all ${amount === preset
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-blue-600"
+                    }`}
+                >
+                  {formatCurrency(preset)}
+                </Button>
+              ))}
+            </div>
+
+            {/* Range Slider */}
+            <div className="w-full max-w-md space-y-2 px-4">
               <Slider
                 value={[amount]}
                 min={MIN_AMOUNT}
                 max={MAX_AMOUNT}
                 step={STEP_AMOUNT}
-                onValueChange={(vals) => setAmount(Array.isArray(vals) ? vals[0] : vals as number)}
+                onValueChange={(val) => setAmount(Array.isArray(val) ? val[0] : (typeof val === "number" ? val : MIN_AMOUNT))}
                 className="cursor-pointer"
               />
-              <div className="flex justify-between text-xs text-muted-foreground mt-2 font-medium">
+              <div className="flex justify-between text-[11px] text-slate-400 font-mono">
                 <span>{formatCurrency(MIN_AMOUNT)}</span>
                 <span>{formatCurrency(MAX_AMOUNT)}</span>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            <div className="bg-background rounded-xl p-4 border flex items-center justify-between shadow-sm">
-              <div className="flex items-center text-muted-foreground">
-                <TrendingUp className="h-5 w-5 mr-2 text-emerald-500" />
-                <span className="font-medium text-sm">Daily Reward Share</span>
+            {/* Revenue Share Estimate Box */}
+            <div className="grid grid-cols-2 gap-4 w-full max-w-md bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 text-center">
+              <div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">Daily Revenue Share</p>
+                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">+{formatCurrency(dailyReturn)}</p>
+                <p className="text-[10px] text-slate-400">{(dailyRatePct).toFixed(4)}%/day</p>
               </div>
-              <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                {formatCurrency(dailyReturn)} <span className="text-xs text-muted-foreground font-normal">/ day</span>
-              </span>
-            </div>
-            <div className="bg-background rounded-xl p-4 border flex items-center justify-between shadow-sm">
-              <div className="flex items-center text-muted-foreground">
-                <TrendingUp className="h-5 w-5 mr-2 text-blue-500" />
-                <span className="font-medium text-sm">Monthly Est.</span>
+              <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">Est. Monthly Payout</p>
+                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">+{formatCurrency(monthlyReturn)}</p>
+                <p className="text-[10px] text-slate-400">~10%/month</p>
               </div>
-              <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                {formatCurrency(monthlyReturn)} <span className="text-xs text-muted-foreground font-normal">/ mo</span>
-              </span>
             </div>
-          </div>
-
-          <div className="flex items-start justify-center text-xs text-muted-foreground max-w-xl mx-auto bg-muted/30 p-3 rounded-md">
-            <Info className="h-4 w-4 mr-2 shrink-0 mt-0.5" />
-            <p>
-              Your subscription receives a daily reward credit of <strong>{dailyRatePct}%</strong> of the subscribed amount.
-              Total credits are capped at <strong>{nonWorkingCap}x</strong> (Non-Working) or <strong>{workingCap}x</strong> (Working) of your subscription.
-            </p>
           </div>
         </CardContent>
-        <CardFooter className="justify-center pb-8">
+
+        <CardFooter className="justify-center pb-6">
           {isKycApproved ? (
             <Dialog>
-              <DialogTrigger 
-                render={
-                  <Button 
-                    size="lg" 
-                    className="w-full max-w-sm text-lg h-14 font-bold shadow-xl shadow-primary/20"
-                  >
-                    Proceed to Subscribe {formatCurrency(amount)}
-                  </Button>
-                }
-              />
-              <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
-                <DialogHeader className="px-6 py-4 bg-muted/30 border-b">
-                  <DialogTitle className="text-xl">Complete Your Subscription</DialogTitle>
-                  <DialogDescription>
-                    Make the payment for your plan participation and submit the UTR/reference number below.
+              <DialogTrigger className="w-full max-w-sm h-11 text-xs font-bold shadow-sm bg-blue-600 text-white hover:bg-blue-700 inline-flex items-center justify-center rounded-lg cursor-pointer transition-all">
+                Proceed to Sponsor {formatCurrency(amount)}
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden rounded-xl border-slate-200 dark:border-slate-800">
+                <DialogHeader className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                  <DialogTitle className="text-base font-bold text-slate-900 dark:text-white">Project Sponsorship Verification</DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500">
+                    Make your payment to the company account below and submit the transaction UTR number.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="px-6 pb-6 pt-2 overflow-y-auto max-h-[70vh]">
+                <div className="px-6 pb-6 pt-3 overflow-y-auto max-h-[70vh]">
                   <InvestForm amount={amount} />
                 </div>
               </DialogContent>
             </Dialog>
           ) : (
-            <Button 
-              size="lg" 
-              variant="secondary" 
-              className="w-full max-w-sm text-lg h-14 font-bold"
+            <Button
+              size="lg"
+              className="w-full max-w-sm h-11 text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 rounded-lg cursor-not-allowed"
               disabled
             >
-              KYC Required
+              KYC Verification Required
             </Button>
           )}
         </CardFooter>
       </Card>
 
-      <div className="mt-12 space-y-6">
-        <h2 className="text-xl font-bold tracking-tight">Active Subscriptions</h2>
-        
+      {/* Active Sponsorships List */}
+      <div className="space-y-4 pt-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">My Active Sponsorships</h2>
+          <Badge variant="outline" className="text-xs font-semibold rounded-lg border-slate-200 dark:border-slate-800">
+            {activeInvestments.length} {activeInvestments.length === 1 ? "Sponsorship" : "Sponsorships"}
+          </Badge>
+        </div>
+
         {isLoading ? (
           <Skeleton className="h-32 w-full rounded-xl" />
         ) : activeInvestments.length > 0 ? (
           <div className="grid gap-4">
-            {activeInvestments.map((inv) => (
-              <Card key={inv.id} className="border bg-card">
-                <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-primary/10 p-3 rounded-full">
-                      <Zap className="h-6 w-6 text-primary" />
+            {activeInvestments.map((inv) => {
+              const earned = inv.total_reward_earned || 0;
+              const capLimit = inv.cap_limit || (inv.amount * 2);
+              const progressPct = Math.min((earned / capLimit) * 100, 100);
+              const isCapped = inv.status === "CAPPED" || earned >= capLimit;
+              const isPending = inv.status === "PENDING";
+              const dailyRoi = (inv.amount * (inv.daily_rate_pct || 0.3333)) / 100;
+
+              return (
+                <Card key={inv.id} className={`border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-xl transition-all shadow-sm ${isCapped ? "opacity-75 bg-slate-50 dark:bg-slate-900/50" : ""}`}>
+                  <CardContent className="p-5 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-3 rounded-xl border ${isCapped ? "bg-amber-50 dark:bg-amber-950/40 border-amber-200 text-amber-600" : isPending ? "bg-slate-100 dark:bg-slate-800 border-slate-200 text-slate-500" : "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900 text-blue-600"}`}>
+                          <Landmark className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-lg text-slate-900 dark:text-white">{formatCurrency(inv.amount)}</span>
+                            <Badge variant={inv.working_cap_at_creation ? "default" : "secondary"} className="text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              {inv.working_cap_at_creation ? "3x Working Cap" : "2x Non-Working"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2">
+                            <span>Sponsored: {new Date(inv.created_at || '').toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                            <span>•</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">+{formatCurrency(dailyRoi)}/day</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="sm:text-right flex flex-col sm:items-end gap-1.5">
+                        {isPending ? (
+                          <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/50 text-amber-600 border-amber-200 text-xs font-semibold">
+                            <Clock className="h-3 w-3 mr-1" /> Pending Approval
+                          </Badge>
+                        ) : isCapped ? (
+                          <Badge variant="outline" className="bg-slate-100 text-slate-500 border-slate-200 text-xs font-semibold">
+                            🔒 Closed (Cap Reached)
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 border-emerald-200 text-xs font-semibold">
+                            🟢 Active &amp; Earning
+                          </Badge>
+                        )}
+
+                        {!isPending && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 font-semibold"
+                            onClick={() => setSelectedReceipt({
+                              id: inv.id,
+                              amount: inv.amount,
+                              created_at: inv.created_at || '',
+                              status: inv.status,
+                              user_name: user?.name,
+                              user_email: user?.email,
+                              referral_code: user?.referralCode
+                            })}
+                          >
+                            <FileCheck className="mr-1 h-3.5 w-3.5" /> Download Tax Receipt
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-lg">{formatCurrency(inv.amount)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {inv.status === "PENDING" ? "Pending Approval" : "Active Plan Subscription"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <Badge variant={inv.status === "PENDING" ? "outline" : "default"} className="mb-1">
-                      {inv.status}
-                    </Badge>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(inv.created_at || '').toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+
+                    {/* Cap Progress Bar */}
+                    {!isPending && (
+                      <div className="space-y-1.5 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-lg border border-slate-200/80 dark:border-slate-800">
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                            <span>Earned Toward Cap:</span>
+                            <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(earned)}</span>
+                          </span>
+                          <span className="text-slate-500 dark:text-slate-400">
+                            Cap Limit: <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(capLimit)}</span> ({progressPct.toFixed(1)}%)
+                          </span>
+                        </div>
+                        <Progress value={progressPct} className={`h-2 rounded-full ${isCapped ? "bg-amber-500/20" : ""}`} />
+                        <div className="flex justify-between text-[10px] text-slate-400 pt-0.5">
+                          <span>ROI + Invite + Level rewards count toward cap</span>
+                          <span>{capLimit - earned > 0 ? `Remaining: ${formatCurrency(capLimit - earned)}` : "Fully Earned"}</span>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         ) : (
-          <EmptyState 
+          <EmptyState
             icon={Zap}
-            title="No Active Subscriptions"
-            description="You haven't subscribed to any plans yet. Use the calculator above to estimate your rewards."
+            title="No Active Sponsorships"
+            description="You haven't sponsored any music projects yet. Use the calculator above to select your contribution."
           />
         )}
       </div>
+
+      {/* PDF Tax Receipt Modal */}
+      <PDFReceipt
+        subscription={selectedReceipt}
+        onClose={() => setSelectedReceipt(null)}
+      />
     </div>
   );
 }

@@ -24,7 +24,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   fetchUser: () => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -38,7 +38,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       const userData = response.data.data;
       if (userData) {
         userData.kycStatus = userData.kyc_status || userData.kycStatus;
-        userData.referralCode = userData.referral_code || userData.referralCode;
+        userData.referralCode = userData.invite_code || userData.referral_code || userData.referralCode;
+        userData.bank_account = userData.bank_account || userData.bankAccount;
+        userData.ifsc = userData.ifsc;
       }
       set({ 
         user: userData, 
@@ -54,11 +56,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
   
-  logout: () => {
-    // Clear localStorage token
+  logout: async () => {
+    // Best-effort background API call
+    api.post('/auth/logout').catch((error) => {
+      console.error('Logout API failed:', error);
+    });
+
+    // Immediately clear client session
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
-      // Clear cookie
+      // Clear cookie (fallback)
       document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     }
     set({ user: null, isAuthenticated: false, isLoading: false });

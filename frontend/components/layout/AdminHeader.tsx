@@ -30,7 +30,7 @@ export function AdminHeader() {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
   
-  const userInitials = user?.name ? user.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : "AD";
+  const userInitials = user?.name ? user.name.trim().split(/\s+/).filter(Boolean).map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : "AD";
 
   return (
     <header className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b lg:border-none lg:bg-transparent">
@@ -39,12 +39,8 @@ export function AdminHeader() {
         {/* Mobile Nav & Logo */}
         <div className="flex items-center gap-4 lg:hidden">
           <Sheet>
-            <SheetTrigger 
-              render={
-                <Button variant="ghost" size="icon" className="lg:hidden" />
-              }
-            >
-              <Menu className="h-5 w-5" />
+            <SheetTrigger className="lg:hidden p-2 rounded-md hover:bg-muted inline-flex items-center justify-center bg-transparent border-none cursor-pointer">
+              <Menu className="h-5 w-5 hover-micro" />
               <span className="sr-only">Toggle Admin Menu</span>
             </SheetTrigger>
             <SheetContent side="left" className="w-64">
@@ -89,17 +85,13 @@ export function AdminHeader() {
           </div>
 
           <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
+            <Bell className="h-5 w-5 hover-micro" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
             <span className="sr-only">Notifications</span>
           </Button>
 
           <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="ghost" size="icon" className="rounded-full" />
-              }
-            >
+            <DropdownMenuTrigger className="rounded-full cursor-pointer outline-none bg-transparent border-none p-0">
               <Avatar className="h-8 w-8 border border-primary/20">
                 <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
                   {userInitials}
@@ -114,7 +106,7 @@ export function AdminHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem render={<Link href="/dashboard" className="cursor-pointer w-full" />}>
+              <DropdownMenuItem onClick={() => window.location.assign("/dashboard")} className="cursor-pointer w-full">
                 Switch to User View
               </DropdownMenuItem>
               <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive cursor-pointer">

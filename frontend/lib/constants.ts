@@ -1,53 +1,12 @@
 // ============================================================
-// Investment Plans (from business plan)
+// Dynamic Subscription Plan Config (Multiples of ₹10,000)
 // ============================================================
-export const INVESTMENT_PLANS = [
-  {
-    id: "starter",
-    name: "Starter",
-    amount: 10000,
-    monthlyReturnPct: 10,
-    dailyROI: 33.33,
-    dailyRatePct: 0.3333,
-    badge: null,
-  },
-  {
-    id: "silver",
-    name: "Silver",
-    amount: 50000,
-    monthlyReturnPct: 10,
-    dailyROI: 166.67,
-    dailyRatePct: 0.3333,
-    badge: null,
-  },
-  {
-    id: "gold",
-    name: "Gold",
-    amount: 100000,
-    monthlyReturnPct: 10,
-    dailyROI: 333.33,
-    dailyRatePct: 0.3333,
-    badge: "Most Popular",
-  },
-  {
-    id: "platinum",
-    name: "Platinum",
-    amount: 250000,
-    monthlyReturnPct: 10,
-    dailyROI: 833.33,
-    dailyRatePct: 0.3333,
-    badge: null,
-  },
-  {
-    id: "diamond",
-    name: "Diamond",
-    amount: 500000,
-    monthlyReturnPct: 10,
-    dailyROI: 1666.67,
-    dailyRatePct: 0.3333,
-    badge: "Premium",
-  },
-] as const;
+export const DYNAMIC_PLAN_CONFIG = {
+  minAmount: 10000,
+  maxAmount: 1000000,
+  stepAmount: 10000,
+  dailyRatePct: 0.3333,
+} as const;
 
 // ============================================================
 // Referral Reward Percentages (one-time on downline invest)
@@ -102,6 +61,7 @@ export const CAP_MULTIPLIER = {
 export const WITHDRAWAL = {
   MIN_AMOUNT: 1000,
   TDS_PCT: 10,
+  ADMIN_FEE_PCT: 0,
   DATES: [10, 20, 30], // Day of month
 } as const;
 
@@ -149,9 +109,9 @@ export const INCOME_TYPE = {
 // ============================================================
 export const APP = {
   NAME: "Musica",
-  TAGLINE: "Experience the Best of Entertainment.",
-  DESCRIPTION: "Premium Haryanvi Music & Entertainment Platform. Discover exclusive music videos, web series, and blockbuster entertainment.",
-  URL: "https://musica.in",
+  TAGLINE: "Pure Desi Haryanvi Music Videos.",
+  DESCRIPTION: "Official Haryanvi Music Video Streaming Platform by Pure Desi Music (OPC) Private Limited.",
+  URL: "https://themusica.in",
   CURRENCY: "INR",
   LOCALE: "en-IN",
 } as const;
@@ -167,8 +127,8 @@ export const NAV_LINKS = [
 
 export const USER_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
-  { label: "Invest Now", href: "/invest", icon: "TrendingUp" },
-  { label: "My Investments", href: "/investments", icon: "Wallet" },
+  { label: "Sponsor Project", href: "/invest", icon: "TrendingUp" },
+  { label: "My Sponsorships", href: "/investments", icon: "Wallet" },
   { label: "Reward Wallet", href: "/wallet", icon: "IndianRupee" },
   { label: "Withdraw", href: "/withdraw", icon: "ArrowDownToLine" },
   { label: "Team & Network", href: "/team", icon: "Users" },
@@ -180,7 +140,7 @@ export const USER_NAV = [
 export const ADMIN_NAV = [
   { label: "Dashboard", href: "/admin/dashboard", icon: "LayoutDashboard" },
   { label: "Users", href: "/admin/users", icon: "Users" },
-  { label: "Investments", href: "/admin/investments", icon: "TrendingUp" },
+  { label: "Project Sponsorships", href: "/admin/investments", icon: "TrendingUp" },
   { label: "Withdrawals", href: "/admin/withdrawals", icon: "ArrowDownToLine" },
   { label: "KYC Review", href: "/admin/kyc", icon: "ShieldCheck" },
   { label: "Reports", href: "/admin/reports", icon: "BarChart3" },

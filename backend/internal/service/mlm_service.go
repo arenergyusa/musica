@@ -10,15 +10,16 @@ import (
 	"github.com/arenergyusa/musica/backend/internal/repository"
 )
 
-// MLM & Investment Core Logic as specified in the plan
+// Community Sponsorship & Reward Core Logic
 
 func CalculateNetWithdrawal(amount float64, s *domain.PlatformSettings) (float64, float64, error) {
 	if amount < s.WithdrawalMinAmount {
 		return 0, 0, errors.New("minimum withdrawal amount is ₹" + strconv.FormatFloat(s.WithdrawalMinAmount, 'f', 2, 64))
 	}
+	// 10% TDS under Income Tax Act (TAN RTKP11658D), 0% platform fee
 	tdsAmount := amount * (s.WithdrawalFeePct / 100.0)
 	netAmount := amount - tdsAmount
-	return math.Round(tdsAmount*100)/100, math.Round(netAmount*100)/100, nil
+	return math.Round(tdsAmount*100) / 100, math.Round(netAmount*100) / 100, nil
 }
 
 func GetIncomeCap(isWorking bool, s *domain.PlatformSettings) float64 {
@@ -28,41 +29,29 @@ func GetIncomeCap(isWorking bool, s *domain.PlatformSettings) float64 {
 	return s.NonWorkingCapMultiplier
 }
 
-func CalculateDailyROI(investedAmount float64, ratePct float64) float64 {
-	roi := investedAmount * (ratePct / 100.0)
-	return math.Round(roi*100) / 100
+func CalculateDailyReward(investedAmount float64, ratePct float64) float64 {
+	reward := investedAmount * (ratePct / 100.0)
+	return math.Round(reward*100) / 100
 }
 
-func GetReferralRewardPercentage(level int, s *domain.PlatformSettings) float64 {
-	switch level {
-	case 1:
-		return s.RefRewardL1Pct
-	case 2:
-		return s.RefRewardL2Pct
-	case 3:
-		return s.RefRewardL3Pct
-	default:
-		return 0.0
+func CalculateDailyRewardForMonth(investedAmount float64, monthlyRatePct float64, daysInMonth int, isFinalDayOfFullMonth ...bool) float64 {
+	if daysInMonth <= 0 {
+		daysInMonth = 30
 	}
-}
+	totalMonthlyReturn := investedAmount * (monthlyRatePct / 100.0)
+	standardDaily := math.Round((totalMonthlyReturn/float64(daysInMonth))*100) / 100
 
-func GetLevelIncomePercentage(level int, s *domain.PlatformSettings) float64 {
-	if level == 1 {
-		return s.LevelIncomeL1Pct
+	if len(isFinalDayOfFullMonth) > 0 && isFinalDayOfFullMonth[0] {
+		// Final day of a full active month: settle exact residual rounding difference
+		accumulatedBeforeFinal := standardDaily * float64(daysInMonth-1)
+		finalDayAmount := math.Round((totalMonthlyReturn-accumulatedBeforeFinal)*100) / 100
+		if finalDayAmount < 0 {
+			return 0
+		}
+		return finalDayAmount
 	}
-	if level == 2 {
-		return s.LevelIncomeL2Pct
-	}
-	if level == 3 {
-		return s.LevelIncomeL3Pct
-	}
-	if level >= 4 && level <= 10 {
-		return s.LevelIncomeL4ToL10Pct
-	}
-	if level >= 11 && level <= 15 {
-		return s.LevelIncomeL11ToL15Pct
-	}
-	return 0.0
+
+	return standardDaily
 }
 
 func GetUnlockedLevels(directsCount int, directBusiness float64, s *domain.PlatformSettings) int {
@@ -76,10 +65,10 @@ func GetUnlockedLevels(directsCount int, directBusiness float64, s *domain.Platf
 	return 0
 }
 
-func EvaluateCapStatus(ctx context.Context, invRepo repository.InvestmentRepository, investment *domain.Investment) bool {
-	if investment.TotalRewardEarned >= investment.CapLimit {
-		investment.Status = "CAPPED"
-		_ = invRepo.UpdateInvestmentStatus(ctx, investment.ID, "CAPPED")
+func EvaluateCapStatus(ctx context.Context, invRepo repository.InvestmentRepository, sponsorship *domain.Sponsorship) bool {
+	if sponsorship.TotalRewardEarned >= sponsorship.CapLimit {
+		sponsorship.Status = "CAPPED"
+		_ = invRepo.UpdateInvestmentStatus(ctx, sponsorship.ID, "CAPPED")
 		return true
 	}
 	return false

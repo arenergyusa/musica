@@ -10,9 +10,9 @@ import (
 )
 
 type InvestmentService interface {
-	GetPlans(ctx context.Context) ([]*domain.InvestmentPlan, error)
-	CreateInvestment(ctx context.Context, userID uuid.UUID, req *domain.InvestRequest) (*domain.Investment, error)
-	GetMyInvestments(ctx context.Context, userID uuid.UUID) ([]*domain.Investment, error)
+	GetPlans(ctx context.Context) ([]*domain.SponsorshipPlan, error)
+	CreateInvestment(ctx context.Context, userID uuid.UUID, req *domain.InvestRequest) (*domain.Sponsorship, error)
+	GetMyInvestments(ctx context.Context, userID uuid.UUID) ([]*domain.Sponsorship, error)
 }
 
 type investmentService struct {
@@ -31,7 +31,7 @@ func NewInvestmentService(invRepo repository.InvestmentRepository, userRepo repo
 	}
 }
 
-func (s *investmentService) GetPlans(ctx context.Context) ([]*domain.InvestmentPlan, error) {
+func (s *investmentService) GetPlans(ctx context.Context) ([]*domain.SponsorshipPlan, error) {
 	plans, err := s.invRepo.GetPlans(ctx)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (s *investmentService) GetPlans(ctx context.Context) ([]*domain.InvestmentP
 	}
 
 	for _, p := range plans {
-		p.DailyRatePct = settings.DailyROIPct
+		p.DailyRatePct = settings.DailyRewardPct
 		p.NonWorkingCapMultiplier = settings.NonWorkingCapMultiplier
 		p.WorkingCapMultiplier = settings.WorkingCapMultiplier
 	}
@@ -51,7 +51,7 @@ func (s *investmentService) GetPlans(ctx context.Context) ([]*domain.InvestmentP
 	return plans, nil
 }
 
-func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UUID, req *domain.InvestRequest) (*domain.Investment, error) {
+func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UUID, req *domain.InvestRequest) (*domain.Sponsorship, error) {
 	// 1. Get user to check KYC
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
@@ -62,12 +62,12 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 	}
 
 	if user.KycStatus != "APPROVED" && user.KycStatus != "COMPLETED" {
-		return nil, errors.New("KYC must be APPROVED before investing")
+		return nil, errors.New("KYC must be APPROVED before sponsoring projects")
 	}
 
-	// 2. Validate amount is multiple of 10000
-	if int64(req.Amount)%10000 != 0 {
-		return nil, errors.New("investment amount must be a multiple of 10,000")
+	// 2. Validate amount is a whole-rupee value and a multiple of 10,000 INR
+	if req.Amount <= 0 || req.Amount != float64(int64(req.Amount)) || int64(req.Amount)%10000 != 0 {
+		return nil, errors.New("sponsorship amount must be a multiple of 10,000 INR")
 	}
 
 	// 3. Check working vs non-working
@@ -84,10 +84,10 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 	capMultiplier := GetIncomeCap(isWorking, settings)
 	capLimit := req.Amount * capMultiplier
 
-	inv := &domain.Investment{
+	inv := &domain.Sponsorship{
 		UserID:               userID,
 		Amount:               req.Amount,
-		DailyRatePct:         settings.DailyROIPct,
+		DailyRatePct:         settings.DailyRewardPct,
 		Status:               "PENDING", // Requires admin approval for payment receipt
 		CapLimit:             capLimit,
 		WorkingCapAtCreation: isWorking,
@@ -100,6 +100,6 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 	return inv, nil
 }
 
-func (s *investmentService) GetMyInvestments(ctx context.Context, userID uuid.UUID) ([]*domain.Investment, error) {
+func (s *investmentService) GetMyInvestments(ctx context.Context, userID uuid.UUID) ([]*domain.Sponsorship, error) {
 	return s.invRepo.GetInvestmentsByUserID(ctx, userID)
 }

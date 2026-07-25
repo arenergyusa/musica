@@ -1,93 +1,111 @@
-/* eslint-disable */
+import { Suspense } from "react";
 import Link from "next/link";
-import { Music, CheckCircle2 } from "lucide-react";
+import { Music, CheckCircle2, ShieldCheck, PlayCircle, Loader2 } from "lucide-react";
 import { APP } from "@/lib/constants";
 import { LoginForm } from "@/components/forms/LoginForm";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: `Login | ${APP.NAME}`,
-  description: "Log in to your Musica RBF investment account.",
+  description: "Log in to your Musica account to stream official Haryanvi music videos and studio tracks.",
 };
 
 const benefits = [
-  "Track your revenue share credits",
-  "Manage RBF pool contributions",
-  "Monitor your team downline",
-  "Seamless one-click withdrawals"
+  "Stream official high-definition Haryanvi music videos",
+  "Access studio audio releases and exclusive tracks",
+  "Save favorite artist playlists and track history",
+  "Secure account authentication with statutory compliance"
 ];
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex w-full">
-      {/* Left Panel - Branding */}
-      <div className="hidden lg:flex w-1/2 bg-primary/5 flex-col justify-between p-12 border-r border-border/40 relative overflow-hidden">
-        {/* Background blobs */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob" />
-           <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/20 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-2000" />
-        </div>
-
-        <div className="relative z-10">
-          <Link href="/" className="flex items-center space-x-2 w-fit">
-            <div className="bg-primary p-2 rounded-xl text-primary-foreground shadow-lg shadow-primary/20">
-              <Music className="h-6 w-6" />
-            </div>
-            <span className="font-bold text-2xl tracking-tight">{APP.NAME}</span>
-          </Link>
-          
-          <div className="mt-28">
-            <h1 className="text-4xl xl:text-5xl font-extrabold mb-6 leading-tight">
-              Welcome back to <span className="text-primary">Musica.</span>
-            </h1>
-            <p className="text-lg text-muted-foreground mb-10 max-w-md leading-relaxed">
-              Log in to your dashboard to monitor your RBF pool contributions and manage your revenue share credits.
-            </p>
-            
-            <ul className="space-y-5">
-              {benefits.map((benefit, i) => (
-                <li key={i} className="flex items-center text-foreground font-medium">
-                  <CheckCircle2 className="h-5 w-5 text-accent mr-3 shrink-0" />
-                  <span>{benefit}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-[#F8F9FA] dark:bg-[#0B0F19]">
+      <div className="w-full max-w-5xl flex flex-col lg:flex-row bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
         
-        <div className="text-sm text-muted-foreground relative z-10">
-          © {new Date().getFullYear()} {APP.NAME}. All rights reserved.
-        </div>
-      </div>
+        {/* Left Panel - Branding */}
+        <div className="hidden lg:flex w-1/2 bg-slate-900 dark:bg-slate-950 flex-col justify-between p-10 xl:p-12 relative overflow-hidden text-white border-r border-slate-800">
+          {/* Background Ambient Glows */}
+          <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+            <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-blue-600/20 rounded-full filter blur-3xl opacity-60" />
+            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-emerald-500/15 rounded-full filter blur-3xl opacity-50" />
+          </div>
 
-      {/* Right Panel - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative">
-        <div className="w-full max-w-sm relative z-10">
-          <div className="mb-8 lg:hidden flex justify-center">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="bg-primary p-2 rounded-lg text-primary-foreground shadow-md shadow-primary/20">
-                <Music className="h-5 w-5" />
+          <div className="relative z-10">
+            <Link href="/" className="flex items-center space-x-3 w-fit">
+              <div className="bg-blue-600 p-2.5 rounded-xl text-white shadow-md">
+                <Music className="h-6 w-6" />
               </div>
-              <span className="font-bold text-xl tracking-tight">{APP.NAME}</span>
+              <span className="font-extrabold text-2xl tracking-tight text-white">{APP.NAME}</span>
             </Link>
+            
+            <div className="mt-20">
+              <div className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-blue-500/10 text-blue-400 text-xs font-semibold mb-4 border border-blue-500/20">
+                <PlayCircle className="h-3.5 w-3.5" />
+                <span>Official Haryanvi Streaming Hub</span>
+              </div>
+
+              <h1 className="text-3xl xl:text-4xl font-extrabold mb-4 leading-tight tracking-tight text-white">
+                Welcome back to <span className="text-blue-500">Musica.</span>
+              </h1>
+              <p className="text-sm text-slate-300 mb-8 max-w-md leading-relaxed">
+                Log in to stream trending Haryanvi music videos, studio recordings, and artist releases in high definition.
+              </p>
+              
+              <ul className="space-y-4">
+                {benefits.map((benefit, i) => (
+                  <li key={i} className="flex items-center text-slate-200 text-xs font-medium">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400 mr-3 shrink-0" />
+                    <span>{benefit}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
           
-          <div className="mb-8 text-center lg:text-left">
-            <h2 className="text-3xl font-bold mb-2">Log in</h2>
-            <p className="text-muted-foreground">
-              Welcome back! Please enter your details.
+          <div className="text-[11px] text-slate-400 relative z-10 pt-8 border-t border-slate-800/80 font-mono">
+            Pure Desi Music (OPC) Private Limited &bull; CIN: U92490HR2020OPC091236
+          </div>
+        </div>
+
+        {/* Right Panel - Login Form Container */}
+        <div className="w-full lg:w-1/2 p-6 sm:p-10 lg:p-12 flex flex-col justify-between">
+          <div>
+            <div className="lg:hidden flex items-center justify-between mb-8 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <Link href="/" className="flex items-center space-x-2.5">
+                <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
+                  <Music className="h-5 w-5 font-bold" />
+                </div>
+                <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">{APP.NAME}</span>
+              </Link>
+              <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-md border border-emerald-200/60 dark:border-emerald-900">
+                <ShieldCheck className="h-3.5 w-3.5" /> Verified Account
+              </div>
+            </div>
+            
+            <div className="mb-8">
+              <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1.5">
+                Account Sign In
+              </h2>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                Enter your credentials to access your official Musica profile.
+              </p>
+            </div>
+            
+            <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>}>
+              <LoginForm />
+            </Suspense>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Don't have an account?{" "}
+              <Link href="/register" className="text-blue-600 dark:text-blue-400 font-bold hover:underline">
+                Create account now
+              </Link>
             </p>
           </div>
-          
-          <LoginForm />
-          
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            Don't have an account?{" "}
-            <Link href="/register" className="text-primary font-semibold hover:underline">
-              Register now
-            </Link>
-          </p>
         </div>
+
       </div>
     </div>
   );

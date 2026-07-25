@@ -1,11 +1,13 @@
-/* eslint-disable */
 "use client";
 
-import { APP } from "@/lib/constants";
+import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, ArrowDownRight, ArrowUpRight, Clock, CheckCircle2, XCircle, HandCoins } from "lucide-react";
+import {
+  Wallet, ArrowUpRight, Clock, CheckCircle2, XCircle, HandCoins,
+  TrendingUp, FileSpreadsheet
+} from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
@@ -24,71 +26,65 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { WithdrawForm } from "@/components/forms/WithdrawForm";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Transaction, Withdrawal } from "@/lib/types";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
+import { PageHeader } from "@/components/shared/PageHeader";
 
-
-
-// Helper to render status badge
 const renderStatusBadge = (status: string) => {
   switch (status) {
     case "CREDITED":
     case "CREDIT":
     case "SUCCESS":
     case "PROCESSED":
+    case "APPROVED":
       return (
-        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+        <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 text-xs font-semibold">
           <CheckCircle2 className="mr-1 h-3 w-3" /> {status}
         </Badge>
       );
     case "PENDING":
       return (
-        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
+        <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/50 text-amber-600 border-amber-200 text-xs font-semibold">
           <Clock className="mr-1 h-3 w-3" /> {status}
         </Badge>
       );
     case "REJECTED":
     case "DEBIT":
       return (
-        <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/30">
+        <Badge variant="outline" className="bg-rose-50 dark:bg-rose-950/50 text-rose-600 border-rose-200 text-xs font-semibold">
           <XCircle className="mr-1 h-3 w-3" /> {status}
         </Badge>
       );
     default:
-      return <Badge variant="outline">{status}</Badge>;
+      return <Badge variant="outline" className="text-xs">{status}</Badge>;
   }
 };
 
-import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
-
 export default function WalletPage() {
   const [balance, setBalance] = useState(0);
+  const [totalCredited, setTotalCredited] = useState(0);
+  const [totalWithdrawn, setTotalWithdrawn] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
-  const [settings, setSettings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [historyType, setHistoryType] = useState("daily_rewards");
 
   useEffect(() => {
     async function fetchData() {
       try {
-        // Start non-blocking settings request
-        api.get("/settings")
-          .then(res => setSettings(res.data.data))
-          .catch(() => setSettings(null));
-
         const [balRes, txRes, wdRes] = await Promise.all([
           api.get("/wallet/balance"),
-          api.get("/wallet/transactions"),
+          api.get("/wallet/transactions?limit=500"),
           api.get("/withdrawal/history")
         ]);
-        setBalance(balRes.data.data?.balance || 0);
+
+        const balData = balRes.data.data || {};
+        setBalance(balData.balance || 0);
+        setTotalCredited(balData.total_credited || 0);
+        setTotalWithdrawn(balData.total_withdrawn || 0);
+
         setTransactions(txRes.data.data || []);
         setWithdrawals(wdRes.data.data || []);
       } catch (error) {
@@ -103,44 +99,73 @@ export default function WalletPage() {
   const dailyRewards = transactions.filter(t => t.source === "DAILY_ROI");
   const levelIncome = transactions.filter(t => t.source === "LEVEL_INCOME" || t.source === "REFERRAL");
 
+  const handleExportCSV = () => {
+    let csvContent = "";
+    let fileName = "";
+
+    if (historyType === "withdrawals") {
+      csvContent = "Date,Status,Requested Amount,TDS Amount,Net Amount\n";
+      withdrawals.forEach((w) => {
+        const date = new Date(w.created_at || '').toLocaleDateString();
+        csvContent += `"${date}","${w.status}",${w.amount_requested || w.amount || 0},${w.tds_amount || 0},${w.net_amount || 0}\n`;
+      });
+      fileName = `musica_withdrawals_${new Date().toISOString().slice(0, 10)}.csv`;
+    } else {
+      const txList = historyType === "daily_rewards" ? dailyRewards : levelIncome;
+      csvContent = "Date,Type,Source,Description,Amount\n";
+      txList.forEach((t) => {
+        const date = new Date(t.created_at || '').toLocaleDateString();
+        const desc = (t.description || t.source || "").replace(/"/g, '""');
+        csvContent += `"${date}","${t.type}","${t.source}","${desc}",${t.amount}\n`;
+      });
+      fileName = `musica_transactions_${historyType}_${new Date().toISOString().slice(0, 10)}.csv`;
+    }
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    toast.success("CSV Statement downloaded successfully!");
+  };
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
-      {/* Page Header & Balance */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-card p-6 md:p-8 rounded-2xl border shadow-sm relative overflow-hidden">
-        {/* Background gradient decorative element */}
-        <div className="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-        
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      {/* Page Header & Balance Card */}
+      <PageHeader
+        title="Wallet & Payouts"
+        description="Manage your accumulated revenue share rewards, withdrawal requests, and transaction statements."
+      />
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
         <div className="flex items-center gap-4 relative z-10">
-          <div className="bg-primary/10 p-4 rounded-xl border border-primary/20">
-            <Wallet className="h-8 w-8 text-primary" />
+          <div className="bg-blue-50 dark:bg-blue-950/60 p-3.5 rounded-xl text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-900/60">
+            <Wallet className="h-7 w-7" />
           </div>
           <div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">Total Reward Wallet Balance</p>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground truncate max-w-[200px] sm:max-w-none">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Available Reward</p>
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white truncate max-w-[200px] sm:max-w-none">
               {isLoading ? "..." : formatCurrency(balance)}
             </h1>
           </div>
         </div>
 
-        <div className="relative z-10 w-full md:w-auto">
+        <div className="relative z-10 w-full md:w-auto flex items-center gap-3">
           <Dialog>
-            <DialogTrigger 
-              render={
-                <Button size="lg" className="w-full md:w-auto font-semibold px-8 shadow-md" disabled={isLoading}>
-                  <HandCoins className="mr-2 h-5 w-5" />
-                  Withdraw Funds
-                </Button>
-              }
-            />
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogTrigger className="w-full md:w-auto font-bold px-6 shadow-sm bg-blue-600 text-white hover:bg-blue-700 inline-flex items-center justify-center rounded-lg h-10 text-xs cursor-pointer border border-blue-600 transition-all disabled:opacity-50" disabled={isLoading}>
+              <HandCoins className="mr-2 h-4 w-4" />
+              Withdraw Funds
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px] rounded-xl border-slate-200 dark:border-slate-800">
               <DialogHeader>
-                <DialogTitle>Withdraw Funds</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-base font-bold text-slate-900 dark:text-white">Withdrawal Request</DialogTitle>
+                <DialogDescription className="text-xs text-slate-500">
                   Enter the amount you wish to withdraw to your registered bank account.
                 </DialogDescription>
               </DialogHeader>
-              <div className="pt-4">
+              <div className="pt-2">
                 <WithdrawForm availableBalance={balance} />
               </div>
             </DialogContent>
@@ -148,27 +173,76 @@ export default function WalletPage() {
         </div>
       </div>
 
+      {/* Wallet Summary Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+          <CardContent className="p-4 flex items-center gap-3.5">
+            <div className="p-2.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 rounded-lg">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Lifetime Credited</p>
+              <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalCredited)}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+          <CardContent className="p-4 flex items-center gap-3.5">
+            <div className="p-2.5 bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 rounded-lg">
+              <ArrowUpRight className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Withdrawn</p>
+              <p className="text-lg font-extrabold text-slate-900 dark:text-white">{formatCurrency(totalWithdrawn)}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+          <CardContent className="p-4 flex items-center gap-3.5">
+            <div className="p-2.5 bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 rounded-lg">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Pending Withdrawals</p>
+              <p className="text-lg font-extrabold text-slate-900 dark:text-white">
+                {withdrawals.filter(w => w.status === "PENDING").length}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Transaction History Section */}
-      <Card className="shadow-sm border">
-        <div className="p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-muted/10">
-          <CardTitle className="text-lg">Transaction History</CardTitle>
-          <div className="flex flex-col sm:flex-row gap-3">
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <CardTitle className="text-base font-bold text-slate-900 dark:text-white">Statement &amp; Transaction History</CardTitle>
+            <CardDescription className="text-xs text-slate-500">Filter and export your revenue ledger records</CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
             <Select value={historyType} onValueChange={(val) => val && setHistoryType(val)}>
-              <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectTrigger className="w-[170px] text-xs h-9 rounded-lg border-slate-200 dark:border-slate-800">
                 <SelectValue placeholder="Select type">
                   {{
-                    daily_rewards: "Interest",
-                    level_income: "Level Income",
+                    daily_rewards: "Daily Rewards",
+                    level_income: "Level & Invite",
                     withdrawals: "Withdrawals"
                   }[historyType]}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="daily_rewards">Interest</SelectItem>
-                <SelectItem value="level_income">Level Income</SelectItem>
+                <SelectItem value="daily_rewards">Daily Rewards</SelectItem>
+                <SelectItem value="level_income">Level &amp; Invite</SelectItem>
                 <SelectItem value="withdrawals">Withdrawals</SelectItem>
               </SelectContent>
             </Select>
+
+            <Button variant="outline" size="sm" className="h-9 text-xs border-slate-200 dark:border-slate-800 font-bold rounded-lg" onClick={handleExportCSV}>
+              <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+              Export CSV
+            </Button>
           </div>
         </div>
 
@@ -176,30 +250,32 @@ export default function WalletPage() {
           <div className="overflow-x-auto w-full">
             {historyType === "daily_rewards" && (
               <Table>
-                <TableHeader className="bg-muted/30">
+                <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
                   <TableRow>
-                    <TableHead className="pl-6">Date</TableHead>
-                    <TableHead>Source Pool</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right pr-6">Amount</TableHead>
+                    <TableHead className="pl-5 text-xs font-bold text-slate-700 dark:text-slate-300">Date</TableHead>
+                    <TableHead className="text-xs font-bold text-slate-700 dark:text-slate-300">Source</TableHead>
+                    <TableHead className="text-xs font-bold text-slate-700 dark:text-slate-300">Type</TableHead>
+                    <TableHead className="text-right pr-5 text-xs font-bold text-slate-700 dark:text-slate-300">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {dailyRewards.length > 0 ? (
                     dailyRewards.map((tx) => (
-                      <TableRow key={tx.id} className="hover:bg-muted/10">
-                        <TableCell className="pl-6 font-medium whitespace-nowrap">{new Date(tx.created_at || '').toLocaleString()}</TableCell>
-                        <TableCell>{tx.source}</TableCell>
+                      <TableRow key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                        <TableCell className="pl-5 font-medium whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">
+                          {new Date(tx.created_at || '').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </TableCell>
+                        <TableCell className="text-xs font-semibold text-slate-900 dark:text-white">Daily Revenue Share (0.3333%/day)</TableCell>
                         <TableCell>{renderStatusBadge(tx.type)}</TableCell>
-                        <TableCell className="text-right pr-6 font-semibold text-emerald-500">
+                        <TableCell className="text-right pr-5 font-extrabold text-xs text-emerald-600 dark:text-emerald-400">
                           +{formatCurrency(tx.amount)}
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                        {isLoading ? "Loading..." : "No interest history found."}
+                      <TableCell colSpan={4} className="h-24 text-center text-xs text-slate-400">
+                        {isLoading ? "Loading..." : "No daily reward history recorded."}
                       </TableCell>
                     </TableRow>
                   )}
@@ -209,30 +285,32 @@ export default function WalletPage() {
 
             {historyType === "level_income" && (
               <Table>
-                <TableHeader className="bg-muted/30">
+                <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
                   <TableRow>
-                    <TableHead className="pl-6">Date</TableHead>
-                    <TableHead>From Member / Source</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right pr-6">Amount</TableHead>
+                    <TableHead className="pl-5 text-xs font-bold text-slate-700 dark:text-slate-300">Date</TableHead>
+                    <TableHead className="text-xs font-bold text-slate-700 dark:text-slate-300">Description</TableHead>
+                    <TableHead className="text-xs font-bold text-slate-700 dark:text-slate-300">Type</TableHead>
+                    <TableHead className="text-right pr-5 text-xs font-bold text-slate-700 dark:text-slate-300">Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {levelIncome.length > 0 ? (
                     levelIncome.map((tx) => (
-                      <TableRow key={tx.id} className="hover:bg-muted/10">
-                        <TableCell className="pl-6 font-medium whitespace-nowrap">{new Date(tx.created_at || '').toLocaleString()}</TableCell>
-                        <TableCell>{tx.description || tx.source}</TableCell>
+                      <TableRow key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                        <TableCell className="pl-5 font-medium whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">
+                          {new Date(tx.created_at || '').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </TableCell>
+                        <TableCell className="text-xs font-semibold text-slate-900 dark:text-white">{tx.description || tx.source}</TableCell>
                         <TableCell>{renderStatusBadge(tx.type)}</TableCell>
-                        <TableCell className="text-right pr-6 font-semibold text-emerald-500">
+                        <TableCell className="text-right pr-5 font-extrabold text-xs text-emerald-600 dark:text-emerald-400">
                           +{formatCurrency(tx.amount)}
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                        {isLoading ? "Loading..." : "No level income found."}
+                      <TableCell colSpan={4} className="h-24 text-center text-xs text-slate-400">
+                        {isLoading ? "Loading..." : "No level/invite income history recorded."}
                       </TableCell>
                     </TableRow>
                   )}
@@ -242,41 +320,38 @@ export default function WalletPage() {
 
             {historyType === "withdrawals" && (
               <Table>
-                <TableHeader className="bg-muted/30">
+                <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
                   <TableRow>
-                    <TableHead className="pl-6">Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Amount</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">TDS</TableHead>
-                    <TableHead className="text-right pr-6">Net Credit</TableHead>
+                    <TableHead className="pl-5 text-xs font-bold text-slate-700 dark:text-slate-300">Date</TableHead>
+                    <TableHead className="text-xs font-bold text-slate-700 dark:text-slate-300">Status</TableHead>
+                    <TableHead className="text-right text-xs font-bold text-slate-700 dark:text-slate-300">Requested</TableHead>
+                    <TableHead className="text-right text-xs font-bold text-slate-700 dark:text-slate-300">TDS (10%)</TableHead>
+                    <TableHead className="text-right pr-5 text-xs font-bold text-slate-900 dark:text-white">Net Received</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {withdrawals.length > 0 ? (
                     withdrawals.map((tx) => (
-                      <TableRow key={tx.id} className="hover:bg-muted/10">
-                        <TableCell className="pl-6 font-medium whitespace-nowrap">{new Date(tx.created_at || '').toLocaleString()}</TableCell>
+                      <TableRow key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                        <TableCell className="pl-5 font-medium whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">
+                          {new Date(tx.created_at || '').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </TableCell>
                         <TableCell>{renderStatusBadge(tx.status)}</TableCell>
-                        <TableCell className="text-right text-muted-foreground hidden sm:table-cell">
+                        <TableCell className="text-right text-slate-500 text-xs font-medium">
                           {formatCurrency((tx.amount_requested as number) || tx.amount || 0)}
                         </TableCell>
-                        <TableCell className="text-right text-destructive hidden sm:table-cell">
+                        <TableCell className="text-right text-red-500 text-xs font-medium">
                           -{formatCurrency(tx.tds_amount || 0)}
-                          <span className="text-xs opacity-70 ml-1">
-                            {((tx as any).withdrawal_fee_pct ?? settings?.withdrawal_fee_pct) != null
-                              ? `(${((tx as any).withdrawal_fee_pct ?? settings?.withdrawal_fee_pct)}%)`
-                              : '(N/A)'}
-                          </span>
                         </TableCell>
-                        <TableCell className="text-right pr-6 font-semibold text-foreground">
+                        <TableCell className="text-right pr-5 font-extrabold text-xs text-slate-900 dark:text-white">
                           {formatCurrency(tx.net_amount || 0)}
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                        {isLoading ? "Loading..." : "No withdrawal history found."}
+                      <TableCell colSpan={5} className="h-24 text-center text-xs text-slate-400">
+                        {isLoading ? "Loading..." : "No withdrawal history recorded."}
                       </TableCell>
                     </TableRow>
                   )}

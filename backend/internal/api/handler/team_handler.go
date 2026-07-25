@@ -26,7 +26,7 @@ func (h *TeamHandler) GetDirectReferrals(c *gin.Context) {
 
 	users, err := h.teamService.GetDirectReferrals(c.Request.Context(), userID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get referrals", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get referrals", err)
 		return
 	}
 
@@ -42,7 +42,7 @@ func (h *TeamHandler) GetTeamStats(c *gin.Context) {
 
 	stats, err := h.teamService.GetTeamStats(c.Request.Context(), userID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get team stats", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get team stats", err)
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *TeamHandler) GetTree(c *gin.Context) {
 
 	tree, err := h.teamService.GetTree(c.Request.Context(), userID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "Failed to get team tree", err.Error())
+		response.Error(c, http.StatusInternalServerError, "Failed to get team tree", err)
 		return
 	}
 
