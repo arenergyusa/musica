@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -17,10 +18,11 @@ import (
 
 type UserHandler struct {
 	userService service.UserService
+	kycVerificationService service.KYCVerificationService
 }
 
-func NewUserHandler(userService service.UserService) *UserHandler {
-	return &UserHandler{userService: userService}
+func NewUserHandler(userService service.UserService, kycVerificationService service.KYCVerificationService) *UserHandler {
+	return &UserHandler{userService: userService, kycVerificationService: kycVerificationService}
 }
 
 func (h *UserHandler) GetProfile(c *gin.Context) {
@@ -91,60 +93,63 @@ func (h *UserHandler) SubmitKYC(c *gin.Context) {
 		log.Printf("Failed to create upload dir: %v", err)
 	}
 
-	var documentURL string
-	timestamp := time.Now().Unix()
-
-	// Try reading multipart form files
 	form, err := c.MultipartForm()
-	if err == nil && form != nil {
-		savedFiles := []string{}
-		fileFields := []string{"aadhaar_front", "aadhaar_back", "pan_front", "selfie"}
-
-		for _, field := range fileFields {
-			files := form.File[field]
-			if len(files) > 0 {
-				file := files[0]
-				ext := filepath.Ext(file.Filename)
-				if ext == "" {
-					ext = ".jpg"
-				}
-				newFilename := fmt.Sprintf("kyc_%s_%s_%d%s", userID.String(), field, timestamp, ext)
-				savePath := filepath.Join(uploadDir, newFilename)
-
-				if err := c.SaveUploadedFile(file, savePath); err == nil {
-					savedFiles = append(savedFiles, "/uploads/kyc/"+newFilename)
-				} else {
-					log.Printf("Error saving uploaded file %s: %v", field, err)
-				}
-			}
-		}
-
-		if len(savedFiles) > 0 {
-			documentURL = strings.Join(savedFiles, ",")
-		}
+	if err != nil || form == nil {
+		response.Error(c, http.StatusBadRequest, "Camera scans are required for KYC", nil)
+		return
 	}
 
-	// Fallback to JSON payload if not multipart
-	if documentURL == "" {
-		var req struct {
-			DocumentURL string `json:"document_url"`
+	timestamp := time.Now().Unix()
+	fileFields := []string{"aadhaar_front", "aadhaar_back", "pan_front", "selfie_front", "selfie_left", "selfie_right", "selfie_up"}
+	verificationFiles := make([]service.KYCFile, 0, len(fileFields))
+	savedFiles := make([]string, 0, len(fileFields))
+	for _, field := range fileFields {
+		files := form.File[field]
+		if len(files) != 1 || files[0].Size <= 0 || files[0].Size > 5*1024*1024 {
+			response.Error(c, http.StatusBadRequest, "Each required camera scan must be an image up to 5MB", nil)
+			return
 		}
-		if err := c.ShouldBindJSON(&req); err == nil && req.DocumentURL != "" {
-			documentURL = req.DocumentURL
+		file := files[0]
+		contentType := file.Header.Get("Content-Type")
+		if contentType != "image/jpeg" && contentType != "image/png" {
+			response.Error(c, http.StatusBadRequest, "Only JPEG or PNG camera scans are accepted", nil)
+			return
 		}
+		opened, err := file.Open()
+		if err != nil { response.Error(c, http.StatusBadRequest, "Unable to read camera scan", nil); return }
+		data, readErr := io.ReadAll(io.LimitReader(opened, 5*1024*1024+1))
+		opened.Close()
+		if readErr != nil || len(data) == 0 || len(data) > 5*1024*1024 { response.Error(c, http.StatusBadRequest, "Invalid camera scan", nil); return }
+		verificationFiles = append(verificationFiles, service.KYCFile{Field: field, Filename: field + ".jpg", ContentType: contentType, Data: data})
+
+		newFilename := fmt.Sprintf("kyc_%s_%s_%d.jpg", userID.String(), field, timestamp)
+		if err := os.WriteFile(filepath.Join(uploadDir, newFilename), data, 0600); err != nil {
+			response.Error(c, http.StatusInternalServerError, "Failed to securely save KYC scan", err)
+			return
+		}
+		savedFiles = append(savedFiles, "/uploads/kyc/"+newFilename)
 	}
 
-	if documentURL == "" {
-		documentURL = fmt.Sprintf("/uploads/kyc/kyc_%s_submission_%d.jpg", userID.String(), timestamp)
+	result, err := h.kycVerificationService.Verify(c.Request.Context(), verificationFiles)
+	if err != nil {
+		response.Error(c, http.StatusUnprocessableEntity, "Automated KYC verification could not be completed", err.Error())
+		return
+	}
+	if err := service.ValidateKYCResult(result); err != nil {
+		_ = h.userService.RejectAutomatedKYC(c.Request.Context(), userID, strings.Join(savedFiles, ","))
+		response.Error(c, http.StatusUnprocessableEntity, "KYC verification failed", err.Error())
+		return
 	}
 
-	if err := h.userService.SubmitKYC(c.Request.Context(), userID, documentURL); err != nil {
+	if err := h.userService.CompleteAutomatedKYC(c.Request.Context(), userID, strings.Join(savedFiles, ","), result.AadhaarNumber, strings.ToUpper(result.PANNumber)); err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to submit KYC", err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "KYC documents submitted successfully for review", gin.H{
-		"document_url": documentURL,
+	response.Success(c, http.StatusOK, "KYC verified and approved", gin.H{
+		"status": "APPROVED",
+		"aadhaar_number": "********" + result.AadhaarNumber[8:],
+		"pan_number": result.PANNumber[:5] + "****" + result.PANNumber[9:],
 	})
 }
 

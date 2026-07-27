@@ -64,7 +64,9 @@ export default function TeamPage() {
         setDirects(directsData.map((d: TeamDirect) => ({
           ...d,
           level: "Level 1",
-          status: d.is_active ? "ACTIVE" : "INACTIVE",
+          // The API returns the user's account status. Preserve it instead of
+          // relying on an `is_active` field that is not returned by this endpoint.
+          status: d.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
           investment: d.total_investment || 0
         })));
 

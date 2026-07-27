@@ -16,6 +16,8 @@ type UserService interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (*domain.User, error)
 	UpdateProfile(ctx context.Context, userID uuid.UUID, req *domain.UpdateProfileRequest) (*domain.User, error)
 	SubmitKYC(ctx context.Context, userID uuid.UUID, documentURL string) error
+	CompleteAutomatedKYC(ctx context.Context, userID uuid.UUID, documentURL, aadhaar, pan string) error
+	RejectAutomatedKYC(ctx context.Context, userID uuid.UUID, documentURL string) error
 	GetKYCStatus(ctx context.Context, userID uuid.UUID) (string, string, error)
 	GetDashboard(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error)
 	ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) error
@@ -113,6 +115,27 @@ func (s *userService) SubmitKYC(ctx context.Context, userID uuid.UUID, documentU
 	user.KycStatus = "PENDING"
 	user.DocumentURL = documentURL
 
+	return s.userRepo.Update(ctx, user)
+}
+
+func (s *userService) CompleteAutomatedKYC(ctx context.Context, userID uuid.UUID, documentURL, aadhaar, pan string) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil { return err }
+	if user == nil { return errors.New("user not found") }
+	user.Aadhaar = aadhaar
+	user.PAN = pan
+	user.DocumentURL = documentURL
+	user.KycStatus = "APPROVED"
+	user.KycRejectionReason = ""
+	return s.userRepo.Update(ctx, user)
+}
+
+func (s *userService) RejectAutomatedKYC(ctx context.Context, userID uuid.UUID, documentURL string) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil { return err }
+	if user == nil { return errors.New("user not found") }
+	user.DocumentURL = documentURL
+	user.KycStatus = "REJECTED"
 	return s.userRepo.Update(ctx, user)
 }
 

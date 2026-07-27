@@ -49,7 +49,6 @@ func LoadConfig() (config Config, err error) {
 	if config.EncryptionKey == "" || len(config.EncryptionKey) != 32 {
 		return config, fmt.Errorf("ENCRYPTION_KEY is required and must be exactly 32 bytes")
 	}
-
 	config.SMTPHost = os.Getenv("SMTP_HOST")
 	config.SMTPUser = os.Getenv("SMTP_USER")
 	config.SMTPPass = os.Getenv("SMTP_PASS")

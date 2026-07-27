@@ -1,484 +1,204 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
-import {
-  Loader2, Camera, X, CheckCircle2, ShieldCheck,
-  UserCheck, ScanLine, RotateCcw, AlertTriangle, RefreshCw
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-
-import { kycSchema, type KycInput } from "@/lib/validators";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertTriangle, Camera, CheckCircle2, Circle, Loader2, ShieldCheck, X } from "lucide-react";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-type DocField = "aadhaarFront" | "aadhaarBack" | "pan" | "selfie";
+type DocField = "aadhaarFront" | "aadhaarBack" | "pan" | "selfieFront" | "selfieLeft" | "selfieRight" | "selfieUp";
+type Capture = { name: DocField; label: string; instruction: string; facingMode: "environment" | "user" };
+
+const fields: Capture[] = [
+  { name: "aadhaarFront", label: "Aadhaar Front", instruction: "Keep Aadhaar front flat and fully inside the frame.", facingMode: "environment" },
+  { name: "aadhaarBack", label: "Aadhaar Back", instruction: "Turn Aadhaar over and keep it fully inside the frame.", facingMode: "environment" },
+  { name: "pan", label: "PAN Card", instruction: "Keep PAN card flat, clear, and fully inside the frame.", facingMode: "environment" },
+  { name: "selfieFront", label: "Face Front", instruction: "Look straight at the camera.", facingMode: "user" },
+  { name: "selfieLeft", label: "Face Left", instruction: "Slowly turn your face to the left.", facingMode: "user" },
+  { name: "selfieRight", label: "Face Right", instruction: "Slowly turn your face to the right.", facingMode: "user" },
+  { name: "selfieUp", label: "Face Up", instruction: "Raise your face slightly upwards.", facingMode: "user" },
+];
 
 export function KycForm() {
-  const [isLoading, setIsLoading] = useState(false);
-
-  // File Previews (Object URLs)
-  const [previews, setPreviews] = useState<{ [key in DocField]?: string }>({});
-
-  // Camera Scanner Modal State
-  const [activeCameraField, setActiveCameraField] = useState<{
-    name: DocField;
-    label: string;
-    facingMode: "environment" | "user";
-  } | null>(null);
-
+  const [captures, setCaptures] = useState<Partial<Record<DocField, File>>>({});
+  const [sequence, setSequence] = useState<Capture[]>(fields);
+  const [previews, setPreviews] = useState<Partial<Record<DocField, string>>>({});
+  const [activeCapture, setActiveCapture] = useState<Capture | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-
+  const [cameraError, setCameraError] = useState("");
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [qualityReady, setQualityReady] = useState(false);
+  const [qualityMessage, setQualityMessage] = useState("Checking camera quality…");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const backFileInputRefs = useRef<{ [key in DocField]?: HTMLInputElement | null }>({});
 
-  const form = useForm<KycInput>({
-    resolver: zodResolver(kycSchema),
-    defaultValues: {
-      aadhaarNumber: "",
-      panNumber: "",
-    },
-  });
+  const closeCamera = () => {
+    stream?.getTracks().forEach((track) => track.stop());
+    setStream(null);
+    setActiveCapture(null);
+    setCameraError("");
+    setCountdown(null);
+    setQualityReady(false);
+  };
 
-  // Start Camera Stream when Modal opens
   useEffect(() => {
-    if (!activeCameraField) {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-        setStream(null);
-      }
-      setCameraError(null);
-      return;
-    }
+    if (!activeCapture) return;
+    let localStream: MediaStream | null = null;
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: activeCapture.facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    }).then((nextStream) => {
+      localStream = nextStream;
+      setStream(nextStream);
+      if (videoRef.current) videoRef.current.srcObject = nextStream;
+    }).catch(() => setCameraError("Camera permission is required. File or gallery uploads are not accepted for KYC."));
+    return () => localStream?.getTracks().forEach((track) => track.stop());
+  }, [activeCapture]);
 
-    async function initCamera() {
-      setCameraError(null);
-      try {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: activeCameraField?.facingMode || "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        });
-        setStream(mediaStream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
-        }
-      } catch (err: any) {
-        console.error("Camera Access Error:", err);
-        setCameraError("Camera access denied or device camera unavailable. Use direct device capture.");
+  useEffect(() => {
+    if (!stream || !activeCapture || !videoRef.current || !canvasRef.current) return;
+    const checkQuality = () => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.videoWidth === 0) return;
+      canvas.width = 160;
+      canvas.height = 120;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) return;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let brightness = 0;
+      let sharpness = 0;
+      let samples = 0;
+      for (let y = 1; y < 119; y += 4) for (let x = 1; x < 159; x += 4) {
+        const index = (y * 160 + x) * 4;
+        const luminance = (pixels[index] * 0.299) + (pixels[index + 1] * 0.587) + (pixels[index + 2] * 0.114);
+        const previous = (pixels[index - 4] * 0.299) + (pixels[index - 3] * 0.587) + (pixels[index - 2] * 0.114);
+        brightness += luminance;
+        sharpness += Math.abs(luminance - previous);
+        samples++;
       }
-    }
-
-    initCamera();
-
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
+      const averageBrightness = brightness / samples;
+      const averageSharpness = sharpness / samples;
+      if (averageBrightness < 55) { setQualityReady(false); setQualityMessage("More light needed"); }
+      else if (averageBrightness > 215) { setQualityReady(false); setQualityMessage("Reduce glare / bright light"); }
+      else if (averageSharpness < 7) { setQualityReady(false); setQualityMessage("Hold camera steady — frame is blurry"); }
+      else { setQualityReady(true); setQualityMessage("Frame looks clear — auto-capture ready"); }
     };
-  }, [activeCameraField]);
+    const interval = window.setInterval(checkQuality, 400);
+    checkQuality();
+    return () => window.clearInterval(interval);
+  }, [stream, activeCapture]);
 
-  // Capture Live Snapshot from Video Feed
-  const captureSnapshot = () => {
-    if (!videoRef.current || !canvasRef.current || !activeCameraField) return;
+  useEffect(() => {
+    if (!stream || !activeCapture || !qualityReady) { setCountdown(null); return; }
+    setCountdown(3);
+    const interval = window.setInterval(() => setCountdown((value) => value && value > 1 ? value - 1 : value), 1000);
+    const timer = window.setTimeout(() => capturePhoto(), 3000);
+    return () => { window.clearInterval(interval); window.clearTimeout(timer); };
+  // The timer deliberately begins only after frame-quality checks pass.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream, activeCapture, qualityReady]);
 
+  const capturePhoto = () => {
+    if (!activeCapture || !videoRef.current || !canvasRef.current || !qualityReady) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Flip horizontally if front camera selfie
-    if (activeCameraField.facingMode === "user") {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    if (activeCapture.facingMode === "user") {
+      context.translate(canvas.width, 0);
+      context.scale(-1, 1);
     }
-
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return;
-        const file = new File(
-          [blob],
-          `kyc_${activeCameraField.name}_${Date.now()}.jpg`,
-          { type: "image/jpeg" }
-        );
-
-        const previewUrl = URL.createObjectURL(blob);
-        setPreviews((prev) => ({ ...prev, [activeCameraField.name]: previewUrl }));
-        form.setValue(activeCameraField.name, file, { shouldValidate: true });
-
-        // Close Modal
-        closeCameraModal();
-        toast.success(`${activeCameraField.label} captured successfully!`);
-      },
-      "image/jpeg",
-      0.9
-    );
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (!blob || !activeCapture) return;
+      const file = new File([blob], `${activeCapture.name}-${Date.now()}.jpg`, { type: "image/jpeg" });
+      const preview = URL.createObjectURL(file);
+      setCaptures((current) => ({ ...current, [activeCapture.name]: file }));
+      setPreviews((current) => ({ ...current, [activeCapture.name]: preview }));
+      const currentIndex = sequence.findIndex((field) => field.name === activeCapture.name);
+      const next = sequence[currentIndex + 1];
+      if (next) {
+        setActiveCapture(next);
+      } else {
+        closeCamera();
+        toast.success("All scans captured. You can retake any step before verification.");
+      }
+    }, "image/jpeg", 0.92);
   };
 
-  const closeCameraModal = () => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
+  const removeCapture = (field: DocField) => {
+    if (previews[field]) URL.revokeObjectURL(previews[field]!);
+    setCaptures((current) => ({ ...current, [field]: undefined }));
+    setPreviews((current) => ({ ...current, [field]: undefined }));
+  };
+
+  const startGuidedCapture = () => {
+    const nextSequence = [...fields.slice(0, 3), ...fields.slice(3).sort(() => Math.random() - 0.5)];
+    setSequence(nextSequence);
+    setActiveCapture(nextSequence.find((field) => !captures[field.name]) || nextSequence[0]);
+  };
+
+  const submit = async () => {
+    if (sequence.some(({ name }) => !captures[name])) {
+      toast.error("Capture all documents and the Front, Left, Right, and Up selfie sequence first.");
+      return;
     }
-    setActiveCameraField(null);
-  };
-
-  const handleNativeFileSelect = (field: DocField, file: File | undefined) => {
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setPreviews((prev) => ({ ...prev, [field]: url }));
-      form.setValue(field, file, { shouldValidate: true });
-    }
-  };
-
-  const removeCapturedDoc = (field: DocField) => {
-    setPreviews((prev) => {
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
-    form.setValue(field, undefined as any, { shouldValidate: true });
-  };
-
-  async function onSubmit(data: KycInput) {
-    setIsLoading(true);
-
+    setIsSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append("aadhaar_number", data.aadhaarNumber);
-      formData.append("pan_number", data.panNumber);
-      formData.append("aadhaar_front", data.aadhaarFront);
-      formData.append("aadhaar_back", data.aadhaarBack);
-      formData.append("pan_front", data.pan);
-      formData.append("selfie", data.selfie);
-
-      await api.post("/user/kyc", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      toast.success("KYC documents & selfie submitted successfully!", {
-        description: "Your verification request is under compliance review.",
-      });
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      formData.append("aadhaar_front", captures.aadhaarFront!);
+      formData.append("aadhaar_back", captures.aadhaarBack!);
+      formData.append("pan_front", captures.pan!);
+      formData.append("selfie_front", captures.selfieFront!);
+      formData.append("selfie_left", captures.selfieLeft!);
+      formData.append("selfie_right", captures.selfieRight!);
+      formData.append("selfie_up", captures.selfieUp!);
+      await api.post("/user/kyc", formData);
+      toast.success("KYC verified and approved.", { description: "Aadhaar and PAN names matched and the live selfie check passed." });
+      window.location.reload();
     } catch (error: any) {
-      console.error("KYC submission error:", error);
-      toast.error(error.response?.data?.message || "Failed to submit KYC documents.");
+      toast.error(error.response?.data?.message || "KYC verification failed. Retake clear camera scans and try again.");
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
-  };
-
-  const renderScanButton = (
-    field: DocField,
-    label: string,
-    facingMode: "environment" | "user"
-  ) => {
-    const preview = previews[field];
-
-    return (
-      <div className="space-y-2">
-        <FormLabel className="text-xs font-bold text-slate-800 dark:text-slate-200">
-          {label}
-        </FormLabel>
-
-        {/* Hidden Fallback Input */}
-        <input
-          type="file"
-          accept="image/*"
-          capture={facingMode}
-          className="hidden"
-          ref={(el) => {
-            backFileInputRefs.current[field] = el;
-          }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            handleNativeFileSelect(field, file);
-          }}
-        />
-
-        {!preview ? (
-          <div className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col items-center justify-center text-center bg-slate-50/50 dark:bg-slate-900/50 hover:bg-blue-50/50 transition-colors h-44 group">
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/60 rounded-full text-blue-600 dark:text-blue-400 mb-3 group-hover:scale-110 transition-transform shadow-xs">
-              <Camera className="h-6 w-6" />
-            </div>
-            <p className="text-xs font-bold text-slate-900 dark:text-white">
-              {facingMode === "user" ? "Take Live Selfie Photo" : "Scan Document"}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1 mb-3">
-              {facingMode === "user" ? "Use Front Camera for face verification" : "Use Back Camera for live document scan"}
-            </p>
-
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-8 px-3 shadow-xs"
-                onClick={() => setActiveCameraField({ name: field, label, facingMode })}
-                disabled={isLoading}
-              >
-                <ScanLine className="h-3.5 w-3.5 mr-1.5" />
-                Live Camera Scan
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="text-xs font-semibold rounded-lg h-8 px-3 border-slate-200 dark:border-slate-800"
-                onClick={() => backFileInputRefs.current[field]?.click()}
-                disabled={isLoading}
-              >
-                Upload File
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 h-44 bg-slate-900 group shadow-xs">
-            <Image
-              src={preview}
-              alt={label}
-              fill
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                className="text-xs font-bold rounded-lg h-8"
-                onClick={() => removeCapturedDoc(field)}
-              >
-                <X className="h-3.5 w-3.5 mr-1" /> Retake / Remove
-              </Button>
-            </div>
-            <div className="absolute bottom-2 left-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center shadow-xs">
-              <CheckCircle2 className="h-3 w-3 mr-1" /> Captured
-            </div>
-          </div>
-        )}
-      </div>
-    );
   };
 
   return (
     <>
-      {/* Hidden Canvas for Camera Snapshots */}
       <canvas ref={canvasRef} className="hidden" />
-
-      {/* Live Camera Scanner Modal */}
-      <Dialog open={Boolean(activeCameraField)} onOpenChange={(open) => !open && closeCameraModal()}>
-        <DialogContent className="sm:max-w-[480px] p-4 rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-950 text-white">
-          <DialogHeader className="pb-2 border-b border-slate-800">
-            <DialogTitle className="text-sm font-bold flex items-center text-white">
-              <Camera className="h-4 w-4 mr-2 text-blue-400" />
-              {activeCameraField?.facingMode === "user" ? "Live Selfie Face Scan" : `Scan ${activeCameraField?.label}`}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-400">
-              {activeCameraField?.facingMode === "user"
-                ? "Position your face clearly inside the frame and click Capture Selfie."
-                : "Hold your document flat and clear inside the camera viewfinder."}
-            </DialogDescription>
+      <Dialog open={Boolean(activeCapture)} onOpenChange={(open) => !open && closeCamera()}>
+        <DialogContent className="sm:max-w-[480px] border-slate-800 bg-slate-950 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm"><Camera className="h-4 w-4 text-blue-400" />Step {sequence.findIndex((field) => field.name === activeCapture?.name) + 1} of {sequence.length}: {activeCapture?.label}</DialogTitle>
+            <DialogDescription className="text-slate-400">{activeCapture?.instruction}</DialogDescription>
           </DialogHeader>
-
-          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black flex items-center justify-center my-2 border border-slate-800">
-            {cameraError ? (
-              <div className="p-4 text-center space-y-3">
-                <AlertTriangle className="h-8 w-8 text-amber-400 mx-auto" />
-                <p className="text-xs text-slate-300 leading-relaxed">{cameraError}</p>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="bg-blue-600 text-white font-bold text-xs rounded-lg"
-                  onClick={() => activeCameraField && backFileInputRefs.current[activeCameraField.name]?.click()}
-                >
-                  Choose From Gallery / File
-                </Button>
-              </div>
-            ) : (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`w-full h-full object-cover ${activeCameraField?.facingMode === "user" ? "scale-x-[-1]" : ""}`}
-                />
-
-                {/* Viewfinder Target Frame Overlay */}
-                <div className="absolute inset-4 border-2 border-dashed border-blue-400/80 rounded-xl pointer-events-none flex items-center justify-center">
-                  <div className="text-[10px] font-bold text-blue-300 bg-slate-950/80 px-3 py-1 rounded-full border border-blue-400/40">
-                    {activeCameraField?.facingMode === "user" ? "Align Face Center" : "Align Document Borders"}
-                  </div>
-                </div>
-              </>
-            )}
+          <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-slate-800 bg-black">
+            {cameraError ? <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-xs text-slate-300"><AlertTriangle className="h-7 w-7 text-amber-400" />{cameraError}</div> : <><video ref={videoRef} autoPlay playsInline muted className={`h-full w-full object-cover ${activeCapture?.facingMode === "user" ? "scale-x-[-1]" : ""}`} /><div className="pointer-events-none absolute inset-5 rounded-xl border-2 border-dashed border-blue-400/80" /><span className={`absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-bold ${qualityReady ? "bg-emerald-600/90" : "bg-amber-600/90"}`}>{qualityReady ? `Auto-capturing in ${countdown ?? 3}s` : qualityMessage}</span></>}
           </div>
-
-          <div className="flex justify-between items-center pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-xs font-bold border-slate-800 text-slate-300 hover:bg-slate-900 rounded-lg"
-              onClick={closeCameraModal}
-            >
-              Cancel
-            </Button>
-
-            {!cameraError && (
-              <Button
-                type="button"
-                size="sm"
-                className="text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-5 shadow-sm"
-                onClick={captureSnapshot}
-              >
-                <Camera className="h-4 w-4 mr-1.5" />
-                Capture Snapshot
-              </Button>
-            )}
-          </div>
+          <div className="flex justify-between"><Button type="button" variant="outline" onClick={closeCamera}>Cancel</Button>{!cameraError && <Button type="button" onClick={capturePhoto} disabled={!qualityReady}><Camera className="mr-2 h-4 w-4" />Capture now</Button>}</div>
         </DialogContent>
       </Dialog>
 
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-
-          {/* Step 1: Aadhaar Verification (Back Camera Document Scan) */}
-          <Card className="border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden bg-white dark:bg-slate-900">
-            <div className="bg-slate-50 dark:bg-slate-800/50 px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center">
-                <span className="bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs mr-2 font-mono">1</span>
-                Aadhaar Document Scan
-              </h3>
-            </div>
-            <CardContent className="p-5 space-y-5">
-              <FormField
-                control={form.control}
-                name="aadhaarNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs font-bold">12-Digit Aadhaar Number</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="1234 5678 9012"
-                        maxLength={12}
-                        className="text-xs h-10 rounded-lg font-mono border-slate-200 dark:border-slate-800"
-                        disabled={isLoading}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage className="text-[11px]" />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {renderScanButton("aadhaarFront", "Aadhaar Front Side", "environment")}
-                {renderScanButton("aadhaarBack", "Aadhaar Back Side", "environment")}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Step 2: PAN Card Verification (Back Camera Document Scan) */}
-          <Card className="border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden bg-white dark:bg-slate-900">
-            <div className="bg-slate-50 dark:bg-slate-800/50 px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center">
-                <span className="bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs mr-2 font-mono">2</span>
-                PAN Card Scan
-              </h3>
-            </div>
-            <CardContent className="p-5 space-y-5">
-              <FormField
-                control={form.control}
-                name="panNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs font-bold">10-Character PAN Number</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="ABCDE1234F"
-                        className="uppercase text-xs h-10 rounded-lg font-mono border-slate-200 dark:border-slate-800"
-                        maxLength={10}
-                        disabled={isLoading}
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      />
-                    </FormControl>
-                    <FormMessage className="text-[11px]" />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {renderScanButton("pan", "PAN Card Front", "environment")}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Step 3: Live Selfie Face Scan (Front Camera) */}
-          <Card className="border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden bg-white dark:bg-slate-900">
-            <div className="bg-slate-50 dark:bg-slate-800/50 px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center">
-                <span className="bg-blue-600 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs mr-2 font-mono">3</span>
-                Live Selfie Face Scan
-              </h3>
-            </div>
-            <CardContent className="p-5 space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {renderScanButton("selfie", "Live Selfie Face Verification", "user")}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Submit Button */}
-          <div className="flex justify-end pt-2">
-            <Button
-              type="submit"
-              className="w-full sm:w-auto min-w-[220px] bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs h-11 shadow-sm transition-all"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading &amp; Submitting...
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="mr-2 h-4 w-4" />
-                  Submit KYC Verification
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
-      </Form>
+      <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+        <Card className="border-slate-200 dark:border-slate-800"><CardContent className="p-6">
+          <div className="mb-6 flex items-start gap-3"><div className="rounded-full bg-blue-100 p-2 text-blue-700 dark:bg-blue-950 dark:text-blue-300"><ShieldCheck className="h-5 w-5" /></div><div><p className="text-sm font-bold">Secure identity verification</p><p className="mt-1 text-xs text-muted-foreground">Camera scans only. Your ID values are read automatically and cannot be edited.</p></div></div>
+          <div className="space-y-3">{sequence.map((field, index) => { const complete = Boolean(previews[field.name]); return <div key={field.name} className={`flex items-center gap-3 rounded-lg border p-3 ${complete ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20" : "border-border"}`}><div className="shrink-0">{complete ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <Circle className="h-5 w-5 text-muted-foreground" />}</div><div className="min-w-0"><p className="text-xs font-bold">{index + 1}. {field.label}</p><p className="truncate text-[11px] text-muted-foreground">{complete ? "Captured successfully" : field.instruction}</p></div></div>; })}</div>
+          {!activeCapture && <Button type="button" className="mt-6 w-full" onClick={startGuidedCapture} disabled={isSubmitting}><Camera className="mr-2 h-4 w-4" />Start secure verification</Button>}
+        </CardContent></Card>
+        <Card className="overflow-hidden border-slate-200 dark:border-slate-800"><CardContent className="p-6">
+          <p className="text-sm font-bold">Capture review</p><p className="mt-1 text-xs text-muted-foreground">Retake any scan before automatic verification.</p>
+          <div className="mt-5 grid grid-cols-2 gap-3">{sequence.map((field) => { const preview = previews[field.name]; return <div key={field.name} className="relative aspect-[1.5/1] overflow-hidden rounded-lg border bg-muted"><p className="absolute left-2 top-2 z-10 rounded bg-background/90 px-1.5 py-1 text-[10px] font-semibold">{field.label}</p>{preview ? <><Image src={preview} alt={field.label} fill unoptimized className="object-cover" /><Button type="button" variant="destructive" size="sm" className="absolute bottom-2 right-2 z-10 h-7 px-2 text-[10px]" onClick={() => removeCapture(field.name)}><X className="mr-1 h-3 w-3" />Retake</Button></> : <div className="flex h-full items-center justify-center text-muted-foreground"><Camera className="h-5 w-5" /></div>}</div>; })}</div>
+          <Button type="button" className="mt-6 w-full" onClick={submit} disabled={isSubmitting || sequence.some(({ name }) => !captures[name])}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying identity…</> : "Verify identity automatically"}</Button>
+        </CardContent></Card>
+      </div>
     </>
   );
 }

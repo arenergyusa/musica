@@ -16,6 +16,13 @@ export const metadata: Metadata = {
   },
   description: "Official Musica streaming platform operated by Pure Desi Music (OPC) Private Limited. Watch trending Haryanvi music videos, audio releases, and studio tracks in high definition.",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/brand/musica-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/brand/musica-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   keywords: [
     "Musica",
     "Musica Streaming",

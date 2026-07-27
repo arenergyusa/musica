@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { Menu, Music } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { APP, NAV_LINKS } from "@/lib/constants";
@@ -31,9 +32,7 @@ export function Navbar() {
     >
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-2.5">
-          <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
-            <Music className="h-5 w-5 font-bold" />
-          </div>
+          <Image src="/brand/musica-icon-192.png" width={40} height={40} alt="Musica" className="h-10 w-10 rounded-lg shadow-sm" priority />
           <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">{APP.NAME}</span>
         </Link>
 

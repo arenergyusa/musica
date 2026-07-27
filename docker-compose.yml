@@ -44,6 +44,16 @@ services:
     depends_on:
       - db
       - redis
+      - kyc-verifier
+    networks:
+      - musica_net
+    restart: unless-stopped
+
+  kyc-verifier:
+    build:
+      context: ./kyc-verifier
+    expose:
+      - "8000"
     networks:
       - musica_net
     restart: unless-stopped

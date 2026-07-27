@@ -55,8 +55,8 @@ func (r *mlmRepository) GetDirectReferrals(ctx context.Context, userID uuid.UUID
 	query := `
 		SELECT u.id, u.name, u.email, u.phone, u.invite_code, u.status, u.created_at
 		FROM users u
-		JOIN invite_tree t ON u.id = t.user_id
-		WHERE t.upline_id = $1
+		WHERE u.invited_by = $1
+		ORDER BY u.created_at DESC
 	`
 	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
@@ -102,9 +102,9 @@ func (r *mlmRepository) HasActiveDirectReferral(ctx context.Context, userID uuid
 	query := `
 		SELECT EXISTS (
 			SELECT 1 
-			FROM invite_tree t
-			JOIN sponsorships i ON t.user_id = i.user_id
-			WHERE t.upline_id = $1 AND i.status = 'ACTIVE'
+			FROM users u
+			JOIN sponsorships i ON u.id = i.user_id
+			WHERE u.invited_by = $1 AND i.status = 'ACTIVE'
 		)
 	`
 	var hasActive bool
@@ -118,9 +118,8 @@ func (r *mlmRepository) GetDirectVolumeAndCount(ctx context.Context, userID uuid
 			COALESCE(SUM(i.amount), 0) as total_volume,
 			COUNT(DISTINCT u.id) as active_directs
 		FROM users u
-		JOIN invite_tree t ON u.id = t.user_id
 		JOIN sponsorships i ON u.id = i.user_id
-		WHERE t.upline_id = $1 AND i.status = 'ACTIVE'
+		WHERE u.invited_by = $1 AND i.status = 'ACTIVE'
 	`
 	var volume float64
 	var count int

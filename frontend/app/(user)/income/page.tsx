@@ -227,7 +227,7 @@ export default function IncomeHistoryPage() {
         <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
           <CardTitle className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
             <Layers className="h-5 w-5 text-blue-600" />
-            Level Reward Breckdown
+            Level Reward Breakdown
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-5">
@@ -241,8 +241,8 @@ export default function IncomeHistoryPage() {
                 <div
                   key={lvl}
                   className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between space-y-2 ${hasEarnings
-                      ? "bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 shadow-xs"
-                      : "bg-slate-50/60 dark:bg-slate-800/30 border-slate-200/60 dark:border-slate-800 opacity-75"
+                    ? "bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 shadow-xs"
+                    : "bg-slate-50/60 dark:bg-slate-800/30 border-slate-200/60 dark:border-slate-800 opacity-75"
                     }`}
                 >
                   <div className="flex items-center justify-between">
@@ -250,8 +250,8 @@ export default function IncomeHistoryPage() {
                       Level {lvl}
                     </span>
                     <Badge variant="outline" className={`text-[10px] font-extrabold border ${hasEarnings
-                        ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200"
-                        : "bg-slate-100 text-slate-500 border-slate-200"
+                      ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200"
+                      : "bg-slate-100 text-slate-500 border-slate-200"
                       }`}>
                       {pct}% Share
                     </Badge>

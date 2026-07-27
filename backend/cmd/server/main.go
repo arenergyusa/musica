@@ -67,6 +67,7 @@ func main() {
 	teamSvc := service.NewTeamService(mlmRepo, settingsRepo)
 	adminSvc := service.NewAdminService(dbPool, invRepo, withdrawalRepo, userRepo, walletRepo, settingsRepo, mlmRepo)
 	userSvc := service.NewUserService(userRepo, walletRepo, invRepo, mlmRepo, settingsRepo)
+	kycVerificationSvc := service.NewKYCVerificationService("http://kyc-verifier:8000/verify", "")
 
 	// Initialize Handlers
 	authH := handler.NewAuthHandler(authSvc)
@@ -75,7 +76,7 @@ func main() {
 	wdH := handler.NewWithdrawalHandler(wdSvc)
 	teamH := handler.NewTeamHandler(teamSvc)
 	adminH := handler.NewAdminHandler(adminSvc)
-	userH := handler.NewUserHandler(userSvc)
+	userH := handler.NewUserHandler(userSvc, kycVerificationSvc)
 
 	// Initialize and Start Cron Jobs
 	jobRunner := cron.NewJobRunner(invRepo, mlmRepo, walletRepo, settingsRepo)
@@ -83,7 +84,7 @@ func main() {
 	defer jobRunner.Stop()
 
 	router := gin.Default()
-	router.Static("/uploads", "./uploads")
+	// KYC scans are intentionally not served as public static files.
 
 	// CORS Middleware
 	router.Use(cors.New(cors.Config{
@@ -329,8 +330,6 @@ func main() {
 			admin.POST("/investments/:id/activate", adminH.ActivateInvestment)
 			admin.POST("/sponsorships/:id/activate", adminH.ActivateInvestment)
 			admin.GET("/kyc", adminH.GetPendingKYC)
-			admin.PUT("/kyc/:id", adminH.ApproveKYC)
-			admin.PUT("/kyc/:id/reject", adminH.RejectKYC)
 			admin.GET("/withdrawals", adminH.GetAllWithdrawals)
 			admin.PUT("/withdrawals/:id/approve", adminH.ApproveWithdrawal)
 			admin.PUT("/withdrawals/:id/reject", adminH.RejectWithdrawal)

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Menu,
   LogOut,
-  Music,
   Wallet,
   ChevronRight,
 } from "lucide-react";
@@ -52,9 +52,7 @@ export function DashboardHeader() {
             {/* Drawer Brand */}
             <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <Link href="/dashboard" className="flex items-center space-x-2.5" onClick={() => setIsMobileMenuOpen(false)}>
-                <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
-                  <Music className="h-5 w-5 font-bold" />
-                </div>
+                <Image src="/brand/musica-icon-192.png" width={36} height={36} alt="Musica" className="h-9 w-9 rounded-lg shadow-sm" />
                 <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">{APP.NAME}</span>
               </Link>
             </div>

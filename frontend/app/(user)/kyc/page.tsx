@@ -39,7 +39,7 @@ export default function KycPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">KYC Verification</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Verify identity via Aadhaar & PAN to comply with statutory statutory TDS regulations (TAN: RTKP11658D).
+            Camera-only Aadhaar, PAN, and live-selfie verification with automatic approval after successful checks.
           </p>
         </div>
         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200/80 dark:border-blue-900 shrink-0">
@@ -61,9 +61,9 @@ export default function KycPage() {
       {kycStatus === "PENDING" && (
         <Alert className="bg-blue-50 text-blue-900 border-blue-200 dark:bg-blue-950/30 dark:text-blue-100 dark:border-blue-900 rounded-lg shadow-sm">
           <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          <AlertTitle className="text-sm font-bold">Verification Under Review</AlertTitle>
+          <AlertTitle className="text-sm font-bold">Verification In Progress</AlertTitle>
           <AlertDescription className="text-xs mt-1 text-blue-800 dark:text-blue-300">
-            Your submitted documents are currently being processed by our compliance team. Verification takes 12-24 hours.
+            Your secure camera scans are being verified automatically. Keep this page open until verification completes.
           </AlertDescription>
         </Alert>
       )}
@@ -77,7 +77,7 @@ export default function KycPage() {
             <p className="font-semibold bg-red-100/50 dark:bg-red-950/50 p-2 rounded-md mb-2 text-xs">
               "{rejectionReason || "Uploaded documents were blurry or missing required details."}"
             </p>
-            <p>Please re-upload clear government ID documents below.</p>
+            <p>Please retake clear camera scans and a live selfie below.</p>
           </AlertDescription>
         </Alert>
       )}
@@ -92,9 +92,9 @@ export default function KycPage() {
             </CardHeader>
             <CardContent className="text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
               <ul className="list-disc pl-4 space-y-1">
-                <li>Provide valid 12-digit Aadhaar number and 10-character PAN number.</li>
-                <li>Ensure document photos are clear, legible, and uncropped.</li>
-                <li>Accepted file formats: JPG, PNG, PDF (Max file size: 5MB).</li>
+                <li>Use the rear camera for Aadhaar and PAN; gallery/file upload is disabled.</li>
+                <li>Use the front camera for a live selfie; one face must be clearly visible.</li>
+                <li>Aadhaar and PAN names are extracted automatically and must match.</li>
               </ul>
             </CardContent>
           </Card>

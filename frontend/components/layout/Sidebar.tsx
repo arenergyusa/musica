@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Music,
   LogOut,
   ChevronRight,
   User as UserIcon,
@@ -65,9 +65,7 @@ export function Sidebar() {
       {/* Brand Header */}
       <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-800">
         <Link href="/dashboard" className="flex items-center space-x-2.5 group">
-          <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm group-hover:scale-105 transition-transform">
-            <Music className="h-5 w-5 font-bold" />
-          </div>
+          <Image src="/brand/musica-icon-192.png" width={36} height={36} alt="Musica" className="h-9 w-9 rounded-lg shadow-sm group-hover:scale-105 transition-transform" />
           <div className="flex flex-col">
             <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white leading-none">
               {APP.NAME}

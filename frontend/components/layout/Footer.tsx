@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Music, Mail } from "lucide-react";
+import Image from "next/image";
+import { Mail } from "lucide-react";
 import { APP, NAV_LINKS } from "@/lib/constants";
 
 export function Footer() {
@@ -12,9 +13,7 @@ export function Footer() {
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/" className="flex items-center space-x-2.5 mb-3">
-              <div className="bg-blue-600 p-2 rounded-lg text-white shadow-sm">
-                <Music className="h-5 w-5 font-bold" />
-              </div>
+              <Image src="/brand/musica-icon-192.png" width={36} height={36} alt="Musica" className="h-9 w-9 rounded-lg shadow-sm" />
               <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">{APP.NAME}</span>
             </Link>
             <p className="text-xs text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
