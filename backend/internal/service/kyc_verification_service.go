@@ -30,6 +30,25 @@ type KYCVerificationResult struct {
 
 type KYCVerificationService interface {
 	Verify(ctx context.Context, files []KYCFile) (*KYCVerificationResult, error)
+	Check(ctx context.Context, file KYCFile) error
+}
+
+func (s *kycVerificationService) Check(ctx context.Context, file KYCFile) error {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	_ = writer.WriteField("field", file.Field)
+	part, err := writer.CreateFormFile("scan", file.Filename)
+	if err != nil { return err }
+	if _, err = part.Write(file.Data); err != nil { return err }
+	if err = writer.Close(); err != nil { return err }
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.url[:strings.LastIndex(s.url, "/")]+"/check", &body)
+	if err != nil { return err }
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	resp, err := s.client.Do(req)
+	if err != nil { return err }
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 { return errors.New("camera frame is not clear enough") }
+	return nil
 }
 
 type kycVerificationService struct {

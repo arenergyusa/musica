@@ -268,6 +268,7 @@ func main() {
 			user.PUT("/password", userH.ChangePassword)
 			user.GET("/dashboard", userH.GetDashboard)
 			user.POST("/kyc", userH.SubmitKYC)
+			user.POST("/kyc/check", userH.CheckKYCScan)
 			user.GET("/kyc/status", userH.GetKYCStatus)
 		}
 

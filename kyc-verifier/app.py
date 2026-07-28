@@ -46,6 +46,17 @@ def pose(img, required: str):
     # framed face before the liveness sequence can pass.
     return np.array([nose.x, nose.y, left_eye.x, left_eye.y, right_eye.x, right_eye.y])
 
+@app.post("/check")
+def check(field: str, scan: UploadFile = File(...)):
+    img = image(scan)
+    if field in ("aadhaar_front", "aadhaar_back", "pan_front"):
+        text(img)
+    elif field.startswith("selfie_"):
+        pose(img, field.replace("selfie_", ""))
+    else:
+        raise HTTPException(422, "Unknown KYC capture type")
+    return {"accepted": True}
+
 @app.post("/verify")
 def verify(
     aadhaar_front: UploadFile = File(...), aadhaar_back: UploadFile = File(...), pan_front: UploadFile = File(...),

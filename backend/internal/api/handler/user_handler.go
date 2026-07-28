@@ -153,6 +153,20 @@ func (h *UserHandler) SubmitKYC(c *gin.Context) {
 	})
 }
 
+func (h *UserHandler) CheckKYCScan(c *gin.Context) {
+	userID, err := GetUserID(c)
+	if err != nil { response.Error(c, http.StatusUnauthorized, "Invalid user token", nil); return }
+	field := c.PostForm("field")
+	file, err := c.FormFile("scan")
+	if err != nil || file.Size <= 0 || file.Size > 5*1024*1024 { response.Error(c, http.StatusBadRequest, "Invalid camera capture", nil); return }
+	opened, err := file.Open(); if err != nil { response.Error(c, http.StatusBadRequest, "Unable to read camera capture", nil); return }
+	data, _ := io.ReadAll(io.LimitReader(opened, 5*1024*1024+1)); opened.Close()
+	if len(data) == 0 || len(data) > 5*1024*1024 { response.Error(c, http.StatusBadRequest, "Invalid camera capture", nil); return }
+	_ = userID
+	if err := h.kycVerificationService.Check(c.Request.Context(), service.KYCFile{Field: field, Filename: "scan.jpg", Data: data}); err != nil { response.Error(c, http.StatusUnprocessableEntity, "Please hold the required item clearly in the frame", nil); return }
+	response.Success(c, http.StatusOK, "Camera capture accepted", nil)
+}
+
 func (h *UserHandler) GetKYCStatus(c *gin.Context) {
 	userID, err := GetUserID(c)
 	if err != nil {
