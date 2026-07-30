@@ -115,7 +115,7 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 
 		// --- Step 1: Calculate & credit Daily Reward to sponsorship owner ---
 		// Dynamic monthly division ensures exact 10% monthly return regardless of month length (28, 30, 31 days)
-		monthlyPct := freshInv.DailyRatePct * 30.0
+		monthlyPct := settings.MonthlyRewardPct
 		if monthlyPct <= 0 {
 			monthlyPct = 10.0
 		}

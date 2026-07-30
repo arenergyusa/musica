@@ -14,20 +14,19 @@ type LoginRequest struct {
 }
 
 type InvestRequest struct {
-	Amount        float64 `json:"amount" binding:"required,min=10000"`
+	Amount        float64 `json:"amount" binding:"required,min=100"`
 	PaymentMethod string  `json:"payment_method"`
 	PaymentRef    string  `json:"payment_ref"`
 }
 
 type WithdrawRequest struct {
-	Amount float64 `json:"amount" binding:"required,min=1000"`
+	Amount float64 `json:"amount" binding:"required,min=10"`
 }
 
 type UpdateProfileRequest struct {
 	Name        string `json:"name"`
 	Phone       string `json:"phone"`
-	BankAccount string `json:"bank_account"`
-    IFSC        string `json:"ifsc"`
+	UsdtAddress string `json:"usdt_address"`
 }
 
 type VerifyOTPRequest struct {

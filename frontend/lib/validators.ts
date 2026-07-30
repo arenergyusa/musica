@@ -9,7 +9,7 @@ export const registerSchema = z
     email: z.string().email("Invalid email address"),
     phone: z
       .string()
-      .regex(/^[6-9]\d{9}$/, "Enter valid 10-digit Indian mobile number"),
+      .regex(/^[6-9]\d{9}$/, "Enter valid 10-digit mobile number"),
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")
@@ -57,19 +57,14 @@ export const changePasswordSchema = z
 export const investSchema = z.object({
   amount: z
     .number({ message: "Amount must be a valid number" })
-    .min(10000, "Minimum investment amount is ₹10,000")
-    .refine((val) => val % 10000 === 0, {
-      message: "Investment amount must be a multiple of ₹10,000",
+    .min(100, "Minimum investment amount is $100")
+    .refine((val) => val % 100 === 0, {
+      message: "Investment amount must be a multiple of $100",
     }),
-  paymentMethod: z.enum(["UPI", "BANK_TRANSFER"], {
-    message: "Select a payment method",
-  }),
-  paymentRef: z
-    .string()
-    .min(4, "Payment reference required (UPI Txn ID / UTR number)")
-    .max(50),
+  paymentMethod: z.string().optional(),
+  paymentRef: z.string().optional(),
   confirmedPayment: z.boolean().refine((v) => v === true, {
-    message: "Confirm that you have made the payment",
+    message: "Confirm that you have completed the USDT transfer",
   }),
 });
 
@@ -79,62 +74,25 @@ export const investSchema = z.object({
 export const withdrawSchema = z.object({
   amount: z
     .number({ error: "Enter a valid amount" })
-    .int("Amount must be a whole number")
-    .min(1000, "Minimum withdrawal amount is ₹1,000")
-    .max(10000000, "Maximum ₹1,00,00,000 per request"),
+    .min(10, "Minimum withdrawal amount is $10")
+    .max(100000, "Maximum $100,000 per request"),
 });
 
 // ============================================================
-// KYC Schema
-// ============================================================
-export const kycSchema = z.object({
-  aadhaarNumber: z.string().regex(/^\d{12}$/, "Enter valid 12-digit Aadhaar number"),
-  aadhaarFront: z
-    .instanceof(File, { message: "Aadhaar front image is required" })
-    .refine((f) => f.size <= 5 * 1024 * 1024, "Aadhaar front: max 5MB")
-    .refine(
-      (f) => ["image/jpeg", "image/png", "application/pdf"].includes(f.type),
-      "Allowed: JPG, PNG, PDF"
-    ),
-  aadhaarBack: z
-    .instanceof(File, { message: "Aadhaar back image is required" })
-    .refine((f) => f.size <= 5 * 1024 * 1024, "Aadhaar back: max 5MB")
-    .refine(
-      (f) => ["image/jpeg", "image/png", "application/pdf"].includes(f.type),
-      "Allowed: JPG, PNG, PDF"
-    ),
-  panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Enter valid PAN number (e.g., ABCDE1234F)"),
-  pan: z
-    .instanceof(File, { message: "PAN image is required" })
-    .refine((f) => f.size <= 5 * 1024 * 1024, "PAN: max 5MB"),
-  selfie: z
-    .instanceof(File, { message: "Live selfie / face scan photo is required" })
-    .refine((f) => f.size <= 5 * 1024 * 1024, "Selfie: max 5MB"),
-});
-
-// ============================================================
-// Profile Schemas
+// Profile & USDT Address Schemas
 // ============================================================
 export const updateProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(100),
   phone: z
     .string()
-    .regex(/^[6-9]\d{9}$/, "Enter valid 10-digit Indian mobile number"),
+    .regex(/^[6-9]\d{9}$/, "Enter valid 10-digit mobile number"),
 });
 
-export const bankDetailsSchema = z.object({
-  accountHolder: z.string().min(2, "Account holder name required"),
-  accountNumber: z
+export const usdtAddressSchema = z.object({
+  usdtAddress: z
     .string()
-    .regex(/^\d{9,18}$/, "Enter valid account number (9-18 digits)"),
-  confirmAccountNumber: z.string(),
-  ifsc: z
-    .string()
-    .regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC code (e.g., SBIN0001234)"),
-  bankName: z.string().min(2, "Bank name required"),
-}).refine((d) => d.accountNumber === d.confirmAccountNumber, {
-  message: "Account numbers do not match",
-  path: ["confirmAccountNumber"],
+    .trim()
+    .regex(/^0x[a-fA-F0-9]{40}$/, "Enter valid BSC BEP-20 address (0x...)"),
 });
 
 // ============================================================
@@ -160,8 +118,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type InvestInput = z.infer<typeof investSchema>;
 export type WithdrawInput = z.infer<typeof withdrawSchema>;
-export type KycInput = z.infer<typeof kycSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
-export type BankDetailsInput = z.infer<typeof bankDetailsSchema>;
+export type UsdtAddressInput = z.infer<typeof usdtAddressSchema>;
 export type RejectReasonInput = z.infer<typeof rejectWithReasonSchema>;
 export type ApproveWithdrawalInput = z.infer<typeof approveWithdrawalSchema>;

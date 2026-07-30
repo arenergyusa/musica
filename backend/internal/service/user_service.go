@@ -3,22 +3,16 @@ package service
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/arenergyusa/musica/backend/internal/repository"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (*domain.User, error)
 	UpdateProfile(ctx context.Context, userID uuid.UUID, req *domain.UpdateProfileRequest) (*domain.User, error)
-	SubmitKYC(ctx context.Context, userID uuid.UUID, documentURL string) error
-	CompleteAutomatedKYC(ctx context.Context, userID uuid.UUID, documentURL, aadhaar, pan string) error
-	RejectAutomatedKYC(ctx context.Context, userID uuid.UUID, documentURL string) error
-	GetKYCStatus(ctx context.Context, userID uuid.UUID) (string, string, error)
 	GetDashboard(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error)
 	ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) error
 }
@@ -42,14 +36,7 @@ func NewUserService(userRepo repository.UserRepository, walletRepo repository.Wa
 }
 
 func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if user != nil && user.KycStatus == "PENDING" && user.DocumentURL == "" {
-		user.KycStatus = "UNINITIALIZED"
-	}
-	return user, nil
+	return s.userRepo.GetByID(ctx, userID)
 }
 
 func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, req *domain.UpdateProfileRequest) (*domain.User, error) {
@@ -74,86 +61,14 @@ func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, req *
 		}
 		user.Phone = req.Phone
 	}
-	if req.BankAccount != "" {
-		// Anti-fraud check: Ensure bank account is not already registered with another user
-		existingUser, err := s.userRepo.GetByBankAccount(ctx, req.BankAccount)
-		if err != nil {
-			return nil, err
-		}
-		if existingUser != nil && existingUser.ID != userID {
-			return nil, errors.New("this bank account is already registered with another user account")
-		}
-		user.BankAccount = req.BankAccount
-	}
-	if req.IFSC != "" {
-		user.IFSC = req.IFSC
+	if req.UsdtAddress != "" {
+		user.UsdtAddress = req.UsdtAddress
 	}
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.ConstraintName == "idx_users_bank_account_hash" {
-			return nil, errors.New("this bank account is already registered with another user account")
-		}
-		if strings.Contains(err.Error(), "idx_users_bank_account_hash") {
-			return nil, errors.New("this bank account is already registered with another user account")
-		}
 		return nil, err
 	}
-
 	return user, nil
-}
-
-func (s *userService) SubmitKYC(ctx context.Context, userID uuid.UUID, documentURL string) error {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return errors.New("user not found")
-	}
-
-	user.KycStatus = "PENDING"
-	user.DocumentURL = documentURL
-
-	return s.userRepo.Update(ctx, user)
-}
-
-func (s *userService) CompleteAutomatedKYC(ctx context.Context, userID uuid.UUID, documentURL, aadhaar, pan string) error {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil { return err }
-	if user == nil { return errors.New("user not found") }
-	user.Aadhaar = aadhaar
-	user.PAN = pan
-	user.DocumentURL = documentURL
-	user.KycStatus = "APPROVED"
-	user.KycRejectionReason = ""
-	return s.userRepo.Update(ctx, user)
-}
-
-func (s *userService) RejectAutomatedKYC(ctx context.Context, userID uuid.UUID, documentURL string) error {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil { return err }
-	if user == nil { return errors.New("user not found") }
-	user.DocumentURL = documentURL
-	user.KycStatus = "REJECTED"
-	return s.userRepo.Update(ctx, user)
-}
-
-func (s *userService) GetKYCStatus(ctx context.Context, userID uuid.UUID) (string, string, error) {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return "", "", err
-	}
-	if user == nil {
-		return "", "", errors.New("user not found")
-	}
-
-	status := user.KycStatus
-	if status == "PENDING" && user.DocumentURL == "" {
-		status = "UNINITIALIZED"
-	}
-
-	return status, user.KycRejectionReason, nil
 }
 
 func (s *userService) GetDashboard(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error) {
@@ -209,15 +124,9 @@ func (s *userService) GetDashboard(ctx context.Context, userID uuid.UUID) (map[s
 		chartData = []map[string]interface{}{}
 	}
 
-	kycStatus := user.KycStatus
-	if kycStatus == "PENDING" && user.DocumentURL == "" {
-		kycStatus = "UNINITIALIZED"
-	}
-
 	return map[string]interface{}{
 		"user": map[string]interface{}{
 			"name":        user.Name,
-			"kyc_status":  kycStatus,
 			"invite_code": user.InviteCode,
 		},
 		"wallet": map[string]interface{}{
@@ -240,6 +149,7 @@ func (s *userService) GetDashboard(ctx context.Context, userID uuid.UUID) (map[s
 		"chart_data":          chartData,
 	}, nil
 }
+
 // ChangePassword validates the old password and sets a new one.
 func (s *userService) ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) error {
 	user, err := s.userRepo.GetByID(ctx, userID)

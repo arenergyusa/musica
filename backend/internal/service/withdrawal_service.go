@@ -23,47 +23,29 @@ type withdrawalService struct {
 	walletRepo   repository.WalletRepository
 	userRepo     repository.UserRepository
 	settingsRepo repository.SettingsRepository
+	usdtService  USDTService
 }
 
-func NewWithdrawalService(dbPool *pgxpool.Pool, wdRepo repository.WithdrawalRepository, walletRepo repository.WalletRepository, userRepo repository.UserRepository, settingsRepo repository.SettingsRepository) WithdrawalService {
+func NewWithdrawalService(
+	dbPool *pgxpool.Pool,
+	wdRepo repository.WithdrawalRepository,
+	walletRepo repository.WalletRepository,
+	userRepo repository.UserRepository,
+	settingsRepo repository.SettingsRepository,
+	usdtService USDTService,
+) WithdrawalService {
 	return &withdrawalService{
 		dbPool:       dbPool,
 		wdRepo:       wdRepo,
 		walletRepo:   walletRepo,
 		userRepo:     userRepo,
 		settingsRepo: settingsRepo,
+		usdtService:  usdtService,
 	}
 }
 
 func (s *withdrawalService) GetNextWithdrawalDate() time.Time {
-	now := time.Now()
-	year, month, day := now.Date()
-
-	lastDay := daysInMonth(year, month)
-	var nextDay int
-
-	if day <= 10 {
-		nextDay = 10
-	} else if day <= 20 {
-		nextDay = 20
-	} else {
-		if lastDay < 30 {
-			nextDay = lastDay
-		} else {
-			nextDay = 30
-		}
-	}
-
-	if day > nextDay {
-		month++
-		if month > 12 {
-			month = 1
-			year++
-		}
-		nextDay = 10
-	}
-
-	return time.Date(year, month, nextDay, 0, 0, 0, 0, now.Location())
+	return time.Now()
 }
 
 func daysInMonth(year int, month time.Month) int {
@@ -71,13 +53,13 @@ func daysInMonth(year int, month time.Month) int {
 }
 
 func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.UUID, req *domain.WithdrawRequest) (*domain.Withdrawal, error) {
-	// 1. Check User Bank Details
+	// 1. Check User USDT Address
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	if user.BankAccount == "" || user.IFSC == "" {
-		return nil, errors.New("bank details must be added before requesting withdrawal")
+	if user.UsdtAddress == "" {
+		return nil, errors.New("USDT (BEP-20) address must be configured in Profile before requesting a withdrawal")
 	}
 
 	settings, err := s.settingsRepo.GetSettings(ctx)
@@ -114,7 +96,7 @@ func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.U
 		INSERT INTO transactions (user_id, type, amount, source, reference_id, description)
 		VALUES ($1, 'DEBIT', $2, 'WITHDRAWAL', NULL, $3)
 	`
-	_, err = tx.Exec(ctx, txQuery, userID, req.Amount, "Withdrawal request")
+	_, err = tx.Exec(ctx, txQuery, userID, req.Amount, "Automated USDT Withdrawal Payout")
 	if err != nil {
 		return nil, err
 	}
@@ -124,11 +106,11 @@ func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.U
 		AmountRequested: req.Amount,
 		TDSAmount:       tdsAmount,
 		NetAmount:       netAmount,
-		Status:          "PENDING",
-		ScheduledDate:   s.GetNextWithdrawalDate(),
+		Status:          "PROCESSED",
+		ScheduledDate:   time.Now(),
 	}
 
-	// 4. Create Withdrawal record
+	// 3. Create Withdrawal record
 	wdQuery := `
 		INSERT INTO withdrawals (user_id, amount_requested, tds_amount, net_amount, status, scheduled_date)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -143,6 +125,15 @@ func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.U
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
+	}
+
+	// 4. Trigger Auto Payout via private key on BSC
+	if s.usdtService != nil {
+		txHash, payoutErr := s.usdtService.ProcessAutoWithdrawal(ctx, wd.ID, userID, user.UsdtAddress, netAmount)
+		if payoutErr == nil && txHash != "" {
+			wd.PaymentRef = txHash
+			_ = s.wdRepo.UpdateRequestStatusWithRef(ctx, wd.ID, "PROCESSED", txHash, "Auto-payout executed via master key")
+		}
 	}
 
 	return wd, nil

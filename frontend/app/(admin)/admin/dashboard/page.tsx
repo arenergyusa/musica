@@ -1,6 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { User, Withdrawal } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,11 +13,15 @@ import {
   Wallet, 
   Activity, 
   Clock, 
-  ArrowRight,
+  ArrowUpRight,
   TrendingUp,
-  FileWarning,
+  Settings,
+  Sparkles,
+  Zap,
+  ArrowRight,
+  ShieldCheck,
+  CircleDollarSign
 } from "lucide-react";
-import Link from "next/link";
 
 import {
   Table,
@@ -23,10 +31,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
-import { User, Withdrawal } from "@/lib/types";
 
 import {
   AreaChart,
@@ -49,12 +53,12 @@ interface AnalyticsTooltipProps {
 const AnalyticsTooltip = ({ active, payload, label }: AnalyticsTooltipProps) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-card border border-border rounded-lg p-3 shadow-lg text-sm">
-        <p className="font-medium text-foreground mb-1">{label}</p>
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-xl text-xs text-white">
+        <p className="font-bold text-slate-400 mb-1">{label}</p>
         {payload.map((p) => {
           const isCurrency = p.name?.toLowerCase().includes("roi") || p.name?.toLowerCase().includes("paid") || p.name?.toLowerCase().includes("amount");
           return (
-            <p key={p.name} style={{ color: p.color }} className="font-bold">
+            <p key={p.name} style={{ color: p.color }} className="font-black font-mono">
               {p.name}: {isCurrency ? formatCurrency(p.value) : p.value}
             </p>
           );
@@ -72,7 +76,6 @@ export default function AdminDashboardPage() {
     pendingInvestments: 0,
     totalInvested: 0,
     totalPaid: 0,
-    pendingKyc: 0,
     pendingWithdrawals: 0,
   });
   
@@ -86,7 +89,7 @@ export default function AdminDashboardPage() {
 
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [recentWithdrawals, setRecentWithdrawals] = useState<Withdrawal[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadStats() {
@@ -112,7 +115,8 @@ export default function AdminDashboardPage() {
         }
       } catch (err) {
         console.error("Failed to load admin stats", err);
-        setError("Unable to load dashboard data. Please try again.");
+      } finally {
+        setIsLoading(false);
       }
     }
     loadStats();
@@ -122,40 +126,52 @@ export default function AdminDashboardPage() {
   const roiData = analytics.daily_roi_paid || [];
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-1">Admin Overview</h1>
-        <p className="text-muted-foreground text-sm">
-          Platform analytics, growth metrics, and pending action items.
-        </p>
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-2xl text-white shadow-lg border border-slate-800">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-extrabold text-blue-400 uppercase tracking-widest mb-1">
+            <Sparkles className="h-3.5 w-3.5" /> Platform Intelligence
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Admin Overview</h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Monitor overall volume, active investments, user growth, and payout queues.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link href="/admin/settings">
+            <Button variant="outline" size="sm" className="bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700 text-xs font-bold rounded-xl h-9">
+              <Settings className="mr-2 h-3.5 w-3.5" />
+              Platform Settings
+            </Button>
+          </Link>
+          <Link href="/admin/withdrawals">
+            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl h-9 shadow-md">
+              <ArrowUpRight className="mr-1.5 h-4 w-4" />
+              Withdrawal Queue
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {error && (
-        <Card className="bg-destructive/10 border-destructive/30">
-          <CardContent className="p-4 flex items-center text-destructive">
-            <div className="font-medium">{error}</div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Action Required Alerts */}
-      {(stats.pendingKyc > 0 || stats.pendingWithdrawals > 0 || stats.pendingInvestments > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Action Required Alert Cards */}
+      {(stats.pendingWithdrawals > 0 || stats.pendingInvestments > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {stats.pendingWithdrawals > 0 && (
-            <Card className="bg-amber-500/10 border-amber-500/30">
+            <Card className="bg-amber-500/10 border-amber-500/30 rounded-xl shadow-sm">
               <CardContent className="p-4 flex justify-between items-center">
                 <div className="flex items-center gap-3 text-amber-700 dark:text-amber-400">
                   <Clock className="h-5 w-5 shrink-0" />
                   <div>
-                    <p className="font-semibold text-sm">{stats.pendingWithdrawals} Pending Withdrawals</p>
-                    <p className="text-xs opacity-80">Requires payout approval</p>
+                    <p className="font-extrabold text-xs uppercase tracking-wider">{stats.pendingWithdrawals} Pending Payout Requests</p>
+                    <p className="text-xs opacity-80 font-medium">Review and process automated USDT BEP-20 payouts</p>
                   </div>
                 </div>
                 <Link href="/admin/withdrawals">
-                  <Button variant="outline" size="sm" className="bg-background border-amber-500/30">
-                    Review
+                  <Button variant="outline" size="sm" className="border-amber-500/40 text-amber-700 dark:text-amber-300 font-bold text-xs rounded-xl bg-white dark:bg-slate-900">
+                    Review Queue
                   </Button>
                 </Link>
               </CardContent>
@@ -163,37 +179,18 @@ export default function AdminDashboardPage() {
           )}
 
           {stats.pendingInvestments > 0 && (
-            <Card className="bg-emerald-500/10 border-emerald-500/30">
+            <Card className="bg-emerald-500/10 border-emerald-500/30 rounded-xl shadow-sm">
               <CardContent className="p-4 flex justify-between items-center">
                 <div className="flex items-center gap-3 text-emerald-700 dark:text-emerald-400">
                   <TrendingUp className="h-5 w-5 shrink-0" />
                   <div>
-                    <p className="font-semibold text-sm">{stats.pendingInvestments} Pending Subscriptions</p>
-                    <p className="text-xs opacity-80">UTR payment receipts</p>
+                    <p className="font-extrabold text-xs uppercase tracking-wider">{stats.pendingInvestments} Active Subscriptions Pending</p>
+                    <p className="text-xs opacity-80 font-medium">Check transaction hashes on BSC network</p>
                   </div>
                 </div>
-                <Link href="/admin/investments">
-                  <Button variant="outline" size="sm" className="bg-background border-emerald-500/30">
-                    Activate
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-
-          {stats.pendingKyc > 0 && (
-            <Card className="bg-blue-500/10 border-blue-500/30">
-              <CardContent className="p-4 flex justify-between items-center">
-                <div className="flex items-center gap-3 text-blue-700 dark:text-blue-400">
-                  <FileWarning className="h-5 w-5 shrink-0" />
-                  <div>
-                    <p className="font-semibold text-sm">{stats.pendingKyc} Pending KYC</p>
-                    <p className="text-xs opacity-80">Awaiting verification</p>
-                  </div>
-                </div>
-                <Link href="/admin/kyc">
-                  <Button variant="outline" size="sm" className="bg-background border-blue-500/30">
-                    Verify
+                <Link href="/admin/users">
+                  <Button variant="outline" size="sm" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-xl bg-white dark:bg-slate-900">
+                    View Users
                   </Button>
                 </Link>
               </CardContent>
@@ -202,133 +199,133 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Top Stats Cards */}
+      {/* Top Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-lg shadow-sm">
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm hover:border-blue-500/40 transition-colors">
           <CardContent className="p-5">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Registered Users</p>
-                <p className="text-2xl font-extrabold text-slate-900 dark:text-white">{stats.totalUsers.toLocaleString()}</p>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Registered Users</p>
+                <p className="text-2xl font-black text-slate-900 dark:text-white font-mono">{stats.totalUsers.toLocaleString()}</p>
               </div>
-              <div className="p-2.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 rounded-lg">
+              <div className="p-2.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 rounded-xl">
                 <Users className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-lg shadow-sm">
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm hover:border-indigo-500/40 transition-colors">
           <CardContent className="p-5">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Active Sponsorships</p>
-                <p className="text-2xl font-extrabold text-slate-900 dark:text-white">{stats.activeInvestments.toLocaleString()}</p>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Investments</p>
+                <p className="text-2xl font-black text-slate-900 dark:text-white font-mono">{stats.activeInvestments.toLocaleString()}</p>
               </div>
-              <div className="p-2.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 rounded-lg">
+              <div className="p-2.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400 rounded-xl">
                 <Activity className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-lg shadow-sm">
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm hover:border-emerald-500/40 transition-colors">
           <CardContent className="p-5">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Active TVL</p>
-                <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">{formatCurrency(stats.totalInvested)}</p>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Active Volume</p>
+                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">{formatCurrency(stats.totalInvested)}</p>
               </div>
-              <div className="p-2.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 rounded-lg">
+              <div className="p-2.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 rounded-xl">
                 <Wallet className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-lg shadow-sm">
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm hover:border-blue-500/40 transition-colors">
           <CardContent className="p-5">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Rewards Paid</p>
-                <p className="text-2xl font-extrabold text-slate-900 dark:text-white">{formatCurrency(stats.totalPaid)}</p>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Payouts Distributed</p>
+                <p className="text-2xl font-black text-blue-600 dark:text-blue-400 font-mono">{formatCurrency(stats.totalPaid)}</p>
               </div>
-              <div className="p-2.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 rounded-lg">
-                <TrendingUp className="h-5 w-5" />
+              <div className="p-2.5 bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 rounded-xl">
+                <CircleDollarSign className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Analytics Charts Row */}
+      {/* Analytics Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* User Signups Trend */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" />
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+          <CardHeader className="pb-2 border-b border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
+                <Users className="h-4 w-4 text-blue-600" />
                 30-Day User Registrations
-              </span>
-              <Badge variant="outline" className="text-xs font-mono">
-                {signupData.reduce((a, c) => a + (c.count || 0), 0)} signups
+              </CardTitle>
+              <Badge variant="outline" className="text-xs font-mono font-bold text-blue-600 border-blue-500/30">
+                +{signupData.reduce((a, c) => a + (c.count || 0), 0)} users
               </Badge>
-            </CardTitle>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {signupData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={210}>
                 <AreaChart data={signupData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
                   <defs>
                     <linearGradient id="signupGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                   <Tooltip content={<AnalyticsTooltip />} />
-                  <Area type="monotone" dataKey="count" name="New Users" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#signupGrad)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="count" name="New Users" stroke="#2563eb" fillOpacity={1} fill="url(#signupGrad)" strokeWidth={2.5} />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-                No registration trend data
+              <div className="h-[210px] flex items-center justify-center text-slate-400 text-xs font-medium">
+                No registration trend data recorded
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Daily Interest Payout Trend */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center justify-between">
-              <span className="flex items-center gap-2">
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+          <CardHeader className="pb-2 border-b border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
                 <TrendingUp className="h-4 w-4 text-emerald-500" />
                 30-Day Daily Rewards Distributed
-              </span>
-              <Badge variant="outline" className="text-xs font-mono text-emerald-600 border-emerald-500/30">
-                +{formatCurrency(roiData.reduce((a, c) => a + (c.amount || 0), 0))}
+              </CardTitle>
+              <Badge variant="outline" className="text-xs font-mono font-bold text-emerald-600 border-emerald-500/30">
+                {formatCurrency(roiData.reduce((a, c) => a + (c.amount || 0), 0))}
               </Badge>
-            </CardTitle>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {roiData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={210}>
                 <BarChart data={roiData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v}`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} />
                   <Tooltip content={<AnalyticsTooltip />} />
-                  <Bar dataKey="amount" name="Reward Paid" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="amount" name="ROI Paid ($)" fill="#10b981" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-                No daily payout data yet
+              <div className="h-[210px] flex items-center justify-center text-slate-400 text-xs font-medium">
+                No daily payout data recorded
               </div>
             )}
           </CardContent>
@@ -339,49 +336,49 @@ export default function AdminDashboardPage() {
       {/* Recent Activity Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* Recent Withdrawals */}
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
+        {/* Recent Payout Requests */}
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
             <div>
-              <CardTitle className="text-base">Recent Withdrawals</CardTitle>
-              <CardDescription className="text-xs">Latest user payout requests</CardDescription>
+              <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white">Recent Payout Requests</CardTitle>
+              <CardDescription className="text-xs text-slate-500">Latest withdrawal requests</CardDescription>
             </div>
             <Link href="/admin/withdrawals">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="text-xs font-bold text-blue-600 hover:text-blue-700">
                 View All <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader className="bg-muted/30">
+              <TableHeader className="bg-slate-50/50 dark:bg-slate-950/40">
                 <TableRow>
-                  <TableHead className="pl-6">Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right pr-6">Requested</TableHead>
+                  <TableHead className="pl-6 text-xs font-bold text-slate-500">Amount</TableHead>
+                  <TableHead className="text-xs font-bold text-slate-500">Status</TableHead>
+                  <TableHead className="text-right pr-6 text-xs font-bold text-slate-500">Requested</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {recentWithdrawals.length > 0 ? (
                   recentWithdrawals.map((wx) => (
-                    <TableRow key={wx.id}>
-                      <TableCell className="pl-6 font-bold text-foreground">
+                    <TableRow key={wx.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                      <TableCell className="pl-6 font-extrabold font-mono text-xs text-slate-900 dark:text-white">
                         {formatCurrency(typeof wx.amount_requested === 'number' ? wx.amount_requested : (typeof wx.amount === 'number' ? wx.amount : 0))}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={wx.status === "PENDING" ? "bg-amber-500/10 text-amber-600 border-amber-500/30" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"}>
+                        <Badge variant="outline" className={`text-[10px] font-bold ${wx.status === "PENDING" ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
                           {wx.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right pr-6 text-muted-foreground text-xs">
-                        {new Date(wx.created_at || "").toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                      <TableCell className="text-right pr-6 text-slate-400 text-xs font-mono">
+                        {new Date(wx.created_at || "").toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={3} className="h-20 text-center text-muted-foreground text-xs">
-                      No recent withdrawals
+                    <TableCell colSpan={3} className="h-20 text-center text-slate-400 text-xs font-medium">
+                      No recent payout requests
                     </TableCell>
                   </TableRow>
                 )}
@@ -391,42 +388,42 @@ export default function AdminDashboardPage() {
         </Card>
 
         {/* Recent Registrations */}
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
             <div>
-              <CardTitle className="text-base">Recent Signups</CardTitle>
-              <CardDescription className="text-xs">New user registrations</CardDescription>
+              <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white">Recent User Registrations</CardTitle>
+              <CardDescription className="text-xs text-slate-500">Newly onboarded members</CardDescription>
             </div>
             <Link href="/admin/users">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="text-xs font-bold text-blue-600 hover:text-blue-700">
                 View All <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader className="bg-muted/30">
+              <TableHeader className="bg-slate-50/50 dark:bg-slate-950/40">
                 <TableRow>
-                  <TableHead className="pl-6">Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead className="text-right pr-6">Joined</TableHead>
+                  <TableHead className="pl-6 text-xs font-bold text-slate-500">Name</TableHead>
+                  <TableHead className="text-xs font-bold text-slate-500">Email</TableHead>
+                  <TableHead className="text-right pr-6 text-xs font-bold text-slate-500">Joined</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {recentUsers.length > 0 ? (
                   recentUsers.map((usr) => (
-                    <TableRow key={usr.id}>
-                      <TableCell className="pl-6 font-medium text-sm">{usr.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{usr.email}</TableCell>
-                      <TableCell className="text-right pr-6 text-muted-foreground text-xs">
-                        {new Date((usr.createdAt as string) || (usr.created_at as string) || '').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    <TableRow key={usr.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                      <TableCell className="pl-6 font-bold text-xs text-slate-900 dark:text-white">{usr.name}</TableCell>
+                      <TableCell className="text-slate-500 text-xs font-mono">{usr.email}</TableCell>
+                      <TableCell className="text-right pr-6 text-slate-400 text-xs font-mono">
+                        {new Date((usr.createdAt as string) || (usr.created_at as string) || '').toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={3} className="h-20 text-center text-muted-foreground text-xs">
-                      No recent signups
+                    <TableCell colSpan={3} className="h-20 text-center text-slate-400 text-xs font-medium">
+                      No recent user signups
                     </TableCell>
                   </TableRow>
                 )}

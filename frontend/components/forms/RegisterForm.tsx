@@ -22,7 +22,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { RbfAgreementModal } from "../sections/RbfAgreementModal";
 
 function RegisterFormInner() {
   const router = useRouter();
@@ -32,7 +31,6 @@ function RegisterFormInner() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isAgreementOpen, setIsAgreementOpen] = useState(false);
 
   const [step, setStep] = useState<"REGISTER" | "OTP">("REGISTER");
   const [registeredEmail, setRegisteredEmail] = useState("");
@@ -408,12 +406,6 @@ function RegisterFormInner() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <RbfAgreementModal
-        open={isAgreementOpen}
-        onOpenChange={setIsAgreementOpen}
-        onAccept={() => form.setValue("agreedToRbf", true, { shouldValidate: true })}
-      />
     </>
   );
 }

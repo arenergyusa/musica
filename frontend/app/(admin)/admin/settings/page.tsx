@@ -1,516 +1,479 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { PlatformSettings } from "@/lib/types";
 import { toast } from "sonner";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, Save } from "lucide-react";
-import { AdminHeader } from "@/components/layout/AdminHeader";
+import { Label } from "@/components/ui/label";
+import { Loader2, Save, Sparkles, RefreshCw, Zap, ShieldCheck, DollarSign, Award, Layers } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
-interface PlatformSettings {
-  id?: number;
-  daily_roi_pct: number;
-  withdrawal_fee_pct: number;
-  withdrawal_min_amount: number;
-  level1_to_5_directs: number;
-  level1_to_5_business: number;
-  level1_to_10_directs: number;
-  level1_to_10_business: number;
-  level1_to_15_directs: number;
-  level1_to_15_business: number;
-  ref_reward_l1_pct: number;
-  ref_reward_l2_pct: number;
-  ref_reward_l3_pct: number;
-  level_income_l1_pct: number;
-  level_income_l2_pct: number;
-  level_income_l3_pct: number;
-  level_income_l4_to_l10_pct: number;
-  level_income_l11_to_l15_pct: number;
-  non_working_cap_multiplier: number;
-  working_cap_multiplier: number;
-  payment_upi_id: string;
-  payment_bank_name: string;
-  payment_account_name: string;
-  payment_account_number: string;
-  payment_ifsc: string;
-}
-
-export default function PlatformSettingsPage() {
+export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchSettings = async (showLoading = true) => {
-    if (showLoading) setIsLoading(true);
-    setError(null);
-    try {
-      const res = await api.get('/admin/settings');
-      setSettings(res.data.data);
-    } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const err = error as any;
-      console.error("Failed to load settings", err);
-      const errMsg = err.response?.data?.message || "Failed to load platform settings.";
-      if (showLoading) {
-        setError(errMsg);
-      } else {
-        toast.error(errMsg);
-      }
-    } finally {
-      if (showLoading) setIsLoading(false);
-    }
-  };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSettings();
   }, []);
 
-  const handleChange = (field: keyof PlatformSettings, value: number | string) => {
+  const fetchSettings = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get("/admin/settings");
+      if (res.data.data) {
+        setSettings(res.data.data);
+      }
+    } catch (error) {
+      console.error("Failed to load platform settings:", error);
+      toast.error("Failed to load platform settings");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChange = (field: keyof PlatformSettings, val: number) => {
     if (!settings) return;
     setSettings({
       ...settings,
-      [field]: value,
-    } as unknown as PlatformSettings);
-  };
-
-  const handleIfscBlur = async () => {
-    if (!settings || !settings.payment_ifsc) return;
-    const ifsc = settings.payment_ifsc.trim().toUpperCase();
-    
-    // Quick regex for IFSC before API call
-    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) return;
-
-    try {
-      const res = await fetch(`https://ifsc.razorpay.com/${ifsc}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.BANK) {
-          setSettings((prev) => prev ? { ...prev, payment_bank_name: data.BANK } as unknown as PlatformSettings : prev);
-          toast.success(`Bank found: ${data.BANK}`);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch IFSC details:", error);
-    }
+      [field]: val,
+    } as PlatformSettings);
   };
 
   const handleSave = async () => {
     if (!settings) return;
 
-    const percentageFields = [
-      'daily_roi_pct', 'withdrawal_fee_pct', 
-      'ref_reward_l1_pct', 'ref_reward_l2_pct', 'ref_reward_l3_pct',
-      'level_income_l1_pct', 'level_income_l2_pct', 'level_income_l3_pct',
-      'level_income_l4_to_l10_pct', 'level_income_l11_to_l15_pct'
-    ];
-    const directCountFields = [
-      'level1_to_5_directs', 'level1_to_10_directs', 'level1_to_15_directs'
-    ];
-
-    const paymentFields = [
-      'payment_upi_id', 'payment_bank_name', 'payment_account_name', 
-      'payment_account_number', 'payment_ifsc'
-    ];
-
-    const payload: Record<string, string | number> = { id: settings.id as number };
-
-    for (const [key, val] of Object.entries(settings)) {
-      if (key === 'id' || key === 'updated_at' || key === 'created_at') continue;
-      
-      // Treat null or undefined as empty string
-      const strVal = val == null ? '' : String(val).trim();
-      if (strVal === '' && !paymentFields.includes(key)) {
-        toast.error(`Missing value for ${key.replace(/_/g, ' ')}`);
-        return;
-      }
-
-      if (paymentFields.includes(key)) {
-        if (strVal === '') {
-          payload[key] = '';
-          continue;
-        }
-        if (key === 'payment_upi_id' && !/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(strVal)) {
-          toast.error("Invalid UPI ID format. E.g., name@bank");
-          return;
-        }
-        if (key === 'payment_ifsc' && !/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(strVal)) {
-          toast.error("Invalid IFSC format. E.g., HDFC0001234");
-          return;
-        }
-        if (key === 'payment_account_number' && !/^\d{9,18}$/.test(strVal)) {
-          toast.error("Account Number must be between 9 and 18 digits");
-          return;
-        }
-        
-        // uppercase IFSC on save
-        payload[key] = key === 'payment_ifsc' ? strVal.toUpperCase() : strVal;
-        continue;
-      }
-
-      const num = Number(strVal);
-      if (!Number.isFinite(num) || num < 0) {
-        toast.error(`Invalid value for ${key.replace(/_/g, ' ')}`);
-        return;
-      }
-      
-      if (directCountFields.includes(key) && !Number.isInteger(num)) {
-        toast.error(`Invalid value for ${key.replace(/_/g, ' ')}`);
-        return;
-      }
-      
-      if (percentageFields.includes(key) && num > 100) {
-        toast.error(`${key.replace(/_/g, ' ')} cannot exceed 100%`);
-        return;
-      }
-
-      if (key === 'daily_roi_pct') {
-        const decimals = strVal.split('.')[1];
-        if (decimals && decimals.length > 4) {
-          toast.error(`Invalid value for ${key.replace(/_/g, ' ')}`);
-          return;
-        }
-      }
-      
-      payload[key] = num;
-    }
-    
-    if ((payload.non_working_cap_multiplier as number) < 1 || (payload.working_cap_multiplier as number) < 1) {
-      toast.error("Cap multipliers must be at least 1");
-      return;
-    }
-    
-    if ((payload.level1_to_10_directs as number) < (payload.level1_to_5_directs as number) || (payload.level1_to_15_directs as number) < (payload.level1_to_10_directs as number)) {
-      toast.error("Direct referral requirements must be ordered (L5 <= L10 <= L15)");
-      return;
-    }
-    
-    if ((payload.level1_to_10_business as number) < (payload.level1_to_5_business as number) || (payload.level1_to_15_business as number) < (payload.level1_to_10_business as number)) {
-      toast.error("Business thresholds must be ordered (L5 <= L10 <= L15)");
-      return;
-    }
-
     setIsSaving(true);
     try {
-      await api.put('/admin/settings', payload);
-      toast.success("Settings updated successfully");
-      await fetchSettings(false);
+      const payload: Record<string, string | number> = { id: settings.id as number };
+
+      for (const [key, val] of Object.entries(settings)) {
+        if (key === 'id' || key === 'updated_at' || key === 'created_at') continue;
+        
+        const strVal = val == null ? '' : String(val).trim();
+        if (strVal === '') {
+          toast.error(`Missing value for ${key.replace(/_/g, ' ')}`);
+          setIsSaving(false);
+          return;
+        }
+
+        const num = Number(strVal);
+        if (!Number.isFinite(num) || num < 0) {
+          toast.error(`Invalid value for ${key.replace(/_/g, ' ')}`);
+          setIsSaving(false);
+          return;
+        }
+
+        payload[key] = num;
+      }
+
+      await api.put("/admin/settings", payload);
+      toast.success("Platform settings updated successfully!");
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const err = error as any;
-      console.error("Failed to update settings", err);
-      toast.error(err.response?.data?.message || "Failed to update settings.");
+      console.error("Failed to save settings:", error);
+      toast.error("Failed to update settings. Please check values.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !settings) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-3">
+        <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
+        <p className="text-xs text-slate-400 font-medium">Loading platform configuration parameters...</p>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center space-y-4">
-        <div className="text-destructive font-semibold">{error}</div>
-        <Button onClick={() => fetchSettings(true)} variant="outline">
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  if (!settings) return null;
+  const dailyReturnPct = (settings.monthly_reward_pct || 10.0) / 30.0;
 
   return (
-    <div className="space-y-6">
-      <AdminHeader />
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Platform Settings</h1>
-      </div>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>General & Financial</CardTitle>
-            <CardDescription>Configure core financial parameters</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Daily ROI Percentage (%)</Label>
-              <Input 
-                type="number" 
-                step="0.0001" 
-                value={settings.daily_roi_pct}
-                onChange={(e) => handleChange('daily_roi_pct', e.target.value)}
-              />
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-2xl text-white shadow-lg border border-slate-800">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-extrabold text-blue-400 uppercase tracking-widest mb-1">
+            <Sparkles className="h-3.5 w-3.5" /> Platform Configuration
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Platform Settings</h1>
+          <p className="text-xs text-slate-400 mt-1">
+            Configure global monthly ROI rates, cap multipliers, minimum withdrawal limit ($), and referral percentages.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={fetchSettings} 
+            variant="outline" 
+            size="sm" 
+            className="bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700 text-xs font-bold rounded-xl h-9"
+          >
+            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            Reset
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={isSaving} 
+            size="sm" 
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold rounded-xl h-9 shadow-md"
+          >
+            {isSaving ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
+            Save Configuration
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {/* Global Financial Limits */}
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
+                <DollarSign className="h-4 w-4 text-blue-600" /> Financial Parameters
+              </CardTitle>
+              <Badge variant="outline" className="text-[10px] font-bold text-blue-600 border-blue-200 bg-blue-50">USD ($)</Badge>
             </div>
-            <div className="space-y-2">
-              <Label>Withdrawal Fee Percentage (%)</Label>
+            <CardDescription className="text-xs text-slate-500">Core system ROI distribution rates and payout limits</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            
+            {/* Monthly ROI % */}
+            <div className="space-y-1.5 p-3.5 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/40">
+              <div className="flex justify-between items-center">
+                <Label className="text-xs font-bold text-slate-900 dark:text-white">Monthly ROI Reward (%)</Label>
+                <span className="text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400">
+                  Daily: {dailyReturnPct.toFixed(4)}% / day
+                </span>
+              </div>
               <Input 
                 type="number" 
                 step="0.1" 
-                value={settings.withdrawal_fee_pct}
-                onChange={(e) => handleChange('withdrawal_fee_pct', e.target.value)}
+                value={settings.monthly_reward_pct}
+                onChange={(e) => handleChange('monthly_reward_pct', parseFloat(e.target.value) || 0)}
+                className="h-10 text-xs font-mono font-bold bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
               />
+              <p className="text-[10px] text-slate-500">Daily ROI is computed automatically as <code className="font-bold">Monthly % / 30</code>.</p>
             </div>
-            <div className="space-y-2">
-              <Label>Minimum Withdrawal Amount (₹)</Label>
+
+            {/* Minimum Withdrawal */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Minimum Withdrawal Amount ($)</Label>
               <Input 
                 type="number" 
+                step="1" 
                 value={settings.withdrawal_min_amount}
-                onChange={(e) => handleChange('withdrawal_min_amount', e.target.value)}
+                onChange={(e) => handleChange('withdrawal_min_amount', parseFloat(e.target.value) || 0)}
+                className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+              />
+              <p className="text-[10px] text-slate-400">Minimum USD threshold required for users to submit a payout request.</p>
+            </div>
+
+            {/* Cap Multipliers */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Non-Working Cap (Multiplier)</Label>
+                <Input 
+                  type="number" 
+                  step="0.1" 
+                  value={settings.non_working_cap_multiplier}
+                  onChange={(e) => handleChange('non_working_cap_multiplier', parseFloat(e.target.value) || 0)}
+                  className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Working Cap (Multiplier)</Label>
+                <Input 
+                  type="number" 
+                  step="0.1" 
+                  value={settings.working_cap_multiplier}
+                  onChange={(e) => handleChange('working_cap_multiplier', parseFloat(e.target.value) || 0)}
+                  className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                />
+              </div>
+            </div>
+
+          </CardContent>
+        </Card>
+
+        {/* Level Unlock Business Requirements */}
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
+            <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
+              <Award className="h-4 w-4 text-emerald-500" /> Level Unlock Requirements ($)
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500">Business volume thresholds to unlock team levels</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-4">
+            
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Levels 1-5 Required Business ($)</Label>
+              <Input 
+                type="number" 
+                step="100" 
+                value={settings.level1_to_5_business}
+                onChange={(e) => handleChange('level1_to_5_business', parseFloat(e.target.value) || 0)}
+                className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+              />
+              <p className="text-[10px] text-slate-400">Total volume required across team line ($1,000 default).</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Levels 6-10 Required Business ($)</Label>
+              <Input 
+                type="number" 
+                step="100" 
+                value={settings.level6_to_10_business}
+                onChange={(e) => handleChange('level6_to_10_business', parseFloat(e.target.value) || 0)}
+                className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Non-Working Cap Multiplier (e.g. 2x)</Label>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Levels 11-15 Required Business ($)</Label>
+              <Input 
+                type="number" 
+                step="100" 
+                value={settings.level11_to_15_business}
+                onChange={(e) => handleChange('level11_to_15_business', parseFloat(e.target.value) || 0)}
+                className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+              />
+            </div>
+
+          </CardContent>
+        </Card>
+
+        {/* Invite Income Rewards */}
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
+            <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
+              <Zap className="h-4 w-4 text-blue-600" /> Invite Income Rates (%)
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500">One-time percentage reward credited upon direct invite investment</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Level 1 Direct Reward (%)</Label>
               <Input 
                 type="number" 
                 step="0.1" 
-                value={settings.non_working_cap_multiplier}
-                onChange={(e) => handleChange('non_working_cap_multiplier', e.target.value)}
+                value={settings.invite_reward_l1_pct}
+                onChange={(e) => handleChange('invite_reward_l1_pct', parseFloat(e.target.value) || 0)}
+                className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Working Cap Multiplier (e.g. 3x)</Label>
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Level 2 Direct Reward (%)</Label>
               <Input 
                 type="number" 
                 step="0.1" 
-                value={settings.working_cap_multiplier}
-                onChange={(e) => handleChange('working_cap_multiplier', e.target.value)}
+                value={settings.invite_reward_l2_pct}
+                onChange={(e) => handleChange('invite_reward_l2_pct', parseFloat(e.target.value) || 0)}
+                className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Level 3 Direct Reward (%)</Label>
+              <Input 
+                type="number" 
+                step="0.1" 
+                value={settings.invite_reward_l3_pct}
+                onChange={(e) => handleChange('invite_reward_l3_pct', parseFloat(e.target.value) || 0)}
+                className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
               />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Level Income Unlocking</CardTitle>
-            <CardDescription>Requirements to unlock level income</CardDescription>
+        {/* Level Income Rewards */}
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
+            <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
+              <Layers className="h-4 w-4 text-indigo-500" /> Level Income Rates (%)
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500">Daily recurring percentage calculated on team ROI</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>L1-L5 Directs Required</Label>
-                <Input 
-                  type="number" 
-                  value={settings.level1_to_5_directs}
-                  onChange={(e) => handleChange('level1_to_5_directs', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>L1-L5 Direct Business (₹)</Label>
-                <Input 
-                  type="number" 
-                  value={settings.level1_to_5_business}
-                  onChange={(e) => handleChange('level1_to_5_business', e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>L1-L10 Directs Required</Label>
-                <Input 
-                  type="number" 
-                  value={settings.level1_to_10_directs}
-                  onChange={(e) => handleChange('level1_to_10_directs', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>L1-L10 Direct Business (₹)</Label>
-                <Input 
-                  type="number" 
-                  value={settings.level1_to_10_business}
-                  onChange={(e) => handleChange('level1_to_10_business', e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>L1-L15 Directs Required</Label>
-                <Input 
-                  type="number" 
-                  value={settings.level1_to_15_directs}
-                  onChange={(e) => handleChange('level1_to_15_directs', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>L1-L15 Direct Business (₹)</Label>
-                <Input 
-                  type="number" 
-                  value={settings.level1_to_15_business}
-                  onChange={(e) => handleChange('level1_to_15_business', e.target.value)}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Direct Referral Rewards</CardTitle>
-            <CardDescription>One-time percentage reward on subscriptions</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Level 1 Reward (%)</Label>
-              <Input 
-                type="number" 
-                step="0.1" 
-                value={settings.ref_reward_l1_pct}
-                onChange={(e) => handleChange('ref_reward_l1_pct', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Level 2 Reward (%)</Label>
-              <Input 
-                type="number" 
-                step="0.1" 
-                value={settings.ref_reward_l2_pct}
-                onChange={(e) => handleChange('ref_reward_l2_pct', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Level 3 Reward (%)</Label>
-              <Input 
-                type="number" 
-                step="0.1" 
-                value={settings.ref_reward_l3_pct}
-                onChange={(e) => handleChange('ref_reward_l3_pct', e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Level Income Rewards</CardTitle>
-            <CardDescription>Daily/Recurring income distribution</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Level 1 (%)</Label>
+          <CardContent className="pt-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Level 1 (%)</Label>
                 <Input 
                   type="number" 
                   step="0.1" 
                   value={settings.level_income_l1_pct}
-                  onChange={(e) => handleChange('level_income_l1_pct', e.target.value)}
+                  onChange={(e) => handleChange('level_income_l1_pct', parseFloat(e.target.value) || 0)}
+                  className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Level 2 (%)</Label>
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Level 2 (%)</Label>
                 <Input 
                   type="number" 
                   step="0.1" 
                   value={settings.level_income_l2_pct}
-                  onChange={(e) => handleChange('level_income_l2_pct', e.target.value)}
+                  onChange={(e) => handleChange('level_income_l2_pct', parseFloat(e.target.value) || 0)}
+                  className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Level 3 (%)</Label>
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Level 3 (%)</Label>
                 <Input 
                   type="number" 
                   step="0.1" 
                   value={settings.level_income_l3_pct}
-                  onChange={(e) => handleChange('level_income_l3_pct', e.target.value)}
+                  onChange={(e) => handleChange('level_income_l3_pct', parseFloat(e.target.value) || 0)}
+                  className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Level 4-10 (%)</Label>
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Level 4-10 (%)</Label>
                 <Input 
                   type="number" 
                   step="0.1" 
                   value={settings.level_income_l4_to_l10_pct}
-                  onChange={(e) => handleChange('level_income_l4_to_l10_pct', e.target.value)}
+                  onChange={(e) => handleChange('level_income_l4_to_l10_pct', parseFloat(e.target.value) || 0)}
+                  className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Level 11-15 (%)</Label>
+              <div className="space-y-1 col-span-2">
+                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Level 11-15 (%)</Label>
                 <Input 
                   type="number" 
                   step="0.1" 
                   value={settings.level_income_l11_to_l15_pct}
-                  onChange={(e) => handleChange('level_income_l11_to_l15_pct', e.target.value)}
+                  onChange={(e) => handleChange('level_income_l11_to_l15_pct', parseFloat(e.target.value) || 0)}
+                  className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                 />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Payment Configuration</CardTitle>
-            <CardDescription>Configure bank details and UPI for user subscriptions</CardDescription>
+
+        {/* Database-Driven Salary Tiers Configuration Card */}
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm col-span-1 md:col-span-2">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+                <Award className="h-4 w-4 text-purple-600" />
+                Dynamic Monthly Salary Tiers Config ($ USD)
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                100% Database-Driven: Manage downline business volume requirements, 60:40 leg balance, and 25% monthly maintenance increment
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs font-bold border-purple-200 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 rounded-lg"
+              onClick={async () => {
+                try {
+                  const res = await api.post("/admin/salary/trigger-payout");
+                  toast.success(`Salary Payout Triggered! Payouts: ${res.data.payout_count}, Total: $${res.data.total_amount}`);
+                } catch (err: any) {
+                  toast.error(err.response?.data?.error || "Failed to trigger salary payout");
+                }
+              }}
+            >
+              <Zap className="mr-1.5 h-3.5 w-3.5 text-amber-500" />
+              Trigger Monthly Salary Payout
+            </Button>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>UPI ID</Label>
-                <Input 
-                  placeholder="e.g. musica@hdfcbank"
-                  value={settings.payment_upi_id || ''}
-                  onChange={(e) => handleChange('payment_upi_id', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Bank Name</Label>
-                <Input 
-                  placeholder="e.g. HDFC Bank"
-                  value={settings.payment_bank_name || ''}
-                  onChange={(e) => handleChange('payment_bank_name', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Account Name</Label>
-                <Input 
-                  placeholder="e.g. Musica RBF Solutions Pvt Ltd"
-                  value={settings.payment_account_name || ''}
-                  onChange={(e) => handleChange('payment_account_name', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Account Number</Label>
-                <Input 
-                  placeholder="e.g. 50200012345678"
-                  value={settings.payment_account_number || ''}
-                  onChange={(e) => handleChange('payment_account_number', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>IFSC Code</Label>
-                <Input 
-                  placeholder="e.g. HDFC0001234"
-                  value={settings.payment_ifsc || ''}
-                  onChange={(e) => handleChange('payment_ifsc', e.target.value.toUpperCase())}
-                  onBlur={handleIfscBlur}
-                />
-                <p className="text-xs text-muted-foreground">Bank name will be auto-filled if valid</p>
-              </div>
+
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { tier: 1, volume: 50000, salary: 100 },
+                { tier: 2, volume: 150000, salary: 250 },
+                { tier: 3, volume: 350000, salary: 500 },
+                { tier: 4, volume: 750000, salary: 700 },
+                { tier: 5, volume: 1000000, salary: 1000 },
+                { tier: 6, volume: 2500000, salary: 2500 },
+                { tier: 7, volume: 5000000, salary: 5000 },
+                { tier: 8, volume: 10000000, salary: 11000 },
+              ].map((t) => (
+                <div key={t.tier} className="bg-slate-50/70 dark:bg-slate-800/40 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-extrabold">
+                    <span className="text-purple-600 dark:text-purple-400">Tier {t.tier}</span>
+                    <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
+                      ${t.salary}/mo
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-slate-500 font-bold">Min Volume ($ USD)</Label>
+                    <Input
+                      type="number"
+                      defaultValue={t.volume}
+                      className="h-8 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                      onBlur={async (e) => {
+                        const newVol = parseFloat(e.target.value) || t.volume;
+                        try {
+                          await api.put("/admin/salary/tiers", {
+                            tier: t.tier,
+                            min_volume_usd: newVol,
+                            monthly_salary_usd: t.salary,
+                            max_strong_leg_pct: 60,
+                            min_weaker_leg_pct: 40,
+                            monthly_increment_pct: 25
+                          });
+                          toast.success(`Tier ${t.tier} updated successfully!`);
+                        } catch (err: any) {
+                          toast.error("Failed to update salary tier");
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-slate-500 font-bold">Monthly Salary ($ USD)</Label>
+                    <Input
+                      type="number"
+                      defaultValue={t.salary}
+                      className="h-8 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                      onBlur={async (e) => {
+                        const newSal = parseFloat(e.target.value) || t.salary;
+                        try {
+                          await api.put("/admin/salary/tiers", {
+                            tier: t.tier,
+                            min_volume_usd: t.volume,
+                            monthly_salary_usd: newSal,
+                            max_strong_leg_pct: 60,
+                            min_weaker_leg_pct: 40,
+                            monthly_increment_pct: 25
+                          });
+                          toast.success(`Tier ${t.tier} monthly salary updated!`);
+                        } catch (err: any) {
+                          toast.error("Failed to update monthly salary");
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div className="text-[10px] text-slate-400 font-semibold pt-1 flex justify-between">
+                    <span>60:40 Leg Ratio</span>
+                    <span>25% Maintenance</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
+
       </div>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={isSaving} size="lg">
+      <div className="flex justify-end pt-2">
+        <Button onClick={handleSave} disabled={isSaving} size="lg" className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl px-8 h-11 text-sm shadow-md">
           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Save Settings
+          Save Platform Configuration
         </Button>
       </div>
+
     </div>
   );
 }

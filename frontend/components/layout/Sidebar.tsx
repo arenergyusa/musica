@@ -30,13 +30,13 @@ const navSections = [
     links: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/watch", label: "Media Hub", icon: PlayCircle },
-      { href: "/investments", label: "My Sponsorships", icon: Briefcase },
+      { href: "/investments", label: "My Investments", icon: Briefcase },
     ]
   },
   {
     title: "FINANCE & TEAM",
     links: [
-      { href: "/wallet", label: "Reward Wallet", icon: Wallet },
+      { href: "/wallet", label: "Wallet", icon: Wallet },
       { href: "/team", label: "My Team", icon: Users },
       { href: "/income", label: "History", icon: History },
     ]
@@ -44,7 +44,6 @@ const navSections = [
   {
     title: "ACCOUNT",
     links: [
-      { href: "/kyc", label: "KYC Verification", icon: ShieldCheck },
       { href: "/profile", label: "Profile Settings", icon: UserCircle },
     ]
   }
@@ -57,7 +56,6 @@ export function Sidebar() {
   const userName = user?.name || "Creator";
   const userEmail = user?.email || "";
   const userInitials = userName.trim().split(/\s+/).filter(Boolean).map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || "U";
-  const isKycApproved = user?.kycStatus === "APPROVED";
 
   return (
     <aside className="w-64 flex-shrink-0 hidden lg:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 h-screen sticky top-0 z-30 select-none shadow-sm">
@@ -127,15 +125,9 @@ export function Sidebar() {
               <p className="font-bold text-xs text-slate-900 dark:text-white truncate leading-tight">
                 {userName}
               </p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className={cn(
-                  "inline-block w-1.5 h-1.5 rounded-full shrink-0",
-                  isKycApproved ? "bg-emerald-500" : "bg-amber-500"
-                )} />
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">
-                  {isKycApproved ? "Verified" : "KYC Pending"}
-                </span>
-              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate mt-0.5">
+                {userEmail || "Active"}
+              </p>
             </div>
           </div>
         )}

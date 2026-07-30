@@ -1,10 +1,10 @@
 // ============================================================
-// Dynamic Subscription Plan Config (Multiples of ₹10,000)
+// Dynamic Investment Plan Config (Multiples of $100 USD)
 // ============================================================
 export const DYNAMIC_PLAN_CONFIG = {
-  minAmount: 10000,
-  maxAmount: 1000000,
-  stepAmount: 10000,
+  minAmount: 100,
+  maxAmount: 10000,
+  stepAmount: 100,
   dailyRatePct: 0.3333,
 } as const;
 
@@ -39,12 +39,12 @@ export const LEVEL_INCOME: Record<number, number> = {
 };
 
 // ============================================================
-// Level Opening Thresholds
+// Level Opening Thresholds ($ USD Team Volume)
 // ============================================================
 export const LEVEL_THRESHOLDS = [
-  { volume: 100000,  levels: 5,  label: "L1–L5" },
-  { volume: 200000,  levels: 10, label: "L1–L10" },
-  { volume: 300000,  levels: 15, label: "L1–L15" },
+  { volume: 1000,  levels: 5,  label: "L1–L5" },
+  { volume: 2000,  levels: 10, label: "L1–L10" },
+  { volume: 3000,  levels: 15, label: "L1–L15" },
 ] as const;
 
 // ============================================================
@@ -59,7 +59,7 @@ export const CAP_MULTIPLIER = {
 // Withdrawal Rules
 // ============================================================
 export const WITHDRAWAL = {
-  MIN_AMOUNT: 1000,
+  MIN_AMOUNT: 10,
   TDS_PCT: 10,
   ADMIN_FEE_PCT: 0,
   DATES: [10, 20, 30], // Day of month
@@ -127,21 +127,19 @@ export const NAV_LINKS = [
 
 export const USER_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
-  { label: "Sponsor Project", href: "/invest", icon: "TrendingUp" },
-  { label: "My Sponsorships", href: "/investments", icon: "Wallet" },
-  { label: "Reward Wallet", href: "/wallet", icon: "IndianRupee" },
+  { label: "Invest", href: "/invest", icon: "TrendingUp" },
+  { label: "My Investments", href: "/investments", icon: "Wallet" },
+  { label: "Wallet", href: "/wallet", icon: "Wallet" },
   { label: "Withdraw", href: "/withdraw", icon: "ArrowDownToLine" },
   { label: "Team & Network", href: "/team", icon: "Users" },
   { label: "Income History", href: "/income", icon: "BarChart3" },
   { label: "Profile", href: "/profile", icon: "User" },
-  { label: "KYC Verification", href: "/kyc", icon: "ShieldCheck" },
 ] as const;
 
 export const ADMIN_NAV = [
   { label: "Dashboard", href: "/admin/dashboard", icon: "LayoutDashboard" },
   { label: "Users", href: "/admin/users", icon: "Users" },
-  { label: "Project Sponsorships", href: "/admin/investments", icon: "TrendingUp" },
+  { label: "Investments", href: "/admin/investments", icon: "TrendingUp" },
   { label: "Withdrawals", href: "/admin/withdrawals", icon: "ArrowDownToLine" },
-  { label: "KYC Review", href: "/admin/kyc", icon: "ShieldCheck" },
-  { label: "Reports", href: "/admin/reports", icon: "BarChart3" },
+  { label: "Settings", href: "/admin/settings", icon: "Settings" },
 ] as const;

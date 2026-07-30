@@ -14,7 +14,6 @@ import { ArrowRight, Calendar, Activity, Lock, Wallet, PlusCircle, FileCheck, Sh
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/store/useAuthStore";
-import { PDFReceipt } from "@/components/shared/PDFReceipt";
 
 export default function InvestmentsPage() {
   const { user } = useAuthStore();
@@ -23,15 +22,6 @@ export default function InvestmentsPage() {
   const [nonWorkingCap, setNonWorkingCap] = useState<number>(2);
   const [workingCap, setWorkingCap] = useState<number>(3);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedReceipt, setSelectedReceipt] = useState<{
-    id: string;
-    amount: number;
-    created_at: string;
-    status: string;
-    user_name?: string;
-    user_email?: string;
-    referral_code?: string;
-  } | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -60,10 +50,10 @@ export default function InvestmentsPage() {
     closedCount: investments.filter(i => i.status === "CLOSED" || i.status === "CAPPED").length,
   };
 
-  const enrichedInvestments = investments.map(inv => {
+      const enrichedInvestments = investments.map(inv => {
     return {
       ...inv,
-      planName: "Sponsorship Pool",
+      planName: "Investment Pool",
       dailyRoi: inv.daily_rate_pct ? (inv.amount * (inv.daily_rate_pct as number)) / 100 : (inv.amount * 0.3333) / 100
     };
   });
@@ -105,13 +95,13 @@ export default function InvestmentsPage() {
 
       {/* Header */}
       <PageHeader
-        title="My Sponsorships"
-        description="Monitor your active Haryanvi music video contributions, daily revenue share credits, and cap progression."
+        title="My Investments"
+        description="Monitor your active contributions, daily ROI credits, and cap progression."
         action={
           <Link href="/invest">
             <Button className="h-10 text-xs font-bold px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-all flex items-center gap-2">
               <PlusCircle className="h-4 w-4" />
-              New Sponsorship
+              New Investment
             </Button>
           </Link>
         }
@@ -220,24 +210,6 @@ export default function InvestmentsPage() {
                       <Badge variant="outline" className="font-semibold text-xs border-blue-200 text-blue-700 bg-blue-50 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900">
                         {inv.working_cap_at_creation ? `${workingCap}X Working` : `${nonWorkingCap}X Non-Working`}
                       </Badge>
-                      {inv.status !== "PENDING" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 font-semibold"
-                          onClick={() => setSelectedReceipt({
-                            id: inv.id,
-                            amount: inv.amount,
-                            created_at: inv.created_at || '',
-                            status: inv.status,
-                            user_name: user?.name,
-                            user_email: user?.email,
-                            referral_code: user?.referralCode
-                          })}
-                        >
-                          <FileCheck className="mr-1 h-3.5 w-3.5" /> Tax Receipt
-                        </Button>
-                      )}
                     </div>
                     <CapProgressBar
                       currentAmount={inv.total_reward_earned || 0}
@@ -269,12 +241,6 @@ export default function InvestmentsPage() {
           />
         )}
       </div>
-
-      {/* Tax Receipt Modal */}
-      <PDFReceipt
-        subscription={selectedReceipt}
-        onClose={() => setSelectedReceipt(null)}
-      />
     </div>
   );
 }

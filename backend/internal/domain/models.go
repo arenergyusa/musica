@@ -7,25 +7,19 @@ import (
 )
 
 type User struct {
-	ID                 uuid.UUID  `json:"id" db:"id"`
-	Name               string     `json:"name" db:"name"`
-	Email              string     `json:"email" db:"email"`
-	Phone              string     `json:"phone" db:"phone"`
-	PasswordHash       string     `json:"-" db:"password_hash"`
-	InviteCode         string     `json:"invite_code" db:"invite_code"`
-	InvitedBy          *uuid.UUID `json:"invited_by,omitempty" db:"invited_by"`
-	KycStatus          string     `json:"kyc_status" db:"kyc_status"` // PENDING, APPROVED, REJECTED
-	KycRejectionReason string     `json:"kyc_rejection_reason,omitempty" db:"kyc_rejection_reason"`
-	BankAccount        string     `json:"bank_account" db:"bank_account"`
-	BankAccountHash    string     `json:"-" db:"bank_account_hash"`
-	IFSC               string     `json:"ifsc" db:"ifsc"`
-	PAN                string     `json:"-" db:"pan"`
-	Aadhaar            string     `json:"-" db:"aadhaar"`
-	Status             string     `json:"status" db:"status"` // ACTIVE, BLOCKED
-	Role               string     `json:"role" db:"role"`
-	DocumentURL        string     `json:"document_url" db:"document_url"`
-	CreatedAt          time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at" db:"updated_at"`
+	ID              uuid.UUID `json:"id" db:"id"`
+	Name            string    `json:"name" db:"name"`
+	Email           string    `json:"email" db:"email"`
+	Phone           string    `json:"phone" db:"phone"`
+	PasswordHash    string    `json:"-" db:"password_hash"`
+	InviteCode      string    `json:"invite_code" db:"invite_code"`
+	InvitedBy       *uuid.UUID `json:"invited_by,omitempty" db:"invited_by"`
+	UsdtAddress     string    `json:"usdt_address" db:"usdt_address"`
+	Leg             string    `json:"leg" db:"leg"` // LEFT, RIGHT
+	Status          string    `json:"status" db:"status"` // ACTIVE, BLOCKED
+	Role            string    `json:"role" db:"role"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type SponsorshipPlan struct {
@@ -58,6 +52,7 @@ type RewardWallet struct {
 	Balance        float64   `json:"balance" db:"balance"`
 	TotalCredited  float64   `json:"total_credited" db:"total_credited"`
 	TotalWithdrawn float64   `json:"total_withdrawn" db:"total_withdrawn"`
+	SalaryIncome   float64   `json:"salary_income" db:"salary_income"`
 }
 
 type Transaction struct {
@@ -87,7 +82,7 @@ type Withdrawal struct {
 
 type PlatformSettings struct {
 	ID                         int       `json:"id" db:"id"`
-	DailyRewardPct             float64   `json:"daily_reward_pct" db:"daily_reward_pct"`
+	MonthlyRewardPct           float64   `json:"monthly_reward_pct" db:"monthly_reward_pct"`
 	WithdrawalFeePct           float64   `json:"withdrawal_fee_pct" db:"withdrawal_fee_pct"`
 	WithdrawalMinAmount        float64   `json:"withdrawal_min_amount" db:"withdrawal_min_amount"`
 	Level1To5Directs           int       `json:"level1_to_5_directs" db:"level1_to_5_directs"`
@@ -106,12 +101,27 @@ type PlatformSettings struct {
 	LevelIncomeL11ToL15Pct     float64   `json:"level_income_l11_to_l15_pct" db:"level_income_l11_to_l15_pct"`
 	NonWorkingCapMultiplier    float64   `json:"non_working_cap_multiplier" db:"non_working_cap_multiplier"`
 	WorkingCapMultiplier       float64   `json:"working_cap_multiplier" db:"working_cap_multiplier"`
-	PaymentUPIID               string    `json:"payment_upi_id" db:"payment_upi_id"`
-	PaymentBankName            string    `json:"payment_bank_name" db:"payment_bank_name"`
-	PaymentAccountName         string    `json:"payment_account_name" db:"payment_account_name"`
-	PaymentAccountNumber       string    `json:"payment_account_number" db:"payment_account_number"`
-	PaymentIFSC                string    `json:"payment_ifsc" db:"payment_ifsc"`
 	UpdatedAt                  time.Time `json:"updated_at" db:"updated_at"`
+}
+
+type UserDepositAddress struct {
+	ID              uuid.UUID `json:"id" db:"id"`
+	UserID          uuid.UUID `json:"user_id" db:"user_id"`
+	Address         string    `json:"address" db:"address"`
+	DerivationIndex int       `json:"derivation_index" db:"derivation_index"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+}
+
+type TransactionAuditLog struct {
+	ID         uuid.UUID `json:"id" db:"id"`
+	UserID     *uuid.UUID `json:"user_id,omitempty" db:"user_id"`
+	Action     string    `json:"action" db:"action"`
+	AmountUSD  float64   `json:"amount_usd" db:"amount_usd"`
+	UsdtAmount float64   `json:"usdt_amount" db:"usdt_amount"`
+	TxHash     string    `json:"tx_hash" db:"tx_hash"`
+	Status     string    `json:"status" db:"status"`
+	Details    string    `json:"details" db:"details"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 }
 
 type OTP struct {
@@ -122,4 +132,62 @@ type OTP struct {
 	ExpiresAt time.Time  `json:"expires_at" db:"expires_at"`
 	UsedAt    *time.Time `json:"used_at,omitempty" db:"used_at"`
 	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+}
+
+type SalaryTier struct {
+	Tier                 int       `json:"tier" db:"tier"`
+	MinVolumeUSD         float64   `json:"min_volume_usd" db:"min_volume_usd"`
+	MonthlySalaryUSD     float64   `json:"monthly_salary_usd" db:"monthly_salary_usd"`
+	MaxStrongLegPct      float64   `json:"max_strong_leg_pct" db:"max_strong_leg_pct"`
+	MinWeakerLegPct      float64   `json:"min_weaker_leg_pct" db:"min_weaker_leg_pct"`
+	MonthlyIncrementPct  float64   `json:"monthly_increment_pct" db:"monthly_increment_pct"`
+	CreatedAt            time.Time `json:"created_at" db:"created_at"`
+}
+
+type SalaryQualification struct {
+	ID                 uuid.UUID  `json:"id" db:"id"`
+	UserID             uuid.UUID  `json:"user_id" db:"user_id"`
+	Tier               int        `json:"tier" db:"tier"`
+	LeftLegVolume      float64    `json:"left_leg_volume" db:"left_leg_volume"`
+	RightLegVolume     float64    `json:"right_leg_volume" db:"right_leg_volume"`
+	TotalVolume        float64    `json:"total_volume" db:"total_volume"`
+	CycleStartDate     time.Time  `json:"cycle_start_date" db:"cycle_start_date"`
+	CycleNewVolume     float64    `json:"cycle_new_volume" db:"cycle_new_volume"`
+	Status             string     `json:"status" db:"status"` // QUALIFIED, PENDING_INCREMENT, PAYOUT_ACTIVE
+	LastPayoutAt       *time.Time `json:"last_payout_at,omitempty" db:"last_payout_at"`
+	CreatedAt          time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at" db:"updated_at"`
+}
+
+type SalaryPayoutLog struct {
+	ID              uuid.UUID `json:"id" db:"id"`
+	UserID          uuid.UUID `json:"user_id" db:"user_id"`
+	Tier            int       `json:"tier" db:"tier"`
+	AmountUSD       float64   `json:"amount_usd" db:"amount_usd"`
+	TotalVolume     float64   `json:"total_volume" db:"total_volume"`
+	LeftLegVolume   float64   `json:"left_leg_volume" db:"left_leg_volume"`
+	RightLegVolume  float64   `json:"right_leg_volume" db:"right_leg_volume"`
+	CycleNewVolume  float64   `json:"cycle_new_volume" db:"cycle_new_volume"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+}
+
+type SalaryProgressResponse struct {
+	CurrentTier             int          `json:"current_tier"`
+	CurrentSalaryUSD        float64      `json:"current_salary_usd"`
+	NextTier                *SalaryTier  `json:"next_tier,omitempty"`
+	LeftLegVolume           float64      `json:"left_leg_volume"`
+	RightLegVolume          float64      `json:"right_leg_volume"`
+	TotalVolume             float64      `json:"total_volume"`
+	TargetVolumeUSD         float64      `json:"target_volume_usd"`
+	RemainingVolumeUSD      float64      `json:"remaining_volume_usd"`
+	StrongLegVolume         float64      `json:"strong_leg_volume"`
+	WeakerLegVolume         float64      `json:"weaker_leg_volume"`
+	WeakerLegRequiredUSD    float64      `json:"weaker_leg_required_usd"`
+	WeakerLegRemainingUSD   float64      `json:"weaker_leg_remaining_usd"`
+	LegRatioMet             bool         `json:"leg_ratio_met"`
+	MonthlyIncrementTarget  float64      `json:"monthly_increment_target"`
+	MonthlyIncrementAchieved float64     `json:"monthly_increment_achieved"`
+	MonthlyIncrementRemaining float64    `json:"monthly_increment_remaining"`
+	DaysRemainingInCycle    int          `json:"days_remaining_in_cycle"`
+	Status                  string       `json:"status"`
 }

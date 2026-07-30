@@ -16,15 +16,11 @@ type UserRepository interface {
 	GetByInviteCode(ctx context.Context, code string) (*domain.User, error)
 	Update(ctx context.Context, user *domain.User) error
 	GetTotalCount(ctx context.Context) (int, error)
-	GetPendingKYCCount(ctx context.Context) (int, error)
 	GetAll(ctx context.Context, limit, offset int) ([]*domain.User, error)
-	GetPendingKYC(ctx context.Context, limit, offset int) ([]*domain.User, error)
 	// SearchUsers filters by optional name/email search and status
 	SearchUsers(ctx context.Context, limit, offset int, search, status string) ([]*domain.User, error)
 	// GetDailySignups returns daily new user counts for the last N days
 	GetDailySignups(ctx context.Context, days int) ([]map[string]interface{}, error)
-	// GetByBankAccount finds a user with exact bank account match
-	GetByBankAccount(ctx context.Context, bankAccount string) (*domain.User, error)
 }
 
 // InvestmentRepository handles sponsorship and plan data
@@ -77,6 +73,7 @@ type WithdrawalRepository interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Withdrawal, error)
 	GetPending(ctx context.Context) ([]*domain.Withdrawal, error)
 	UpdateRequestStatus(ctx context.Context, id uuid.UUID, status string, adminNote string) error
+	UpdateRequestStatusWithRef(ctx context.Context, id uuid.UUID, status string, paymentRef string, adminNote string) error
 	GetPendingCount(ctx context.Context) (int, error)
 	GetAll(ctx context.Context, limit, offset int) ([]*domain.Withdrawal, error)
 }

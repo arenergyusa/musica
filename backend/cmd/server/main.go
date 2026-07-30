@@ -55,6 +55,7 @@ func main() {
 	withdrawalRepo := repository.NewWithdrawalRepository(dbPool)
 	settingsRepo := repository.NewSettingsRepository(dbPool)
 	otpRepo := repository.NewOTPRepository(dbPool)
+	salaryRepo := repository.NewSalaryRepository(dbPool)
 
 	// Initialize Email Sender
 	emailSender := email.NewEmailSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass)
@@ -63,11 +64,12 @@ func main() {
 	authSvc := service.NewAuthService(userRepo, mlmRepo, otpRepo, emailSender, cfg.JWTSecret)
 	invSvc := service.NewInvestmentService(invRepo, userRepo, mlmRepo, settingsRepo)
 	walletSvc := service.NewWalletService(walletRepo)
-	wdSvc := service.NewWithdrawalService(dbPool, withdrawalRepo, walletRepo, userRepo, settingsRepo)
+	auditSvc := service.NewAuditService(dbPool)
+	usdtSvc := service.NewUSDTService(dbPool, auditSvc)
+	wdSvc := service.NewWithdrawalService(dbPool, withdrawalRepo, walletRepo, userRepo, settingsRepo, usdtSvc)
 	teamSvc := service.NewTeamService(mlmRepo, settingsRepo)
 	adminSvc := service.NewAdminService(dbPool, invRepo, withdrawalRepo, userRepo, walletRepo, settingsRepo, mlmRepo)
 	userSvc := service.NewUserService(userRepo, walletRepo, invRepo, mlmRepo, settingsRepo)
-	kycVerificationSvc := service.NewKYCVerificationService("http://kyc-verifier:8000/verify", "")
 
 	// Initialize Handlers
 	authH := handler.NewAuthHandler(authSvc)
@@ -76,7 +78,9 @@ func main() {
 	wdH := handler.NewWithdrawalHandler(wdSvc)
 	teamH := handler.NewTeamHandler(teamSvc)
 	adminH := handler.NewAdminHandler(adminSvc)
-	userH := handler.NewUserHandler(userSvc, kycVerificationSvc)
+	userH := handler.NewUserHandler(userSvc)
+	usdtH := handler.NewUSDTHandler(usdtSvc, auditSvc)
+	salaryH := handler.NewSalaryHandler(salaryRepo)
 
 	// Initialize and Start Cron Jobs
 	jobRunner := cron.NewJobRunner(invRepo, mlmRepo, walletRepo, settingsRepo)
@@ -267,9 +271,8 @@ func main() {
 			user.PUT("/profile", userH.UpdateProfile)
 			user.PUT("/password", userH.ChangePassword)
 			user.GET("/dashboard", userH.GetDashboard)
-			user.POST("/kyc", userH.SubmitKYC)
-			user.POST("/kyc/check", userH.CheckKYCScan)
-			user.GET("/kyc/status", userH.GetKYCStatus)
+			user.GET("/deposit-address", usdtH.GetDepositAddress)
+			user.GET("/audit-logs", usdtH.GetAuditLogs)
 		}
 
 		sponsorship := api.Group("/sponsorship")
@@ -319,6 +322,14 @@ func main() {
 			withdrawal.GET("/next-dates", wdH.GetNextDates)
 		}
 
+		salary := api.Group("/salary")
+		salary.Use(middleware.AuthMiddleware())
+		salary.POST("/divide-downlines", salaryH.DivideDownlines)
+		{
+			salary.GET("/progress", salaryH.GetUserSalaryProgress)
+			salary.GET("/tiers", salaryH.GetSalaryTiers)
+		}
+
 		admin := api.Group("/admin")
 		admin.Use(middleware.AuthMiddleware(), middleware.AdminMiddleware())
 		{
@@ -330,12 +341,14 @@ func main() {
 			admin.PUT("/users/:id/unblock", adminH.UnblockUser)
 			admin.POST("/investments/:id/activate", adminH.ActivateInvestment)
 			admin.POST("/sponsorships/:id/activate", adminH.ActivateInvestment)
-			admin.GET("/kyc", adminH.GetPendingKYC)
 			admin.GET("/withdrawals", adminH.GetAllWithdrawals)
 			admin.PUT("/withdrawals/:id/approve", adminH.ApproveWithdrawal)
 			admin.PUT("/withdrawals/:id/reject", adminH.RejectWithdrawal)
 			admin.GET("/settings", adminH.GetSettings)
 			admin.PUT("/settings", adminH.UpdateSettings)
+			admin.GET("/salary/tiers", salaryH.GetSalaryTiers)
+			admin.PUT("/salary/tiers", salaryH.UpdateSalaryTier)
+			admin.POST("/salary/trigger-payout", salaryH.TriggerSalaryPayout)
 		}
 	}
 

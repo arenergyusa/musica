@@ -42,8 +42,10 @@ func (s *investmentService) GetPlans(ctx context.Context) ([]*domain.Sponsorship
 		return nil, err
 	}
 
+	dailyRate := settings.MonthlyRewardPct / 30.0
+
 	for _, p := range plans {
-		p.DailyRatePct = settings.DailyRewardPct
+		p.DailyRatePct = dailyRate
 		p.NonWorkingCapMultiplier = settings.NonWorkingCapMultiplier
 		p.WorkingCapMultiplier = settings.WorkingCapMultiplier
 	}
@@ -52,7 +54,6 @@ func (s *investmentService) GetPlans(ctx context.Context) ([]*domain.Sponsorship
 }
 
 func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UUID, req *domain.InvestRequest) (*domain.Sponsorship, error) {
-	// 1. Get user to check KYC
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -61,16 +62,12 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 		return nil, errors.New("user not found")
 	}
 
-	if user.KycStatus != "APPROVED" && user.KycStatus != "COMPLETED" {
-		return nil, errors.New("KYC must be APPROVED before sponsoring projects")
+	// Validate amount is a multiple of $100 USD
+	if req.Amount <= 0 || req.Amount != float64(int64(req.Amount)) || int64(req.Amount)%100 != 0 {
+		return nil, errors.New("investment amount must be a multiple of $100 USD")
 	}
 
-	// 2. Validate amount is a whole-rupee value and a multiple of 10,000 INR
-	if req.Amount <= 0 || req.Amount != float64(int64(req.Amount)) || int64(req.Amount)%10000 != 0 {
-		return nil, errors.New("sponsorship amount must be a multiple of 10,000 INR")
-	}
-
-	// 3. Check working vs non-working
+	// Check working vs non-working
 	isWorking, err := s.mlmRepo.HasActiveDirectReferral(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -83,12 +80,13 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 
 	capMultiplier := GetIncomeCap(isWorking, settings)
 	capLimit := req.Amount * capMultiplier
+	dailyRate := settings.MonthlyRewardPct / 30.0
 
 	inv := &domain.Sponsorship{
 		UserID:               userID,
 		Amount:               req.Amount,
-		DailyRatePct:         settings.DailyRewardPct,
-		Status:               "PENDING", // Requires admin approval for payment receipt
+		DailyRatePct:         dailyRate,
+		Status:               "PENDING",
 		CapLimit:             capLimit,
 		WorkingCapAtCreation: isWorking,
 	}

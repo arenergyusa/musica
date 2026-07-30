@@ -3,7 +3,6 @@ import { create } from 'zustand';
 import { api } from '@/lib/api';
 
 export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN';
-export type KycStatus = 'UNINITIALIZED' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface User {
   id: string;
@@ -11,12 +10,9 @@ export interface User {
   email: string;
   phone: string;
   role: UserRole;
-  kycStatus: KycStatus;
-  referralCode: string;
-  bank_account?: string;
-  ifsc?: string;
-  pan?: string;
-  aadhaar?: string;
+  referralCode?: string;
+  usdtAddress?: string;
+  usdt_address?: string;
 }
 
 interface AuthState {
@@ -37,10 +33,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       const response = await api.get('/user/profile');
       const userData = response.data.data;
       if (userData) {
-        userData.kycStatus = userData.kyc_status || userData.kycStatus;
         userData.referralCode = userData.invite_code || userData.referral_code || userData.referralCode;
-        userData.bank_account = userData.bank_account || userData.bankAccount;
-        userData.ifsc = userData.ifsc;
+        userData.usdtAddress = userData.usdt_address || userData.usdtAddress;
       }
       set({ 
         user: userData, 

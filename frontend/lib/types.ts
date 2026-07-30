@@ -91,6 +91,7 @@ export interface TeamDirect {
   name?: string;
   email?: string;
   is_active?: boolean;
+  leg?: string;
   total_investment?: number;
   joined_at?: string;
   createdAt?: string;
@@ -99,4 +100,24 @@ export interface TeamDirect {
   status?: string;
   investment?: number;
   [key: string]: unknown;
+}
+
+export interface PlatformSettings {
+  id?: number;
+  monthly_reward_pct: number;
+  withdrawal_min_amount: number;
+  non_working_cap_multiplier: number;
+  working_cap_multiplier: number;
+  level1_to_5_business: number;
+  level6_to_10_business: number;
+  level11_to_15_business: number;
+  invite_reward_l1_pct: number;
+  invite_reward_l2_pct: number;
+  invite_reward_l3_pct: number;
+  level_income_l1_pct: number;
+  level_income_l2_pct: number;
+  level_income_l3_pct: number;
+  level_income_l4_to_l10_pct: number;
+  level_income_l11_to_l15_pct: number;
+  [key: string]: any;
 }

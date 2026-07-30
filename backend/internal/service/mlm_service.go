@@ -14,7 +14,7 @@ import (
 
 func CalculateNetWithdrawal(amount float64, s *domain.PlatformSettings) (float64, float64, error) {
 	if amount < s.WithdrawalMinAmount {
-		return 0, 0, errors.New("minimum withdrawal amount is ₹" + strconv.FormatFloat(s.WithdrawalMinAmount, 'f', 2, 64))
+		return 0, 0, errors.New("minimum withdrawal amount is $" + strconv.FormatFloat(s.WithdrawalMinAmount, 'f', 2, 64))
 	}
 	// 10% TDS under Income Tax Act (TAN RTKP11658D), 0% platform fee
 	tdsAmount := amount * (s.WithdrawalFeePct / 100.0)

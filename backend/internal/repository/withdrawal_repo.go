@@ -86,6 +86,16 @@ func (r *withdrawalRepository) UpdateRequestStatus(ctx context.Context, id uuid.
 	return err
 }
 
+func (r *withdrawalRepository) UpdateRequestStatusWithRef(ctx context.Context, id uuid.UUID, status string, paymentRef string, adminNote string) error {
+	query := `
+		UPDATE withdrawals 
+		SET status = $1, payment_ref = $2, admin_note = $3, processed_at = CURRENT_TIMESTAMP
+		WHERE id = $4
+	`
+	_, err := r.db.Exec(ctx, query, status, paymentRef, adminNote, id)
+	return err
+}
+
 func (r *withdrawalRepository) GetPendingCount(ctx context.Context) (int, error) {
 	var count int
 	err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM withdrawals WHERE status = 'PENDING'").Scan(&count)

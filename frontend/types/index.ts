@@ -11,13 +11,14 @@ export interface User {
   name: string;
   email: string;
   phone: string;
-  referralCode: string;
+  referralCode?: string;
   referredBy?: string;
-  kycStatus: KycStatus;
+  usdtAddress?: string;
+  usdt_address?: string;
+  kycStatus?: string;
   role: UserRole;
-  isActive: boolean;
-  hasBankAccount: boolean;
-  createdAt: string;
+  isActive?: boolean;
+  createdAt?: string;
 }
 
 export interface AuthSession {
@@ -57,7 +58,7 @@ export interface Investment {
 // ============================================================
 // Wallet & Transactions
 // ============================================================
-export type IncomeType = "DAILY_ROI" | "REFERRAL" | "LEVEL_INCOME" | "WITHDRAWAL";
+export type IncomeType = "DAILY_ROI" | "REFERRAL" | "LEVEL_INCOME" | "SALARY_INCOME" | "WITHDRAWAL";
 
 export interface RewardWallet {
   id: string;
@@ -65,6 +66,7 @@ export interface RewardWallet {
   balance: number;
   totalCredited: number;
   totalWithdrawn: number;
+  salaryIncome?: number;
 }
 
 export interface Transaction {

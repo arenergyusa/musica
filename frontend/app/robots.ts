@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: ["/", "/privacy", "/terms"],
-      disallow: ["/admin/", "/dashboard/", "/income/", "/invest/", "/investments/", "/kyc/", "/login/", "/profile/", "/register/", "/team/", "/wallet/", "/watch/", "/withdraw/", "/forgot-password/"],
+      disallow: ["/admin/", "/dashboard/", "/income/", "/invest/", "/investments/", "/login/", "/profile/", "/register/", "/team/", "/wallet/", "/watch/", "/withdraw/", "/forgot-password/"],
     },
     sitemap: "https://themusica.in/sitemap.xml",
   };

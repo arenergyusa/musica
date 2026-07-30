@@ -53,7 +53,7 @@ export function OnboardingTour() {
   const [isDismissed, setIsDismissed] = useState(true);
 
   useEffect(() => {
-    if (user && user.kycStatus === "APPROVED") {
+    if (user) {
       const dismissed = localStorage.getItem(`onboarding_dismissed_${user.id}`);
       if (!dismissed) {
         setIsDismissed(false);

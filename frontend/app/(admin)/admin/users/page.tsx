@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import type { User as UserType } from "@/lib/types";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,9 @@ import {
   Wallet,
   TrendingUp,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Copy,
+  Zap
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,7 +58,6 @@ export default function AdminUsersPage() {
     email: string;
     phone: string;
     referralCode: string;
-    kycStatus: string;
     joinDate: string;
     status: string;
   }>>([]);
@@ -65,7 +66,7 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [selectedUser, setSelectedUser] = useState<{ id: string; name?: string } | null>(null);
   const [userSummary, setUserSummary] = useState<{
-    user?: { id: string; name: string; email: string; phone: string; kyc_status: string; status: string; created_at: string };
+    user?: { id: string; name: string; email: string; phone: string; status: string; created_at: string; usdt_address?: string };
     wallet?: { balance: number; total_credited: number };
     investments?: Array<{ id: string; amount: number; total_reward_earned: number; cap_limit: number; status: string }>;
   } | null>(null);
@@ -90,71 +91,50 @@ export default function AdminUsersPage() {
           email: u.email,
           phone: u.phone || "",
           referralCode: (u.referralCode as string) || (u.referral_code as string) || "",
-          kycStatus: (u.kycStatus as string) || (u.kyc_status as string) || "",
-          joinDate: new Date((u.createdAt as string) || (u.created_at as string) || '').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-          status: u.status
+          joinDate: new Date((u.createdAt as string) || (u.created_at as string) || '').toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }),
+          status: u.status || "ACTIVE"
         }));
         setUsers(mappedUsers);
       }
     } catch (error) {
       console.error("Failed to fetch users", error);
+      toast.error("Failed to fetch user list");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleBlockUser = async (userId: string) => {
-    try {
-      await api.put(`/admin/users/${userId}/block`);
-      toast.success("User blocked successfully");
-      fetchUsers();
-      if (selectedUser?.id === userId) {
-        openUserSummary(userId);
-      }
-    } catch (error) {
-      toast.error("Failed to block user");
-    }
-  };
-
-  const handleUnblockUser = async (userId: string) => {
-    try {
-      await api.put(`/admin/users/${userId}/unblock`);
-      toast.success("User unblocked successfully");
-      fetchUsers();
-      if (selectedUser?.id === userId) {
-        openUserSummary(userId);
-      }
-    } catch (error) {
-      toast.error("Failed to unblock user");
-    }
-  };
-
-  const openUserSummary = async (userId: string) => {
-    const u = users.find(x => x.id === userId);
-    setSelectedUser(u || { id: userId });
+  const handleFetchUserSummary = async (userId: string, userName: string) => {
+    setSelectedUser({ id: userId, name: userName });
     setIsSummaryLoading(true);
-    setUserSummary(null);
     try {
       const res = await api.get(`/admin/users/${userId}/summary`);
-      setUserSummary(res.data.data);
+      if (res.data.data) {
+        setUserSummary(res.data.data);
+      }
     } catch (error) {
-      console.error("Failed to load user summary", error);
-      toast.error("Failed to load user financial summary");
+      console.error("Failed to fetch user summary", error);
+      toast.error("Failed to load user detail summary");
     } finally {
       setIsSummaryLoading(false);
     }
   };
 
-  const getKycBadge = (status?: string) => {
-    switch (status) {
-      case "APPROVED":
-        return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Approved</Badge>;
-      case "PENDING":
-        return <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">Pending</Badge>;
-      case "REJECTED":
-        return <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/30">Rejected</Badge>;
-      default:
-        return <Badge variant="outline">{status || "Uninitialized"}</Badge>;
+  const handleToggleStatus = async (userId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === "BLOCKED" ? "ACTIVE" : "BLOCKED";
+    try {
+      await api.put(`/admin/users/${userId}/status`, { status: nextStatus });
+      toast.success(`User status updated to ${nextStatus}`);
+      fetchUsers();
+      if (selectedUser?.id === userId && userSummary?.user) {
+        setUserSummary({
+          ...userSummary,
+          user: { ...userSummary.user, status: nextStatus }
+        });
+      }
+    } catch (error) {
+      console.error("Failed to update status", error);
+      toast.error("Failed to update user status");
     }
   };
 
@@ -162,111 +142,138 @@ export default function AdminUsersPage() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-2xl text-white shadow-lg border border-slate-800">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight mb-1">Users Management</h1>
-          <p className="text-muted-foreground text-sm">
-            View, filter, and review full financial summaries for all platform users.
+          <div className="flex items-center gap-2 text-xs font-extrabold text-blue-400 uppercase tracking-widest mb-1">
+            <User className="h-3.5 w-3.5" /> User Directory
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">User Management</h1>
+          <p className="text-xs text-slate-400 mt-1">
+            View user profiles, USDT settlement addresses, active portfolios, and manage access controls.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchUsers} disabled={isLoading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} /> Refresh
+
+        <Button 
+          onClick={fetchUsers} 
+          variant="outline" 
+          size="sm" 
+          className="bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700 text-xs font-bold rounded-xl h-9 self-start sm:self-auto"
+        >
+          <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          Refresh List
         </Button>
       </div>
 
-      <Card className="shadow-sm">
-        <div className="p-4 border-b bg-muted/10 flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full sm:w-[350px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or email..."
-              className="pl-9 bg-background"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-4 w-full sm:w-auto">
-            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || "ALL")}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-background">
-                <SelectValue placeholder="Status Filter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Users</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="BLOCKED">Blocked</SelectItem>
-                <SelectItem value="APPROVED">KYC Approved</SelectItem>
-                <SelectItem value="PENDING">KYC Pending</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+      {/* Filter & Controls Card */}
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-3 justify-between items-center">
+            
+            {/* Search Input */}
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search name, email, invite code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+              />
+            </div>
 
+            {/* Status Filter Dropdown */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <span className="text-xs font-bold text-slate-500 shrink-0">Account Status:</span>
+              <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || "ALL")}>
+                <SelectTrigger className="h-9 w-36 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="ALL">All Users</SelectItem>
+                  <SelectItem value="ACTIVE">Active Only</SelectItem>
+                  <SelectItem value="BLOCKED">Blocked Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Users Table */}
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-muted/30">
+            <TableHeader className="bg-slate-50/50 dark:bg-slate-950/40">
               <TableRow>
-                <TableHead className="pl-6">User</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>KYC Status</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead>Account Status</TableHead>
-                <TableHead className="text-right pr-6">Actions</TableHead>
+                <TableHead className="pl-6 text-xs font-bold text-slate-500">Member</TableHead>
+                <TableHead className="text-xs font-bold text-slate-500">Phone</TableHead>
+                <TableHead className="text-xs font-bold text-slate-500">Invite Code</TableHead>
+                <TableHead className="text-xs font-bold text-slate-500">Joined</TableHead>
+                <TableHead className="text-xs font-bold text-slate-500">Status</TableHead>
+                <TableHead className="text-right pr-6 text-xs font-bold text-slate-500">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                    <div className="flex items-center justify-center space-x-2">
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                      <span>Loading users...</span>
-                    </div>
+                  <TableCell colSpan={6} className="h-32 text-center text-slate-400">
+                    <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-blue-600" />
+                    <span className="text-xs font-medium">Loading user directory...</span>
                   </TableCell>
                 </TableRow>
               ) : users.length > 0 ? (
-                users.map((user) => (
-                  <TableRow key={user.id} className="hover:bg-muted/10">
+                users.map((u) => (
+                  <TableRow key={u.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
                     <TableCell className="pl-6">
-                      <div className="font-medium text-sm">{user.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono">Ref: {user.referralCode}</div>
+                      <div className="flex flex-col">
+                        <span className="font-extrabold text-xs text-slate-900 dark:text-white">{u.name}</span>
+                        <span className="text-[11px] text-slate-400 font-mono">{u.email}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600 dark:text-slate-300 font-mono">
+                      {u.phone || "—"}
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm">{user.email}</div>
-                      <div className="text-xs text-muted-foreground">{user.phone}</div>
+                      <Badge variant="outline" className="font-mono text-[10px] font-bold bg-blue-50/50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border-blue-200/60">
+                        {u.referralCode || "N/A"}
+                      </Badge>
                     </TableCell>
-                    <TableCell>{getKycBadge(user.kycStatus)}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{user.joinDate}</TableCell>
+                    <TableCell className="text-xs text-slate-500 font-mono">
+                      {u.joinDate}
+                    </TableCell>
                     <TableCell>
-                      {user.status === "ACTIVE" ? (
-                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Active</Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/30">Blocked</Badge>
-                      )}
+                      <Badge variant="outline" className={`text-[10px] font-bold ${u.status === "BLOCKED" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
+                        {u.status}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right pr-6">
                       <DropdownMenu>
-                        <DropdownMenuTrigger className="h-8 w-8 p-0 inline-flex items-center justify-center rounded-md hover:bg-muted cursor-pointer">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
+                        <DropdownMenuTrigger className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 outline-none">
+                          <MoreHorizontal className="h-4 w-4 text-slate-500" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => openUserSummary(user.id)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Summary
+                        <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                          <DropdownMenuLabel className="text-[11px] font-bold text-slate-400">Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handleFetchUserSummary(u.id, u.name)} className="cursor-pointer text-xs font-semibold">
+                            <Eye className="mr-2 h-3.5 w-3.5 text-blue-600" />
+                            View Detail Summary
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          {user.status === "ACTIVE" ? (
-                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleBlockUser(user.id)}>
-                              <Ban className="mr-2 h-4 w-4" />
-                              Block User
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem className="text-emerald-600 focus:text-emerald-600" onClick={() => handleUnblockUser(user.id)}>
-                              <CheckCircle2 className="mr-2 h-4 w-4" />
-                              Unblock User
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuItem 
+                            onClick={() => handleToggleStatus(u.id, u.status)} 
+                            className={`cursor-pointer text-xs font-semibold ${u.status === "BLOCKED" ? "text-emerald-600 focus:text-emerald-600" : "text-rose-600 focus:text-rose-600"}`}
+                          >
+                            {u.status === "BLOCKED" ? (
+                              <>
+                                <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
+                                Unblock Account
+                              </>
+                            ) : (
+                              <>
+                                <Ban className="mr-2 h-3.5 w-3.5" />
+                                Block Account
+                              </>
+                            )}
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -274,8 +281,8 @@ export default function AdminUsersPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                    No users found matching your search.
+                  <TableCell colSpan={6} className="h-28 text-center text-slate-400 text-xs font-medium">
+                    No users found matching filter
                   </TableCell>
                 </TableRow>
               )}
@@ -284,129 +291,86 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      {/* User Details & Financial Summary Sheet */}
+      {/* User Summary Drawer */}
       <Sheet open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
-        <SheetContent side="right" className="w-full sm:w-[500px] sm:max-w-lg overflow-y-auto">
-          <SheetHeader className="mb-6">
-            <SheetTitle>User Financial Summary</SheetTitle>
-            <SheetDescription>
-              Complete profile, investments, and wallet summary.
+        <SheetContent side="right" className="sm:max-w-md w-full overflow-y-auto p-6">
+          <SheetHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+            <SheetTitle className="text-lg font-black text-slate-900 dark:text-white">User Financial Overview</SheetTitle>
+            <SheetDescription className="text-xs text-slate-500">
+              Detailed account snapshot for {selectedUser?.name}
             </SheetDescription>
           </SheetHeader>
-          
+
           {isSummaryLoading ? (
-            <div className="h-64 flex items-center justify-center text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="py-16 text-center text-xs text-slate-400 font-medium">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-blue-600" />
+              Loading portfolio summary...
             </div>
           ) : userSummary ? (
-            <div className="space-y-6">
+            <div className="space-y-6 pt-6">
               
               {/* Profile Card */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                      <User className="h-7 w-7 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg">{userSummary.user?.name}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        {getKycBadge(userSummary.user?.kyc_status)}
-                        {userSummary.user?.status === "BLOCKED" && (
-                          <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/30">Blocked</Badge>
-                        )}
-                      </div>
-                    </div>
+              <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">{userSummary.user?.name}</h3>
+                    <p className="text-xs text-slate-500 font-mono">{userSummary.user?.email}</p>
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">{userSummary.user?.phone}</p>
                   </div>
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-3 text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      <span className="text-foreground">{userSummary.user?.email}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span className="text-foreground">{userSummary.user?.phone}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      <span className="text-foreground">
-                        Joined {new Date(userSummary.user?.created_at || '').toLocaleDateString('en-IN')}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Financial Stats */}
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <Wallet className="h-4 w-4 text-emerald-500" />
-                      <span className="text-xs font-medium uppercase">Wallet Balance</span>
-                    </div>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                      {formatCurrency(userSummary.wallet?.balance || 0)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Credited: {formatCurrency(userSummary.wallet?.total_credited || 0)}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                      <span className="text-xs font-medium uppercase">Investments</span>
-                    </div>
-                    <p className="text-2xl font-bold">
-                      {(userSummary.investments || []).length}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Active: {(userSummary.investments || []).filter((i) => i.status === "ACTIVE").length}
-                    </p>
-                  </CardContent>
-                </Card>
+                  <Badge variant="outline" className={`text-[10px] font-bold ${userSummary.user?.status === "BLOCKED" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
+                    {userSummary.user?.status}
+                  </Badge>
+                </div>
               </div>
 
-              {/* Investment Details */}
-              <Card>
-                <CardContent className="p-4 space-y-2">
-                  <p className="text-sm font-semibold mb-2">Investments List</p>
-                  {(userSummary.investments || []).length > 0 ? (
-                    (userSummary.investments || []).map((inv) => (
-                      <div key={inv.id} className="p-3 bg-muted/30 rounded-lg text-xs flex justify-between items-center border">
-                        <div>
-                          <p className="font-bold text-sm">{formatCurrency(inv.amount)}</p>
-                          <p className="text-muted-foreground">
-                            Earned: {formatCurrency(inv.total_reward_earned || 0)} / {formatCurrency(inv.cap_limit)}
-                          </p>
-                        </div>
-                        <Badge variant={inv.status === "ACTIVE" ? "default" : "secondary"}>
+              {/* USDT Address */}
+              <div className="bg-blue-50/50 dark:bg-blue-950/30 p-4 rounded-xl border border-blue-100 dark:border-blue-900/50 space-y-1.5">
+                <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">USDT (BEP-20) Address</p>
+                <p className="text-xs font-mono text-slate-800 dark:text-slate-200 break-all bg-white dark:bg-slate-950 p-2 rounded-lg border border-blue-200/60 dark:border-blue-900/40">
+                  {userSummary.user?.usdt_address || "Not saved yet"}
+                </p>
+              </div>
+
+              {/* Wallet Summary */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Wallet Balance</p>
+                  <p className="text-base font-black text-blue-600 dark:text-blue-400 font-mono mt-1">
+                    {formatCurrency(userSummary.wallet?.balance || 0)}
+                  </p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Credited</p>
+                  <p className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono mt-1">
+                    {formatCurrency(userSummary.wallet?.total_credited || 0)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Investments List */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Zap className="h-3.5 w-3.5 text-blue-600" /> Active Investments ({userSummary.investments?.length || 0})
+                </h4>
+                {userSummary.investments && userSummary.investments.length > 0 ? (
+                  userSummary.investments.map((inv) => (
+                    <div key={inv.id} className="p-3 bg-white dark:bg-slate-950 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-1.5 text-xs">
+                      <div className="flex justify-between items-center font-mono">
+                        <span className="font-black text-slate-900 dark:text-white">{formatCurrency(inv.amount)}</span>
+                        <Badge variant="outline" className="text-[10px] font-bold bg-emerald-50 text-emerald-600 border-emerald-200">
                           {inv.status}
                         </Badge>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-muted-foreground text-center py-4">No investments found</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Administrative Actions */}
-              <div className="space-y-3 pt-4 border-t">
-                <h4 className="text-sm font-medium text-muted-foreground">Account Status Controls</h4>
-                {userSummary.user?.status === "ACTIVE" ? (
-                  <Button variant="destructive" className="w-full" onClick={() => userSummary.user?.id && handleBlockUser(userSummary.user.id)}>
-                    <Ban className="mr-2 h-4 w-4" />
-                    Block User Account
-                  </Button>
+                      <div className="flex justify-between text-slate-500 font-mono text-[11px]">
+                        <span>Earned: {formatCurrency(inv.total_reward_earned)}</span>
+                        <span>Cap: {formatCurrency(inv.cap_limit)}</span>
+                      </div>
+                    </div>
+                  ))
                 ) : (
-                  <Button variant="outline" className="w-full border-emerald-500 text-emerald-600 hover:bg-emerald-500/10" onClick={() => userSummary.user?.id && handleUnblockUser(userSummary.user.id)}>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Unblock User Account
-                  </Button>
+                  <p className="text-xs text-slate-400 text-center py-4 bg-slate-50 dark:bg-slate-900 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                    No investments active
+                  </p>
                 )}
               </div>
 

@@ -31,6 +31,7 @@ import { Transaction, Withdrawal } from "@/lib/types";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { SalaryProgressCard } from "@/components/shared/SalaryProgressCard";
 
 const renderStatusBadge = (status: string) => {
   switch (status) {
@@ -135,8 +136,8 @@ export default function WalletPage() {
 
       {/* Page Header & Balance Card */}
       <PageHeader
-        title="Wallet & Payouts"
-        description="Manage your accumulated revenue share rewards, withdrawal requests, and transaction statements."
+        title="Wallet"
+        description="Manage your accumulated ROI rewards, withdrawal requests, and transaction statements."
       />
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
@@ -145,7 +146,7 @@ export default function WalletPage() {
             <Wallet className="h-7 w-7" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Available Reward</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Wallet Balance</p>
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white truncate max-w-[200px] sm:max-w-none">
               {isLoading ? "..." : formatCurrency(balance)}
             </h1>
@@ -213,6 +214,8 @@ export default function WalletPage() {
           </CardContent>
         </Card>
       </div>
+
+
 
       {/* Transaction History Section */}
       <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">

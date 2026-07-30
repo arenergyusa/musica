@@ -21,9 +21,6 @@ type AdminService interface {
 	UnblockUser(ctx context.Context, userID uuid.UUID) error
 	GetDashboardStats(ctx context.Context) (map[string]interface{}, error)
 	GetUsers(ctx context.Context, limit, offset int, search, status string) ([]*domain.User, error)
-	GetPendingKYC(ctx context.Context, limit, offset int) ([]*domain.User, error)
-	ApproveKYC(ctx context.Context, userID uuid.UUID) error
-	RejectKYC(ctx context.Context, userID uuid.UUID, reason string) error
 	GetAllWithdrawals(ctx context.Context, limit, offset int) ([]*domain.Withdrawal, error)
 	GetSettings(ctx context.Context) (*domain.PlatformSettings, error)
 	UpdateSettings(ctx context.Context, settings *domain.PlatformSettings) error
@@ -356,11 +353,10 @@ func (s *adminService) UnblockUser(ctx context.Context, userID uuid.UUID) error 
 }
 
 func (s *adminService) GetDashboardStats(ctx context.Context) (map[string]interface{}, error) {
-	var totalUsers, activeInvestments, pendingKyc, pendingWithdrawals, pendingInvestments int
+	var totalUsers, activeInvestments, pendingWithdrawals, pendingInvestments int
 	var totalInvested, totalPaid float64
 
 	totalUsers, _ = s.userRepo.GetTotalCount(ctx)
-	pendingKyc, _ = s.userRepo.GetPendingKYCCount(ctx)
 	activeInvestments, _ = s.invRepo.GetActiveCount(ctx)
 	pendingInvestments, _ = s.invRepo.GetPendingCount(ctx)
 	totalInvested, _ = s.invRepo.GetTotalActiveInvested(ctx)
@@ -373,37 +369,12 @@ func (s *adminService) GetDashboardStats(ctx context.Context) (map[string]interf
 		"pendingInvestments": pendingInvestments,
 		"totalInvested":      totalInvested,
 		"totalPaid":          totalPaid,
-		"pendingKyc":         pendingKyc,
 		"pendingWithdrawals": pendingWithdrawals,
 	}, nil
 }
 
 func (s *adminService) GetUsers(ctx context.Context, limit, offset int, search, status string) ([]*domain.User, error) {
 	return s.userRepo.SearchUsers(ctx, limit, offset, search, status)
-}
-
-func (s *adminService) GetPendingKYC(ctx context.Context, limit, offset int) ([]*domain.User, error) {
-	return s.userRepo.GetPendingKYC(ctx, limit, offset)
-}
-
-func (s *adminService) ApproveKYC(ctx context.Context, userID uuid.UUID) error {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return err
-	}
-	user.KycStatus = "APPROVED"
-	user.KycRejectionReason = "" // Clear reason on approval
-	return s.userRepo.Update(ctx, user)
-}
-
-func (s *adminService) RejectKYC(ctx context.Context, userID uuid.UUID, reason string) error {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return err
-	}
-	user.KycStatus = "REJECTED"
-	user.KycRejectionReason = reason
-	return s.userRepo.Update(ctx, user)
 }
 
 func (s *adminService) GetAllWithdrawals(ctx context.Context, limit, offset int) ([]*domain.Withdrawal, error) {
@@ -431,8 +402,6 @@ func (s *adminService) GetUserSummary(ctx context.Context, userID uuid.UUID) (ma
 
 	// Scrub sensitive data
 	user.PasswordHash = ""
-	user.BankAccount = "***"
-	user.IFSC = "***"
 
 	return map[string]interface{}{
 		"user":        user,

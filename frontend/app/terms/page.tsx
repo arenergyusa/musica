@@ -145,7 +145,7 @@ export default function TermsPage() {
                 6. Withdrawals &amp; Statutory Tax Deductions (TDS)
               </h2>
               <p>
-                Withdrawal requests are processed on designated monthly schedule dates (<strong>10th, 20th, and 30th</strong> of each month, or the final day of the month), subject to a minimum threshold of ₹1,000.
+                Withdrawal requests are processed on designated monthly schedule dates (<strong>10th, 20th, and 30th</strong> of each month, or the final day of the month), subject to a minimum threshold of $10 USD.
               </p>
               <div className="bg-[#F8F9FA] dark:bg-slate-800/40 p-4 rounded-lg border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
                 <p className="font-semibold text-slate-900 dark:text-white">Statutory Tax Deductions:</p>

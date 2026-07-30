@@ -23,6 +23,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { RewardWalletCard } from "@/components/shared/RewardWalletCard";
+import { SalaryProgressCard } from "@/components/shared/SalaryProgressCard";
 import { StatCard } from "@/components/shared/StatCard";
 import { OnboardingTour } from "@/components/shared/OnboardingTour";
 import { Transaction } from "@/lib/types";
@@ -100,8 +101,6 @@ export default function DashboardPage() {
     fetchDashboard();
   }, [fetchUser]);
 
-  const kycStatus = user?.kycStatus || "UNINITIALIZED";
-
   if (isLoading) {
     return (
       <div className="space-y-6 p-2 sm:p-4 animate-pulse">
@@ -153,39 +152,9 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* KYC Alert Banner */}
-      <AnimatePresence>
-        {kycStatus !== "APPROVED" && (
-          <motion.div variants={itemVariants} exit={{ opacity: 0, height: 0 }}>
-            <Alert variant={kycStatus === "REJECTED" ? "destructive" : "default"} className="bg-amber-50/90 dark:bg-amber-950/30 text-amber-900 dark:text-amber-100 border border-amber-200/80 dark:border-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-lg shadow-sm gap-3">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-amber-100 dark:bg-amber-900/60 rounded-lg shrink-0 text-amber-600 dark:text-amber-300">
-                  <AlertCircle className="h-5 w-5" />
-                </div>
-                <div>
-                  <AlertTitle className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    {kycStatus === "PENDING" ? "KYC Verification Under Review" : "Identity Verification Required"}
-                  </AlertTitle>
-                  <AlertDescription className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                    {kycStatus === "PENDING"
-                      ? "Your Aadhaar & PAN details are under review by compliance team."
-                      : "Complete government identity verification to enable instant bank payouts."}
-                  </AlertDescription>
-                </div>
-              </div>
-              <Link
-                href="/kyc"
-                className={buttonVariants({ size: "sm", className: "shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg px-4 py-2 shadow-sm" })}
-              >
-                {kycStatus === "PENDING" ? "Check Verification" : "Verify KYC Now"}
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Link>
-            </Alert>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* Core Reward Wallet Card */}
+
+      {/* Core Wallet Card */}
       <motion.div variants={itemVariants}>
         <RewardWalletCard
           balance={wallet.balance}
@@ -198,26 +167,33 @@ export default function DashboardPage() {
       <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
         {/* Sponsorship Tier Card */}
-        <Card className={`border rounded-lg shadow-sm transition-all ${isWorking ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/60" : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800"}`}>
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-lg ${isWorking ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400"}`}>
-                <Zap className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Working Status</p>
-                <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">
-                  {isWorking ? "Working" : "No-working"}
-                </p>
-              </div>
-            </div>
-            {levelsUnlocked > 0 && (
-              <Badge variant="outline" className="border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 text-xs font-bold rounded-md px-2.5 py-1">
-                L1–L{levelsUnlocked} Active
-              </Badge>
-            )}
-          </CardContent>
-        </Card>
+        {(() => {
+          const accountStatus = investments.active_amount === 0 ? "Inactive" : team.direct_count > 0 ? "Working" : "No-working";
+          const isInactive = accountStatus === "Inactive";
+          const isWorkingStatus = accountStatus === "Working";
+          return (
+            <Card className={`border rounded-lg shadow-sm transition-all ${isWorkingStatus ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/60" : isInactive ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/60" : "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/60"}`}>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-lg ${isWorkingStatus ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : isInactive ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-blue-500/15 text-blue-600 dark:text-blue-400"}`}>
+                    <Zap className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Account Status</p>
+                    <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">
+                      {accountStatus}
+                    </p>
+                  </div>
+                </div>
+                {levelsUnlocked > 0 && (
+                  <Badge variant="outline" className="border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 text-xs font-bold rounded-md px-2.5 py-1">
+                    L1–L{levelsUnlocked} Active
+                  </Badge>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Daily Settlement Countdown Card */}
         <Card className="border border-blue-200/80 dark:border-blue-900/60 bg-gradient-to-r from-blue-50/60 to-slate-50/60 dark:from-blue-950/30 dark:to-slate-900 rounded-lg shadow-sm">
@@ -227,15 +203,15 @@ export default function DashboardPage() {
                 <Timer className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Next Settlement</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Cycle</p>
                 <span className="text-lg font-bold font-mono text-blue-600 dark:text-blue-400 tabular-nums">
                   {String(countdown.h).padStart(2, "0")}:{String(countdown.m).padStart(2, "0")}:{String(countdown.s).padStart(2, "0")}
                 </span>
               </div>
             </div>
 
-            <div className="w-20 text-right">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-1">Cycle</span>
+            <div className="w-24 text-right">
+              <span className="text-[11px] font-semibold text-slate-400 block mb-1">Progress</span>
               <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
                 <div
                   className="bg-blue-600 h-full rounded-full transition-all duration-1000"
@@ -247,31 +223,12 @@ export default function DashboardPage() {
         </Card>
       </motion.div>
 
-      {/* Top Metric Cards (without bottom description text or trend badges) */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Credited Revenue"
-          value={wallet.total_credited}
-          isCurrency
-          icon={TrendingUp}
-        />
-        <StatCard
-          title="Direct Team Members"
-          value={team.direct_count}
-          icon={Users}
-        />
-        <StatCard
-          title="Network Sponsorship Volume"
-          value={team.active_volume}
-          isCurrency
-          icon={Network}
-        />
-        <StatCard
-          title="Active Sponsorships"
-          value={investments.active_count ?? investments.total_plans}
-          icon={Briefcase}
-        />
+      {/* Monthly Salary Progress Visualizer */}
+      <motion.div variants={itemVariants}>
+        <SalaryProgressCard />
       </motion.div>
+
+
 
       {/* Level Stream Revenue Distribution — Rendered if levels unlocked */}
       {levelsUnlocked > 0 && (

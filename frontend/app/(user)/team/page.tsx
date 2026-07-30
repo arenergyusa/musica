@@ -335,7 +335,7 @@ export default function TeamPage() {
                     <div className="font-bold mb-0.5">L{lvl}</div>
                     <div className="text-[10px] opacity-75">{pct}%</div>
                     {earned > 0 && (
-                      <div className="text-[10px] font-semibold mt-0.5">₹{Math.floor(earned)}</div>
+                      <div className="text-[10px] font-semibold mt-0.5">${Math.floor(earned)}</div>
                     )}
                   </div>
                 );
@@ -378,6 +378,7 @@ export default function TeamPage() {
             <TableHeader className="bg-slate-50/80 dark:bg-slate-900/80">
               <TableRow className="border-b border-slate-100 dark:border-slate-800">
                 <TableHead className="pl-6 text-xs font-bold text-slate-700 dark:text-slate-300">Member</TableHead>
+                <TableHead className="text-xs font-bold text-slate-700 dark:text-slate-300">Binary Placement</TableHead>
                 <TableHead className="text-xs font-bold text-slate-700 dark:text-slate-300">Join Date</TableHead>
                 <TableHead className="text-xs font-bold text-slate-700 dark:text-slate-300">Status</TableHead>
                 <TableHead className="text-right pr-6 text-xs font-bold text-slate-700 dark:text-slate-300">Sponsorship</TableHead>
@@ -397,6 +398,11 @@ export default function TeamPage() {
                           <p className="text-[11px] text-slate-500 dark:text-slate-400">{member.email}</p>
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={member.leg === "RIGHT" ? "bg-purple-50 dark:bg-purple-950/40 text-purple-600 border-purple-200 dark:border-purple-900 text-[11px] font-bold" : "bg-blue-50 dark:bg-blue-950/40 text-blue-600 border-blue-200 dark:border-blue-900 text-[11px] font-bold"}>
+                        {member.leg === "RIGHT" ? "RIGHT LEG" : "LEFT LEG"}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-slate-500 dark:text-slate-400 text-xs">
                       {new Date((member.createdAt as string) || (member.created_at as string) || '').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
