@@ -63,10 +63,10 @@ export default function TermsPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[#F8F9FA] dark:bg-slate-800/60 rounded-lg border border-slate-200/80 dark:border-slate-800 gap-3 text-xs">
               <div className="flex items-center gap-2.5">
                 <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                <span className="font-bold text-slate-900 dark:text-white">Pure Desi Music (OPC) Private Limited</span>
+                <span className="font-bold text-slate-900 dark:text-white">Pure Desi Music </span>
               </div>
               <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400">
-                CIN: U92490HR2020OPC091236 &bull; PAN: AALCP6210F &bull; TAN: RTKP11658D
+
               </div>
             </div>
           </div>
@@ -79,7 +79,7 @@ export default function TermsPage() {
                 1. Acceptance of Terms &amp; Corporate Details
               </h2>
               <p>
-                By accessing and using the Musica platform (<strong>https://themusica.in</strong>), operated exclusively by <strong>Pure Desi Music (OPC) Private Limited</strong>, you agree to be bound by these Terms of Service. The company operates exclusively in Haryanvi music video production, audio recording, and official music distribution. If you do not agree with any portion of these terms, please discontinue platform use immediately.
+                By accessing and using the Musica platform (<strong>https://the-musica.com</strong>), operated exclusively by <strong>Pure Desi Music</strong>, you agree to be bound by these Terms of Service. The company operates exclusively in Haryanvi music video production, audio recording, and official music distribution. If you do not agree with any portion of these terms, please discontinue platform use immediately.
               </p>
             </section>
 
@@ -150,7 +150,7 @@ export default function TermsPage() {
               <div className="bg-[#F8F9FA] dark:bg-slate-800/40 p-4 rounded-lg border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
                 <p className="font-semibold text-slate-900 dark:text-white">Statutory Tax Deductions:</p>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li>Standard <strong>10% Tax Deducted at Source (TDS)</strong> under Income Tax regulations under TAN <strong>RTKP11658D</strong> is deducted.</li>
+                  <li>Standard <strong>10% Tax Deducted at Source (TDS)</strong> under Income Tax regulations under TAN is deducted.</li>
                   <li><strong>0% Platform Administrative Fee</strong> is charged on payout requests.</li>
                 </ul>
               </div>

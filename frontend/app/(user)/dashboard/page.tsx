@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { RewardWalletCard } from "@/components/shared/RewardWalletCard";
 import { SalaryProgressCard } from "@/components/shared/SalaryProgressCard";
 import { StatCard } from "@/components/shared/StatCard";
-import { OnboardingTour } from "@/components/shared/OnboardingTour";
+// import { OnboardingTour } from "@/components/shared/OnboardingTour";
 import { Transaction } from "@/lib/types";
 
 // ─── Next Settlement Countdown ──────────────────────────────────────────────
@@ -131,9 +131,9 @@ export default function DashboardPage() {
       animate="show"
       className="space-y-6 pb-8 text-slate-900 dark:text-slate-100"
     >
-      {/* Interactive Onboarding Tour */}
+      {/* Interactive Onboarding Tour 
       <OnboardingTour />
-
+*/}
       {/* Welcome Header Card */}
       <motion.div variants={itemVariants}>
         <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-2xl p-6 sm:p-7 text-white shadow-lg border border-slate-800">

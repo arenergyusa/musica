@@ -21,7 +21,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-[#F8F9FA] dark:bg-[#0B0F19]">
       <div className="w-full max-w-5xl flex flex-col lg:flex-row bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
-        
+
         {/* Left Panel - Branding */}
         <div className="hidden lg:flex w-1/2 bg-slate-900 dark:bg-slate-950 flex-col justify-between p-10 xl:p-12 relative overflow-hidden text-white border-r border-slate-800">
           {/* Ambient Glows */}
@@ -37,7 +37,7 @@ export default function RegisterPage() {
               </div>
               <span className="font-extrabold text-2xl tracking-tight text-white">{APP.NAME}</span>
             </Link>
-            
+
             <div className="mt-16">
               <div className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold mb-4 border border-emerald-500/20">
                 <Sparkles className="h-3.5 w-3.5" />
@@ -50,7 +50,7 @@ export default function RegisterPage() {
               <p className="text-sm text-slate-300 mb-8 max-w-md leading-relaxed">
                 Create your account today to stream exclusive music video releases, audio tracks, and studio productions.
               </p>
-              
+
               <ul className="space-y-4">
                 {benefits.map((benefit, i) => (
                   <li key={i} className="flex items-center text-slate-200 text-xs font-medium">
@@ -61,9 +61,9 @@ export default function RegisterPage() {
               </ul>
             </div>
           </div>
-          
+
           <div className="text-[11px] text-slate-400 relative z-10 pt-8 border-t border-slate-800/80 font-mono">
-            Pure Desi Music (OPC) Private Limited &bull; CIN: U92490HR2020OPC091236
+            Pure Desi Music
           </div>
         </div>
 
@@ -81,7 +81,7 @@ export default function RegisterPage() {
                 <ShieldCheck className="h-3.5 w-3.5" /> Fast Verification
               </div>
             </div>
-            
+
             <div className="mb-6">
               <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-1.5">
                 Create Free Account
@@ -90,7 +90,7 @@ export default function RegisterPage() {
                 Enter your details to register for official Musica streaming.
               </p>
             </div>
-            
+
             <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>}>
               <RegisterForm />
             </Suspense>

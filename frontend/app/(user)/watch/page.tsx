@@ -35,7 +35,7 @@ export default function WatchMediaPage() {
               Exclusive Music Video Releases <br /> Coming Soon
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed pt-1">
-              We are currently curating and uploading official Haryanvi music video releases and studio audio tracks by <strong>Pure Desi Music (OPC) Private Limited</strong>.
+              We are currently curating and uploading official Haryanvi music video releases and studio audio tracks by <strong>Pure Desi Music</strong>.
             </p>
           </div>
 

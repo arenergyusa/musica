@@ -66,14 +66,14 @@ export function Footer() {
 
         <div className="border-t border-slate-200/80 dark:border-slate-800 pt-6 flex flex-col space-y-3">
           <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-            <strong>Company Notice:</strong> {APP.NAME} is a digital music streaming platform operated by <strong>Pure Desi Music (OPC) Private Limited</strong>. The company works exclusively in Haryanvi music video production, song recording, and official music distribution.
+            <strong>Company Notice:</strong> {APP.NAME} is a digital music streaming platform operated by <strong>Pure Desi Music</strong>. The company works exclusively in Haryanvi music video production, song recording, and official music distribution.
           </p>
-          
+
           <div className="flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="flex flex-col space-y-1 text-center md:text-left">
-              <p className="font-semibold text-slate-900 dark:text-white">© {currentYear} Pure Desi Music (OPC) Private Limited. All rights reserved.</p>
+              <p className="font-semibold text-slate-900 dark:text-white">© {currentYear} Pure Desi Music. All rights reserved.</p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                CIN: U92490HR2020OPC091236 &bull; PAN: AALCP6210F &bull; TAN: RTKP11658D
+                {/*  CIN: U92490HR2020OPC091236 &bull; PAN: AALCP6210F &bull; TAN: RTKP11658D  */}
               </p>
             </div>
             <p className="mt-3 md:mt-0 text-xs font-medium text-slate-500">
