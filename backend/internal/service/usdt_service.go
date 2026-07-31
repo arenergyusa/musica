@@ -1,12 +1,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"bytes"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
@@ -16,6 +15,9 @@ import (
 	"strings"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/sha3"
@@ -33,10 +35,10 @@ const transferTopic = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df
 
 type bscReceipt struct {
 	Status string `json:"status"`
-	Logs []struct {
-		Address string `json:"address"`
-		Topics []string `json:"topics"`
-		Data string `json:"data"`
+	Logs   []struct {
+		Address string   `json:"address"`
+		Topics  []string `json:"topics"`
+		Data    string   `json:"data"`
 	} `json:"logs"`
 }
 
@@ -52,29 +54,43 @@ func (s *usdtService) VerifyDeposit(ctx context.Context, userID uuid.UUID, txHas
 		return fmt.Errorf("deposit address not found")
 	}
 	rpcURL := os.Getenv("BSC_RPC_URL")
-	if rpcURL == "" { return fmt.Errorf("BSC_RPC_URL not configured") }
+	if rpcURL == "" {
+		return fmt.Errorf("BSC_RPC_URL not configured")
+	}
 	var receipt bscReceipt
 	if err := callBSCJSON(ctx, rpcURL, "eth_getTransactionReceipt", []interface{}{txHash}, &receipt); err != nil {
 		return err
 	}
-	if receipt.Status != "0x1" { return fmt.Errorf("transaction is not successful or not mined yet") }
+	if receipt.Status != "0x1" {
+		return fmt.Errorf("transaction is not successful or not mined yet")
+	}
 
 	contract := strings.ToLower(strings.TrimPrefix(os.Getenv("USDT_CONTRACT_ADDRESS"), "0x"))
 	recipient := strings.ToLower(strings.TrimPrefix(depositAddress, "0x"))
 	decimals := 18
 	if raw := os.Getenv("USDT_DECIMALS"); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 2 && parsed <= 36 { decimals = parsed }
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 2 && parsed <= 36 {
+			decimals = parsed
+		}
 	}
 	expectedUnits := new(big.Int)
 	amountCents := strings.Replace(fmt.Sprintf("%.2f", expectedAmount), ".", "", 1)
-	if _, ok := expectedUnits.SetString(amountCents, 10); !ok { return fmt.Errorf("invalid investment amount") }
+	if _, ok := expectedUnits.SetString(amountCents, 10); !ok {
+		return fmt.Errorf("invalid investment amount")
+	}
 	expectedUnits.Mul(expectedUnits, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals-2)), nil))
 
 	for _, logItem := range receipt.Logs {
-		if strings.ToLower(strings.TrimPrefix(logItem.Address, "0x")) != contract || len(logItem.Topics) < 3 { continue }
-		if strings.ToLower(strings.TrimPrefix(logItem.Topics[0], "0x")) != transferTopic { continue }
+		if strings.ToLower(strings.TrimPrefix(logItem.Address, "0x")) != contract || len(logItem.Topics) < 3 {
+			continue
+		}
+		if strings.ToLower(strings.TrimPrefix(logItem.Topics[0], "0x")) != transferTopic {
+			continue
+		}
 		to := strings.ToLower(strings.TrimPrefix(logItem.Topics[2], "0x"))
-		if len(to) < 40 || to[len(to)-40:] != recipient { continue }
+		if len(to) < 40 || to[len(to)-40:] != recipient {
+			continue
+		}
 		value, ok := new(big.Int).SetString(strings.TrimPrefix(logItem.Data, "0x"), 16)
 		if ok && value.Cmp(expectedUnits) == 0 {
 			_ = s.auditService.Log(ctx, &userID, "DEPOSIT_VERIFIED", expectedAmount, expectedAmount, txHash, "SUCCESS", fmt.Sprintf(`{"address":"%s"}`, depositAddress))
@@ -130,23 +146,7 @@ func pubkeyToAddress(pub *ecdsa.PublicKey) string {
 // hexToPrivateKey parses a raw 32-byte hex private key string into ecdsa.PrivateKey using secp256k1 curve
 func hexToPrivateKey(hexKey string) (*ecdsa.PrivateKey, error) {
 	hexKey = strings.TrimPrefix(hexKey, "0x")
-	bytes, err := hex.DecodeString(hexKey)
-	if err != nil {
-		return nil, err
-	}
-	if len(bytes) != 32 {
-		return nil, fmt.Errorf("invalid private key length: %d", len(bytes))
-	}
-
-	curve := elliptic.P256() // Standard 256-bit ECDSA fallback
-	k := new(big.Int).SetBytes(bytes)
-
-	priv := new(ecdsa.PrivateKey)
-	priv.PublicKey.Curve = curve
-	priv.D = k
-	priv.PublicKey.X, priv.PublicKey.Y = curve.ScalarBaseMult(bytes)
-
-	return priv, nil
+	return gethcrypto.HexToECDSA(hexKey)
 }
 
 // GetOrCreateDepositAddress returns an existing derived BEP20 address or derives a new one on demand.
@@ -219,11 +219,80 @@ func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, u
 		return "", fmt.Errorf("failed to parse master private key: %v", err)
 	}
 
-	fromAddress := pubkeyToAddress(&privKey.PublicKey)
+	if !gethcommon.IsHexAddress(recipientAddress) {
+		return "", fmt.Errorf("invalid recipient BEP-20 address")
+	}
+	contractAddress := os.Getenv("USDT_CONTRACT_ADDRESS")
+	if !gethcommon.IsHexAddress(contractAddress) {
+		return "", fmt.Errorf("invalid USDT_CONTRACT_ADDRESS")
+	}
+	rpcURL := os.Getenv("BSC_RPC_URL")
+	if rpcURL == "" {
+		return "", fmt.Errorf("BSC_RPC_URL not configured")
+	}
+	fromAddress := gethcrypto.PubkeyToAddress(privKey.PublicKey).Hex()
 
-	// Hash transaction payload for deterministic tx_hash on BSC
-	txData := fmt.Sprintf("%s->%s:%.2f_%s", fromAddress, recipientAddress, amountUSD, withdrawalID.String())
-	txHash := "0x" + hex.EncodeToString(keccak256([]byte(txData)))
+	nonceHex, err := callBSC(ctx, rpcURL, "eth_getTransactionCount", []interface{}{fromAddress, "pending"})
+	if err != nil {
+		return "", err
+	}
+	gasPriceHex, err := callBSC(ctx, rpcURL, "eth_gasPrice", []interface{}{})
+	if err != nil {
+		return "", err
+	}
+	chainIDHex, err := callBSC(ctx, rpcURL, "eth_chainId", []interface{}{})
+	if err != nil {
+		return "", err
+	}
+	nonce, ok := new(big.Int).SetString(strings.TrimPrefix(nonceHex, "0x"), 16)
+	if !ok {
+		return "", fmt.Errorf("invalid BSC nonce")
+	}
+	gasPrice, ok := new(big.Int).SetString(strings.TrimPrefix(gasPriceHex, "0x"), 16)
+	if !ok {
+		return "", fmt.Errorf("invalid BSC gas price")
+	}
+	chainID, ok := new(big.Int).SetString(strings.TrimPrefix(chainIDHex, "0x"), 16)
+	if !ok {
+		return "", fmt.Errorf("invalid BSC chain ID")
+	}
+
+	decimals := 18
+	if raw := os.Getenv("USDT_DECIMALS"); raw != "" {
+		if parsed, parseErr := strconv.Atoi(raw); parseErr == nil && parsed >= 2 && parsed <= 36 {
+			decimals = parsed
+		}
+	}
+	amountUnits := new(big.Int)
+	amountCents := strings.Replace(fmt.Sprintf("%.2f", amountUSD), ".", "", 1)
+	if _, ok := amountUnits.SetString(amountCents, 10); !ok {
+		return "", fmt.Errorf("invalid payout amount")
+	}
+	amountUnits.Mul(amountUnits, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals-2)), nil))
+
+	// ERC-20 transfer(address,uint256) calldata.
+	methodID := keccak256([]byte("transfer(address,uint256)"))[:4]
+	toBytes := commonAddressBytes(recipientAddress)
+	data := append([]byte{}, methodID...)
+	data = append(data, make([]byte, 12)...)
+	data = append(data, toBytes...)
+	amountBytes := make([]byte, 32)
+	amountUnits.FillBytes(amountBytes)
+	data = append(data, amountBytes...)
+
+	tx := gethtypes.NewTransaction(nonce.Uint64(), gethcommon.HexToAddress(contractAddress), big.NewInt(0), 100000, gasPrice, data)
+	signedTx, err := gethtypes.SignTx(tx, gethtypes.NewEIP155Signer(chainID), privKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign payout transaction: %w", err)
+	}
+	rawTx, err := signedTx.MarshalBinary()
+	if err != nil {
+		return "", fmt.Errorf("failed to encode payout transaction: %w", err)
+	}
+	txHash, err := callBSC(ctx, rpcURL, "eth_sendRawTransaction", []interface{}{"0x" + hex.EncodeToString(rawTx)})
+	if err != nil {
+		return "", fmt.Errorf("failed to broadcast payout transaction: %w", err)
+	}
 
 	// Audit log for withdrawal payout execution
 	_ = s.auditService.Log(
@@ -238,6 +307,10 @@ func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, u
 	)
 
 	return txHash, nil
+}
+
+func commonAddressBytes(address string) []byte {
+	return gethcommon.HexToAddress(address).Bytes()
 }
 
 // GetMasterWalletBalance reads the native BNB and BEP-20 USDT balances from BSC.
@@ -301,35 +374,73 @@ func (s *usdtService) getWalletBalance(ctx context.Context, address string) (*Ma
 
 func callBSC(ctx context.Context, url, method string, params []interface{}) (string, error) {
 	payload, err := json.Marshal(map[string]interface{}{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil { return "", fmt.Errorf("BSC RPC request failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("BSC RPC request failed: %w", err)
+	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
-	if err != nil { return "", err }
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 { return "", fmt.Errorf("BSC RPC returned HTTP %d", resp.StatusCode) }
-	var result struct { Result string `json:"result"`; Error *struct { Message string `json:"message"` } `json:"error"` }
-	if err := json.Unmarshal(body, &result); err != nil { return "", fmt.Errorf("invalid BSC RPC response: %w", err) }
-	if result.Error != nil { return "", fmt.Errorf("BSC RPC error: %s", result.Error.Message) }
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("BSC RPC returned HTTP %d", resp.StatusCode)
+	}
+	var result struct {
+		Result string `json:"result"`
+		Error  *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("invalid BSC RPC response: %w", err)
+	}
+	if result.Error != nil {
+		return "", fmt.Errorf("BSC RPC error: %s", result.Error.Message)
+	}
 	return result.Result, nil
 }
 
 func callBSCJSON(ctx context.Context, url, method string, params []interface{}, out interface{}) error {
 	payload, err := json.Marshal(map[string]interface{}{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 { return fmt.Errorf("BSC RPC returned HTTP %d", resp.StatusCode) }
-	var envelope struct { Result json.RawMessage `json:"result"`; Error *struct { Message string `json:"message"` } `json:"error"` }
-	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil { return err }
-	if envelope.Error != nil { return fmt.Errorf("BSC RPC: %s", envelope.Error.Message) }
-	if len(envelope.Result) == 0 || string(envelope.Result) == "null" { return fmt.Errorf("transaction not mined yet") }
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("BSC RPC returned HTTP %d", resp.StatusCode)
+	}
+	var envelope struct {
+		Result json.RawMessage `json:"result"`
+		Error  *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return err
+	}
+	if envelope.Error != nil {
+		return fmt.Errorf("BSC RPC: %s", envelope.Error.Message)
+	}
+	if len(envelope.Result) == 0 || string(envelope.Result) == "null" {
+		return fmt.Errorf("transaction not mined yet")
+	}
 	return json.Unmarshal(envelope.Result, out)
 }

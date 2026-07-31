@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
@@ -106,7 +107,7 @@ func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.U
 		AmountRequested: req.Amount,
 		TDSAmount:       tdsAmount,
 		NetAmount:       netAmount,
-		Status:          "PROCESSED",
+		Status:          "PENDING",
 		ScheduledDate:   time.Now(),
 	}
 
@@ -127,16 +128,73 @@ func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.U
 		return nil, err
 	}
 
-	// 4. Trigger Auto Payout via private key on BSC
-	if s.usdtService != nil {
-		txHash, payoutErr := s.usdtService.ProcessAutoWithdrawal(ctx, wd.ID, userID, user.UsdtAddress, netAmount)
-		if payoutErr == nil && txHash != "" {
-			wd.PaymentRef = txHash
-			_ = s.wdRepo.UpdateRequestStatusWithRef(ctx, wd.ID, "PROCESSED", txHash, "Auto-payout executed via master key")
+	// 4. Trigger the automatic payout immediately. There is no admin approval step.
+	if s.usdtService == nil {
+		_ = s.refundFailedWithdrawal(ctx, wd.ID, userID, req.Amount, "Automatic payout service is unavailable")
+		return nil, errors.New("automatic payout service is unavailable")
+	}
+	txHash, payoutErr := s.usdtService.ProcessAutoWithdrawal(ctx, wd.ID, userID, user.UsdtAddress, netAmount)
+	if payoutErr != nil || txHash == "" {
+		reason := "automatic payout failed"
+		if payoutErr != nil {
+			reason = payoutErr.Error()
 		}
+		if refundErr := s.refundFailedWithdrawal(ctx, wd.ID, userID, req.Amount, reason); refundErr != nil {
+			return nil, fmt.Errorf("%s; refund failed: %w", reason, refundErr)
+		}
+		return nil, errors.New(reason)
 	}
 
+	wd.PaymentRef = txHash
+	wd.Status = "PROCESSED"
+	_ = s.wdRepo.UpdateRequestStatusWithRef(ctx, wd.ID, "PROCESSED", txHash, "Automatic BEP-20 payout broadcast via master key")
+
 	return wd, nil
+}
+
+// refundFailedWithdrawal restores the debited amount when signing/broadcasting
+// fails before a transaction hash is returned to the service.
+func (s *withdrawalService) refundFailedWithdrawal(ctx context.Context, withdrawalID, userID uuid.UUID, amount float64, reason string) error {
+	tx, err := s.dbPool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	result, err := tx.Exec(ctx, `
+		UPDATE withdrawals
+		SET status = 'REJECTED', admin_note = $1, processed_at = CURRENT_TIMESTAMP
+		WHERE id = $2 AND status = 'PENDING'
+	`, "Automatic payout failed: "+reason, withdrawalID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return errors.New("withdrawal is no longer pending")
+	}
+
+	result, err = tx.Exec(ctx, `
+		UPDATE reward_wallet
+		SET balance = balance + $1,
+			total_withdrawn = GREATEST(total_withdrawn - $1, 0),
+			updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = $2
+	`, amount, userID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return errors.New("wallet not found")
+	}
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO transactions (user_id, type, amount, source, reference_id, description)
+		VALUES ($1, 'CREDIT', $2, 'WITHDRAWAL', $3, $4)
+	`, userID, amount, withdrawalID, "Automatic withdrawal refund: "+reason)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *withdrawalService) GetMyWithdrawals(ctx context.Context, userID uuid.UUID) ([]*domain.Withdrawal, error) {

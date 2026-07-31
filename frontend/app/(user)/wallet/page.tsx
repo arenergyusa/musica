@@ -17,21 +17,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { WithdrawForm } from "@/components/forms/WithdrawForm";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Transaction, Withdrawal } from "@/lib/types";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { SalaryProgressCard } from "@/components/shared/SalaryProgressCard";
+import Link from "next/link";
 
 const renderStatusBadge = (status: string) => {
   switch (status) {
@@ -70,7 +61,7 @@ export default function WalletPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [historyType, setHistoryType] = useState("daily_rewards");
+  const [historyType, setHistoryType] = useState("daily_roi");
 
   useEffect(() => {
     async function fetchData() {
@@ -97,8 +88,18 @@ export default function WalletPage() {
     fetchData();
   }, []);
 
-  const dailyRewards = transactions.filter(t => t.source === "DAILY_ROI");
-  const levelIncome = transactions.filter(t => t.source === "LEVEL_INCOME" || t.source === "REFERRAL");
+  const dailyRewards = transactions.filter(t => t.source === "DAILY_ROI" || t.source === "DAILY_REWARD");
+  const levelIncome = transactions.filter(t => t.source === "LEVEL_INCOME");
+  const inviteIncome = transactions.filter(t => t.source === "INVITE" || t.source === "REFERRAL");
+  const salaryIncome = transactions.filter(t => t.source === "SALARY_INCOME" || t.source === "SALARY");
+  const statementTransactions = historyType === "daily_roi" ? dailyRewards
+    : historyType === "level_income" ? levelIncome
+    : historyType === "invite_income" ? inviteIncome
+    : salaryIncome;
+  const statementLabel = historyType === "daily_roi" ? "Daily ROI"
+    : historyType === "level_income" ? "Level Income"
+    : historyType === "invite_income" ? "Invite Income"
+    : "Salary";
 
   const handleExportCSV = () => {
     let csvContent = "";
@@ -112,7 +113,7 @@ export default function WalletPage() {
       });
       fileName = `musica_withdrawals_${new Date().toISOString().slice(0, 10)}.csv`;
     } else {
-      const txList = historyType === "daily_rewards" ? dailyRewards : levelIncome;
+      const txList = statementTransactions;
       csvContent = "Date,Type,Source,Description,Amount\n";
       txList.forEach((t) => {
         const date = new Date(t.created_at || '').toLocaleDateString();
@@ -154,23 +155,10 @@ export default function WalletPage() {
         </div>
 
         <div className="relative z-10 w-full md:w-auto flex items-center gap-3">
-          <Dialog>
-            <DialogTrigger className="w-full md:w-auto font-bold px-6 shadow-sm bg-blue-600 text-white hover:bg-blue-700 inline-flex items-center justify-center rounded-lg h-10 text-xs cursor-pointer border border-blue-600 transition-all disabled:opacity-50" disabled={isLoading}>
+          <Link href="/withdraw" className="w-full md:w-auto font-bold px-6 shadow-sm bg-blue-600 text-white hover:bg-blue-700 inline-flex items-center justify-center rounded-lg h-10 text-xs border border-blue-600 transition-all">
               <HandCoins className="mr-2 h-4 w-4" />
               Withdraw Funds
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] rounded-xl border-slate-200 dark:border-slate-800">
-              <DialogHeader>
-                <DialogTitle className="text-base font-bold text-slate-900 dark:text-white">Withdrawal Request</DialogTitle>
-                <DialogDescription className="text-xs text-slate-500">
-                  Enter the amount you wish to withdraw to your registered bank account.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="pt-2">
-                <WithdrawForm availableBalance={balance} />
-              </div>
-            </DialogContent>
-          </Dialog>
+          </Link>
         </div>
       </div>
 
@@ -229,15 +217,19 @@ export default function WalletPage() {
               <SelectTrigger className="w-[170px] text-xs h-9 rounded-lg border-slate-200 dark:border-slate-800">
                 <SelectValue placeholder="Select type">
                   {{
-                    daily_rewards: "Daily Rewards",
-                    level_income: "Level & Invite",
+                    daily_roi: "Daily ROI",
+                    level_income: "Level Income",
+                    invite_income: "Invite Income",
+                    salary: "Salary",
                     withdrawals: "Withdrawals"
                   }[historyType]}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="daily_rewards">Daily Rewards</SelectItem>
-                <SelectItem value="level_income">Level &amp; Invite</SelectItem>
+              <SelectItem value="daily_roi">Daily ROI</SelectItem>
+              <SelectItem value="level_income">Level Income</SelectItem>
+              <SelectItem value="invite_income">Invite Income</SelectItem>
+              <SelectItem value="salary">Salary</SelectItem>
                 <SelectItem value="withdrawals">Withdrawals</SelectItem>
               </SelectContent>
             </Select>
@@ -251,7 +243,7 @@ export default function WalletPage() {
 
         <CardContent className="p-0">
           <div className="overflow-x-auto w-full">
-            {historyType === "daily_rewards" && (
+            {historyType !== "withdrawals" && (
               <Table>
                 <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
                   <TableRow>
@@ -262,13 +254,13 @@ export default function WalletPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dailyRewards.length > 0 ? (
-                    dailyRewards.map((tx) => (
+                  {statementTransactions.length > 0 ? (
+                    statementTransactions.map((tx) => (
                       <TableRow key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                         <TableCell className="pl-5 font-medium whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">
                           {new Date(tx.created_at || '').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </TableCell>
-                        <TableCell className="text-xs font-semibold text-slate-900 dark:text-white">Daily Revenue Share (0.3333%/day)</TableCell>
+                        <TableCell className="text-xs font-semibold text-slate-900 dark:text-white">{tx.description || statementLabel}</TableCell>
                         <TableCell>{renderStatusBadge(tx.type)}</TableCell>
                         <TableCell className="text-right pr-5 font-extrabold text-xs text-emerald-600 dark:text-emerald-400">
                           +{formatCurrency(tx.amount)}
@@ -278,42 +270,7 @@ export default function WalletPage() {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={4} className="h-24 text-center text-xs text-slate-400">
-                        {isLoading ? "Loading..." : "No daily reward history recorded."}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
-
-            {historyType === "level_income" && (
-              <Table>
-                <TableHeader className="bg-slate-50 dark:bg-slate-800/50">
-                  <TableRow>
-                    <TableHead className="pl-5 text-xs font-bold text-slate-700 dark:text-slate-300">Date</TableHead>
-                    <TableHead className="text-xs font-bold text-slate-700 dark:text-slate-300">Description</TableHead>
-                    <TableHead className="text-xs font-bold text-slate-700 dark:text-slate-300">Type</TableHead>
-                    <TableHead className="text-right pr-5 text-xs font-bold text-slate-700 dark:text-slate-300">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {levelIncome.length > 0 ? (
-                    levelIncome.map((tx) => (
-                      <TableRow key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                        <TableCell className="pl-5 font-medium whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">
-                          {new Date(tx.created_at || '').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </TableCell>
-                        <TableCell className="text-xs font-semibold text-slate-900 dark:text-white">{tx.description || tx.source}</TableCell>
-                        <TableCell>{renderStatusBadge(tx.type)}</TableCell>
-                        <TableCell className="text-right pr-5 font-extrabold text-xs text-emerald-600 dark:text-emerald-400">
-                          +{formatCurrency(tx.amount)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center text-xs text-slate-400">
-                        {isLoading ? "Loading..." : "No level/invite income history recorded."}
+                        {isLoading ? "Loading..." : `No ${statementLabel.toLowerCase()} history recorded.`}
                       </TableCell>
                     </TableRow>
                   )}

@@ -74,8 +74,7 @@ export const investSchema = z.object({
 export const withdrawSchema = z.object({
   amount: z
     .number({ error: "Enter a valid amount" })
-    .min(10, "Minimum withdrawal amount is $10")
-    .max(100000, "Maximum $100,000 per request"),
+    .min(10, "Minimum withdrawal amount is $10"),
 });
 
 // ============================================================

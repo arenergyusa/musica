@@ -33,6 +33,7 @@ interface WithdrawFormProps {
 export function WithdrawForm({ availableBalance, onSuccess }: WithdrawFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [minWithdrawal, setMinWithdrawal] = useState<number>(10);
+  const [feePct, setFeePct] = useState<number>(10);
   const { user, fetchUser } = useAuthStore();
 
   useEffect(() => {
@@ -41,6 +42,9 @@ export function WithdrawForm({ availableBalance, onSuccess }: WithdrawFormProps)
       .then((res) => {
         if (res.data?.data?.withdrawal_min_amount) {
           setMinWithdrawal(res.data.data.withdrawal_min_amount);
+        }
+        if (typeof res.data?.data?.withdrawal_fee_pct === "number") {
+          setFeePct(res.data.data.withdrawal_fee_pct);
         }
       })
       .catch((err) => console.error(err));
@@ -55,6 +59,9 @@ export function WithdrawForm({ availableBalance, onSuccess }: WithdrawFormProps)
 
   const usdtAddress = user?.usdtAddress || (user as any)?.usdt_address;
   const hasUsdtAddress = Boolean(usdtAddress && usdtAddress.trim() !== "");
+  const watchedAmount = form.watch("amount") || 0;
+  const feeAmount = watchedAmount * (feePct / 100);
+  const netAmount = Math.max(0, watchedAmount - feeAmount);
 
   const handleMaxAmount = () => {
     if (availableBalance > 0) {
@@ -173,12 +180,23 @@ export function WithdrawForm({ availableBalance, onSuccess }: WithdrawFormProps)
                 </Button>
               </div>
               <FormDescription className="text-[11px] text-slate-400">
-                Minimum withdrawal is {formatCurrency(minWithdrawal)}. Payouts are executed automatically on BSC network.
+                Minimum withdrawal is {formatCurrency(minWithdrawal)}. No maximum amount restriction.
               </FormDescription>
               <FormMessage className="text-[11px]" />
             </FormItem>
           )}
         />
+
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/60 dark:bg-blue-950/20 p-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Fee ({feePct}%)</p>
+            <p className="mt-1 text-base font-black text-rose-600">-{formatCurrency(feeAmount)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">You receive</p>
+            <p className="mt-1 text-base font-black text-emerald-600">{formatCurrency(netAmount)}</p>
+          </div>
+        </div>
 
         <Button
           type="submit"
@@ -192,7 +210,7 @@ export function WithdrawForm({ availableBalance, onSuccess }: WithdrawFormProps)
             </>
           ) : (
             <>
-              Request Automated Payout <ArrowRightCircle className="ml-2 h-4 w-4" />
+            Withdraw &amp; Auto-Pay <ArrowRightCircle className="ml-2 h-4 w-4" />
             </>
           )}
         </Button>
