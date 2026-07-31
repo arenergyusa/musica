@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import {
   AlertCircle,
   TrendingUp,
@@ -9,16 +8,13 @@ import {
   Briefcase,
   ArrowRight,
   Zap,
-  Network,
   Timer,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/store/useAuthStore";
-import { LEVEL_INCOME } from "@/lib/constants";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -227,38 +223,6 @@ export default function DashboardPage() {
       <motion.div variants={itemVariants}>
         <SalaryProgressCard />
       </motion.div>
-
-
-
-      {/* Level Stream Revenue Distribution — Rendered if levels unlocked */}
-      {levelsUnlocked > 0 && (
-        <motion.div variants={itemVariants}>
-          <Card className="shadow-sm bg-gradient-to-r from-blue-50/50 via-white to-emerald-50/30 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/20 border border-blue-200/80 dark:border-blue-900/60 rounded-lg">
-            <CardContent className="p-5 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                    <Network className="h-4 w-4 text-blue-600" />
-                    Unlocked Sponsorship Levels — L1 to L{levelsUnlocked}
-                  </h3>
-                </div>
-                <Link href="/income" className={buttonVariants({ variant: "outline", size: "sm", className: "shrink-0 border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-50 font-bold rounded-lg text-xs" })}>
-                  View Income Breakdown
-                </Link>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                {Array.from({ length: 10 }, (_, i) => i + 1).map((l) => (
-                  <div key={l} className={`text-center p-2.5 rounded-lg border text-xs font-semibold transition-all ${l <= levelsUnlocked ? 'bg-blue-50/80 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800' : 'bg-slate-50 dark:bg-slate-800/40 text-slate-400 border-slate-100 dark:border-slate-800 opacity-40'}`}>
-                    <div className="font-mono font-bold text-sm">Level {l}</div>
-                    <div className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">{LEVEL_INCOME[l as keyof typeof LEVEL_INCOME]}% Share</div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
 
     </motion.div>
   );
