@@ -45,6 +45,42 @@ func (h *AdminHandler) ActivateInvestment(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Investment activated successfully", nil)
 }
 
+func (h *AdminHandler) GetInvestments(c *gin.Context) {
+	limit, offset := ParsePagination(c)
+	investments, err := h.adminService.GetInvestments(c.Request.Context(), limit, offset, c.Query("status"))
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Failed to get investments", err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Investments retrieved", investments)
+}
+
+func (h *AdminHandler) ChangeInvestmentStatus(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil { response.Error(c, http.StatusBadRequest, "Invalid investment ID", nil); return }
+	var req struct { Status string `json:"status" binding:"required"` }
+	if err := c.ShouldBindJSON(&req); err != nil { response.Error(c, http.StatusBadRequest, "Invalid request payload", err); return }
+	if err := h.adminService.ChangeInvestmentStatus(c.Request.Context(), id, req.Status); err != nil {
+		handleServiceError(c, err, "Failed to update investment status")
+		return
+	}
+	response.Success(c, http.StatusOK, "Investment status updated", nil)
+}
+
+func (h *AdminHandler) GetMasterWalletBalance(c *gin.Context) {
+	balance, err := h.adminService.GetMasterWalletBalance(c.Request.Context())
+	if err != nil { response.Error(c, http.StatusBadGateway, "Failed to fetch HD wallet balance", err); return }
+	response.Success(c, http.StatusOK, "HD wallet balance retrieved", balance)
+}
+
+func (h *AdminHandler) GetDepositWalletBalance(c *gin.Context) {
+	userID, err := uuid.Parse(c.Param("id"))
+	if err != nil { response.Error(c, http.StatusBadRequest, "Invalid user ID", nil); return }
+	balance, err := h.adminService.GetDepositWalletBalance(c.Request.Context(), userID)
+	if err != nil { handleServiceError(c, err, "Failed to fetch sub-wallet balance"); return }
+	response.Success(c, http.StatusOK, "Sub-wallet balance retrieved", balance)
+}
+
 func (h *AdminHandler) ApproveWithdrawal(c *gin.Context) {
 	wdIDStr := c.Param("id")
 	wdID, err := uuid.Parse(wdIDStr)

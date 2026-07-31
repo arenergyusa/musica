@@ -12,7 +12,8 @@ import {
   LogOut,
   Settings,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  TrendingUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/store/useAuthStore";
@@ -29,6 +30,11 @@ const navItems = [
     title: "User Management",
     href: "/admin/users",
     icon: Users,
+  },
+  {
+    title: "Investment Queue",
+    href: "/admin/investments",
+    icon: TrendingUp,
   },
   {
     title: "Withdrawal Payouts",

@@ -15,6 +15,10 @@ import (
 
 type AdminService interface {
 	ActivateInvestment(ctx context.Context, invID uuid.UUID) error
+	ChangeInvestmentStatus(ctx context.Context, invID uuid.UUID, status string) error
+	GetInvestments(ctx context.Context, limit, offset int, status string) ([]*domain.Sponsorship, error)
+	GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error)
+	GetDepositWalletBalance(ctx context.Context, userID uuid.UUID) (*MasterWalletBalance, error)
 	ApproveWithdrawal(ctx context.Context, wdID uuid.UUID, adminNote string) error
 	RejectWithdrawal(ctx context.Context, wdID uuid.UUID, adminNote string) error
 	BlockUser(ctx context.Context, userID uuid.UUID) error
@@ -36,9 +40,10 @@ type adminService struct {
 	walletRepo   repository.WalletRepository
 	settingsRepo repository.SettingsRepository
 	mlmRepo      repository.MLMRepository
+	usdtService  USDTService
 }
 
-func NewAdminService(dbPool *pgxpool.Pool, invRepo repository.InvestmentRepository, wdRepo repository.WithdrawalRepository, userRepo repository.UserRepository, walletRepo repository.WalletRepository, settingsRepo repository.SettingsRepository, mlmRepo repository.MLMRepository) AdminService {
+func NewAdminService(dbPool *pgxpool.Pool, invRepo repository.InvestmentRepository, wdRepo repository.WithdrawalRepository, userRepo repository.UserRepository, walletRepo repository.WalletRepository, settingsRepo repository.SettingsRepository, mlmRepo repository.MLMRepository, usdtService USDTService) AdminService {
 	return &adminService{
 		dbPool:       dbPool,
 		invRepo:      invRepo,
@@ -47,7 +52,34 @@ func NewAdminService(dbPool *pgxpool.Pool, invRepo repository.InvestmentReposito
 		walletRepo:   walletRepo,
 		settingsRepo: settingsRepo,
 		mlmRepo:      mlmRepo,
+		usdtService:  usdtService,
 	}
+}
+
+func (s *adminService) ChangeInvestmentStatus(ctx context.Context, invID uuid.UUID, status string) error {
+	switch status {
+	case "ACTIVE":
+		return s.ActivateInvestment(ctx, invID)
+	case "CLOSED":
+		rows, err := s.invRepo.UpdateInvestmentStatusAtomic(ctx, invID, "PENDING", "CLOSED")
+		if err != nil { return err }
+		if rows != 1 { return errors.New("investment is not pending approval") }
+		return nil
+	default:
+		return errors.New("invalid investment status")
+	}
+}
+
+func (s *adminService) GetInvestments(ctx context.Context, limit, offset int, status string) ([]*domain.Sponsorship, error) {
+	return s.invRepo.GetAllWithFilters(ctx, limit, offset, status)
+}
+
+func (s *adminService) GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error) {
+	return s.usdtService.GetMasterWalletBalance(ctx)
+}
+
+func (s *adminService) GetDepositWalletBalance(ctx context.Context, userID uuid.UUID) (*MasterWalletBalance, error) {
+	return s.usdtService.GetDepositWalletBalance(ctx, userID)
 }
 
 // referralRewardPct is the one-time percentage paid to each upline level on investment activation.

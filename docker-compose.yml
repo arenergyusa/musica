@@ -41,6 +41,9 @@ services:
       - SMTP_USER=hello@themusica.in
       - SMTP_PASS=${SMTP_PASS:?SMTP_PASS is required}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      - MASTER_PRIVATE_KEY=${MASTER_PRIVATE_KEY:?MASTER_PRIVATE_KEY is required}
+      - BSC_RPC_URL=${BSC_RPC_URL:?BSC_RPC_URL is required}
+      - USDT_CONTRACT_ADDRESS=${USDT_CONTRACT_ADDRESS:?USDT_CONTRACT_ADDRESS is required}
     depends_on:
       - db
       - redis

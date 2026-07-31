@@ -89,15 +89,17 @@ export default function AdminDashboardPage() {
 
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [recentWithdrawals, setRecentWithdrawals] = useState<Withdrawal[]>([]);
+  const [masterWallet, setMasterWallet] = useState<{ address: string; bnb: number; usdt: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadStats() {
       try {
-        const [res, usersRes, withdrawalsRes, analyticsRes] = await Promise.all([
+        const [res, usersRes, withdrawalsRes, walletRes, analyticsRes] = await Promise.all([
           api.get("/admin/dashboard"),
           api.get("/admin/users"),
           api.get("/admin/withdrawals"),
+          api.get("/admin/wallet/balance").catch(() => ({ data: { data: null } })),
           api.get("/admin/analytics").catch(() => ({ data: { data: null } })),
         ]);
 
@@ -110,6 +112,7 @@ export default function AdminDashboardPage() {
         if (withdrawalsRes.data.data) {
           setRecentWithdrawals(withdrawalsRes.data.data.slice(0, 5));
         }
+        if (walletRes.data.data) setMasterWallet(walletRes.data.data);
         if (analyticsRes.data.data) {
           setAnalytics(analyticsRes.data.data);
         }
@@ -188,9 +191,9 @@ export default function AdminDashboardPage() {
                     <p className="text-xs opacity-80 font-medium">Check transaction hashes on BSC network</p>
                   </div>
                 </div>
-                <Link href="/admin/users">
+                <Link href="/admin/investments">
                   <Button variant="outline" size="sm" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-xl bg-white dark:bg-slate-900">
-                    View Users
+                    Review Queue
                   </Button>
                 </Link>
               </CardContent>
@@ -200,6 +203,12 @@ export default function AdminDashboardPage() {
       )}
 
       {/* Top Metric Cards */}
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm">
+        <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div><p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">HD Wallet Balance (BSC)</p><p className="text-lg font-black text-slate-900 dark:text-white font-mono">{masterWallet ? `${masterWallet.usdt.toFixed(2)} USDT · ${masterWallet.bnb.toFixed(6)} BNB` : "Unavailable"}</p></div>
+          {masterWallet && <p className="text-[10px] text-slate-400 font-mono break-all">{masterWallet.address}</p>}
+        </CardContent>
+      </Card>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm hover:border-blue-500/40 transition-colors">
           <CardContent className="p-5">

@@ -4,9 +4,13 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"bytes"
+	"encoding/json"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"math/big"
+	"net/http"
 	"os"
 	"strings"
 
@@ -18,7 +22,15 @@ import (
 
 type USDTService interface {
 	GetOrCreateDepositAddress(ctx context.Context, userID uuid.UUID) (*domain.UserDepositAddress, error)
+	GetDepositWalletBalance(ctx context.Context, userID uuid.UUID) (*MasterWalletBalance, error)
 	ProcessAutoWithdrawal(ctx context.Context, withdrawalID, userID uuid.UUID, recipientAddress string, amountUSD float64) (string, error)
+	GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error)
+}
+
+type MasterWalletBalance struct {
+	Address string  `json:"address"`
+	BNB     float64 `json:"bnb"`
+	USDT    float64 `json:"usdt"`
 }
 
 type usdtService struct {
@@ -168,4 +180,81 @@ func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, u
 	)
 
 	return txHash, nil
+}
+
+// GetMasterWalletBalance reads the native BNB and BEP-20 USDT balances from BSC.
+// It deliberately returns only the public address and balances, never the private key.
+func (s *usdtService) GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error) {
+	masterHex := strings.TrimPrefix(os.Getenv("MASTER_PRIVATE_KEY"), "0x")
+	if masterHex == "" {
+		return nil, fmt.Errorf("MASTER_PRIVATE_KEY not configured")
+	}
+	privKey, err := hexToPrivateKey(masterHex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse master private key: %v", err)
+	}
+	address := pubkeyToAddress(&privKey.PublicKey)
+	return s.getWalletBalance(ctx, address)
+}
+
+func (s *usdtService) GetDepositWalletBalance(ctx context.Context, userID uuid.UUID) (*MasterWalletBalance, error) {
+	var address string
+	err := s.db.QueryRow(ctx, `SELECT address FROM user_deposit_addresses WHERE user_id = $1`, userID).Scan(&address)
+	if err != nil {
+		return nil, fmt.Errorf("deposit wallet not found for user")
+	}
+	return s.getWalletBalance(ctx, address)
+}
+
+func (s *usdtService) getWalletBalance(ctx context.Context, address string) (*MasterWalletBalance, error) {
+	rpcURL := os.Getenv("BSC_RPC_URL")
+	if rpcURL == "" {
+		return nil, fmt.Errorf("BSC_RPC_URL not configured")
+	}
+
+	native, err := callBSC(ctx, rpcURL, "eth_getBalance", []interface{}{address, "latest"})
+	if err != nil {
+		return nil, err
+	}
+	nativeWei, ok := new(big.Int).SetString(strings.TrimPrefix(native, "0x"), 16)
+	if !ok {
+		return nil, fmt.Errorf("invalid BNB balance returned by BSC")
+	}
+	usdtRaw, err := callBSC(ctx, rpcURL, "eth_call", []interface{}{map[string]string{
+		"to":   os.Getenv("USDT_CONTRACT_ADDRESS"),
+		"data": "0x70a08231" + strings.Repeat("0", 64-len(strings.TrimPrefix(address, "0x"))) + strings.TrimPrefix(address, "0x"),
+	}, "latest"})
+	if err != nil {
+		return nil, err
+	}
+	usdtUnits, ok := new(big.Int).SetString(strings.TrimPrefix(usdtRaw, "0x"), 16)
+	if !ok {
+		return nil, fmt.Errorf("invalid USDT balance returned by BSC")
+	}
+
+	bnb, _ := new(big.Float).Quo(new(big.Float).SetInt(nativeWei), big.NewFloat(1e18)).Float64()
+	usdt, _ := new(big.Float).Quo(new(big.Float).SetInt(usdtUnits), big.NewFloat(1e18)).Float64()
+	return &MasterWalletBalance{
+		Address: address,
+		BNB:     bnb,
+		USDT:    usdt,
+	}, nil
+}
+
+func callBSC(ctx context.Context, url, method string, params []interface{}) (string, error) {
+	payload, err := json.Marshal(map[string]interface{}{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
+	if err != nil { return "", err }
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil { return "", err }
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil { return "", fmt.Errorf("BSC RPC request failed: %w", err) }
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil { return "", err }
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 { return "", fmt.Errorf("BSC RPC returned HTTP %d", resp.StatusCode) }
+	var result struct { Result string `json:"result"`; Error *struct { Message string `json:"message"` } `json:"error"` }
+	if err := json.Unmarshal(body, &result); err != nil { return "", fmt.Errorf("invalid BSC RPC response: %w", err) }
+	if result.Error != nil { return "", fmt.Errorf("BSC RPC error: %s", result.Error.Message) }
+	return result.Result, nil
 }

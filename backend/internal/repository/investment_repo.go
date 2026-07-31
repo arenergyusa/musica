@@ -245,7 +245,7 @@ func (r *investmentRepository) GetAllWithFilters(ctx context.Context, limit, off
 	query := `
 		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, created_at, closed_at
 		FROM sponsorships
-		WHERE ($1 = '' OR status = $1)
+		WHERE ($1 = '' OR status = NULLIF($1, '')::investment_status)
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`

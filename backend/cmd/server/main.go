@@ -68,7 +68,7 @@ func main() {
 	usdtSvc := service.NewUSDTService(dbPool, auditSvc)
 	wdSvc := service.NewWithdrawalService(dbPool, withdrawalRepo, walletRepo, userRepo, settingsRepo, usdtSvc)
 	teamSvc := service.NewTeamService(mlmRepo, settingsRepo)
-	adminSvc := service.NewAdminService(dbPool, invRepo, withdrawalRepo, userRepo, walletRepo, settingsRepo, mlmRepo)
+	adminSvc := service.NewAdminService(dbPool, invRepo, withdrawalRepo, userRepo, walletRepo, settingsRepo, mlmRepo, usdtSvc)
 	userSvc := service.NewUserService(userRepo, walletRepo, invRepo, mlmRepo, settingsRepo)
 
 	// Initialize Handlers
@@ -337,6 +337,10 @@ func main() {
 			admin.GET("/analytics", adminH.GetAnalytics)
 			admin.GET("/users", adminH.GetUsers)
 			admin.GET("/users/:id/summary", adminH.GetUserSummary)
+			admin.GET("/investments", adminH.GetInvestments)
+			admin.PUT("/investments/:id/status", adminH.ChangeInvestmentStatus)
+			admin.GET("/wallet/balance", adminH.GetMasterWalletBalance)
+			admin.GET("/users/:id/wallet/balance", adminH.GetDepositWalletBalance)
 			admin.PUT("/users/:id/block", adminH.BlockUser)
 			admin.PUT("/users/:id/unblock", adminH.UnblockUser)
 			admin.POST("/investments/:id/activate", adminH.ActivateInvestment)
