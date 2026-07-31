@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
@@ -23,8 +24,65 @@ import (
 type USDTService interface {
 	GetOrCreateDepositAddress(ctx context.Context, userID uuid.UUID) (*domain.UserDepositAddress, error)
 	GetDepositWalletBalance(ctx context.Context, userID uuid.UUID) (*MasterWalletBalance, error)
+	VerifyDeposit(ctx context.Context, userID uuid.UUID, txHash string, expectedAmount float64) error
 	ProcessAutoWithdrawal(ctx context.Context, withdrawalID, userID uuid.UUID, recipientAddress string, amountUSD float64) (string, error)
 	GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error)
+}
+
+const transferTopic = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+
+type bscReceipt struct {
+	Status string `json:"status"`
+	Logs []struct {
+		Address string `json:"address"`
+		Topics []string `json:"topics"`
+		Data string `json:"data"`
+	} `json:"logs"`
+}
+
+// VerifyDeposit validates an actual mined BEP-20 Transfer event. The server never
+// trusts a client supplied amount or address; both are resolved from our DB.
+func (s *usdtService) VerifyDeposit(ctx context.Context, userID uuid.UUID, txHash string, expectedAmount float64) error {
+	txHash = strings.TrimSpace(txHash)
+	if !strings.HasPrefix(txHash, "0x") || len(txHash) != 66 {
+		return fmt.Errorf("invalid BSC transaction hash")
+	}
+	var depositAddress string
+	if err := s.db.QueryRow(ctx, `SELECT address FROM user_deposit_addresses WHERE user_id = $1`, userID).Scan(&depositAddress); err != nil {
+		return fmt.Errorf("deposit address not found")
+	}
+	rpcURL := os.Getenv("BSC_RPC_URL")
+	if rpcURL == "" { return fmt.Errorf("BSC_RPC_URL not configured") }
+	var receipt bscReceipt
+	if err := callBSCJSON(ctx, rpcURL, "eth_getTransactionReceipt", []interface{}{txHash}, &receipt); err != nil {
+		return err
+	}
+	if receipt.Status != "0x1" { return fmt.Errorf("transaction is not successful or not mined yet") }
+
+	contract := strings.ToLower(strings.TrimPrefix(os.Getenv("USDT_CONTRACT_ADDRESS"), "0x"))
+	recipient := strings.ToLower(strings.TrimPrefix(depositAddress, "0x"))
+	decimals := 18
+	if raw := os.Getenv("USDT_DECIMALS"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 2 && parsed <= 36 { decimals = parsed }
+	}
+	expectedUnits := new(big.Int)
+	amountCents := strings.Replace(fmt.Sprintf("%.2f", expectedAmount), ".", "", 1)
+	if _, ok := expectedUnits.SetString(amountCents, 10); !ok { return fmt.Errorf("invalid investment amount") }
+	expectedUnits.Mul(expectedUnits, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals-2)), nil))
+
+	for _, logItem := range receipt.Logs {
+		if strings.ToLower(strings.TrimPrefix(logItem.Address, "0x")) != contract || len(logItem.Topics) < 3 { continue }
+		if strings.ToLower(strings.TrimPrefix(logItem.Topics[0], "0x")) != transferTopic { continue }
+		to := strings.ToLower(strings.TrimPrefix(logItem.Topics[2], "0x"))
+		if len(to) < 40 || to[len(to)-40:] != recipient { continue }
+		value, ok := new(big.Int).SetString(strings.TrimPrefix(logItem.Data, "0x"), 16)
+		if ok && value.Cmp(expectedUnits) == 0 {
+			_ = s.auditService.Log(ctx, &userID, "DEPOSIT_VERIFIED", expectedAmount, expectedAmount, txHash, "SUCCESS", fmt.Sprintf(`{"address":"%s"}`, depositAddress))
+			return nil
+		}
+	}
+	_ = s.auditService.Log(ctx, &userID, "DEPOSIT_VERIFIED", expectedAmount, expectedAmount, txHash, "FAILED", "{}")
+	return fmt.Errorf("no exact USDT deposit found for this investment")
 }
 
 type MasterWalletBalance struct {
@@ -257,4 +315,21 @@ func callBSC(ctx context.Context, url, method string, params []interface{}) (str
 	if err := json.Unmarshal(body, &result); err != nil { return "", fmt.Errorf("invalid BSC RPC response: %w", err) }
 	if result.Error != nil { return "", fmt.Errorf("BSC RPC error: %s", result.Error.Message) }
 	return result.Result, nil
+}
+
+func callBSCJSON(ctx context.Context, url, method string, params []interface{}, out interface{}) error {
+	payload, err := json.Marshal(map[string]interface{}{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
+	if err != nil { return err }
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil { return err }
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil { return err }
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 { return fmt.Errorf("BSC RPC returned HTTP %d", resp.StatusCode) }
+	var envelope struct { Result json.RawMessage `json:"result"`; Error *struct { Message string `json:"message"` } `json:"error"` }
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil { return err }
+	if envelope.Error != nil { return fmt.Errorf("BSC RPC: %s", envelope.Error.Message) }
+	if len(envelope.Result) == 0 || string(envelope.Result) == "null" { return fmt.Errorf("transaction not mined yet") }
+	return json.Unmarshal(envelope.Result, out)
 }

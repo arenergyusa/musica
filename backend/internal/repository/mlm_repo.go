@@ -97,6 +97,22 @@ func (r *mlmRepository) GetDownlineVolume(ctx context.Context, userID uuid.UUID)
 	return volume, err
 }
 
+func (r *mlmRepository) GetDownlineTotalInvestment(ctx context.Context, userID uuid.UUID) (float64, error) {
+	query := `
+		WITH RECURSIVE downline AS (
+			SELECT id FROM users WHERE invited_by = $1
+			UNION ALL
+			SELECT child.id FROM users child JOIN downline d ON child.invited_by = d.id
+		)
+		SELECT COALESCE(SUM(s.amount), 0)
+		FROM sponsorships s
+		WHERE s.user_id IN (SELECT id FROM downline)
+		  AND (s.status IN ('ACTIVE', 'CLOSED') OR s.total_reward_earned >= s.cap_limit)`
+	var total float64
+	if err := r.db.QueryRow(ctx, query, userID).Scan(&total); err != nil { return 0, err }
+	return total, nil
+}
+
 
 func (r *mlmRepository) HasActiveDirectReferral(ctx context.Context, userID uuid.UUID) (bool, error) {
 	query := `
@@ -183,4 +199,58 @@ func (r *mlmRepository) GetAncestorAtLevel(ctx context.Context, userID uuid.UUID
 		return nil, err
 	}
 	return &id, nil
+}
+
+func (r *mlmRepository) GetTeamBreakdown(ctx context.Context, userID uuid.UUID, maxLevel int) (*domain.TeamBreakdown, error) {
+	query := `
+		WITH RECURSIVE team AS (
+			SELECT u.id, 1 AS team_level
+			FROM users u
+			WHERE u.invited_by = $1
+			UNION ALL
+			SELECT child.id, team.team_level + 1
+			FROM users child
+			JOIN team ON child.invited_by = team.id
+			WHERE team.team_level < $2
+		), classified AS (
+			SELECT
+				u.id, u.name, u.email, u.phone, u.invite_code, u.leg, u.created_at,
+				team.team_level,
+				COALESCE((SELECT SUM(s.amount) FROM sponsorships s WHERE s.user_id = u.id AND s.status = 'ACTIVE'), 0) AS total_investment,
+				COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.user_id = u.id AND t.type = 'CREDIT'), 0) AS lifetime_income,
+				(SELECT COUNT(DISTINCT direct.id)
+				 FROM users direct
+				 WHERE direct.invited_by = u.id
+				   AND EXISTS (SELECT 1 FROM sponsorships ds WHERE ds.user_id = direct.id AND ds.status = 'ACTIVE')) AS direct_active_count
+			FROM team
+			JOIN users u ON u.id = team.id
+		)
+		SELECT id, name, email, phone, invite_code, leg, created_at, team_level,
+		       total_investment, lifetime_income, direct_active_count,
+		       CASE WHEN total_investment <= 0 THEN 'INACTIVE'
+		            WHEN direct_active_count > 0 THEN 'WORKING'
+		            ELSE 'NON_WORKING' END AS member_status
+		FROM classified
+		ORDER BY team_level ASC, created_at DESC`
+	rows, err := r.db.Query(ctx, query, userID, maxLevel)
+	if err != nil { return nil, err }
+	defer rows.Close()
+
+	breakdown := &domain.TeamBreakdown{Levels: make([]*domain.TeamLevelSummary, 15), Members: make([]*domain.TeamMemberDetail, 0)}
+	for i := 0; i < 15; i++ { breakdown.Levels[i] = &domain.TeamLevelSummary{Level: i + 1} }
+	for rows.Next() {
+		member := &domain.TeamMemberDetail{}
+		if err := rows.Scan(&member.ID, &member.Name, &member.Email, &member.Phone, &member.InviteCode, &member.Leg, &member.CreatedAt, &member.Level, &member.TotalInvestment, &member.LifetimeIncome, &member.DirectActiveCount, &member.Status); err != nil { return nil, err }
+		breakdown.Members = append(breakdown.Members, member)
+		summary := breakdown.Levels[member.Level-1]
+		summary.TotalMembers++
+		summary.TotalInvestment += member.TotalInvestment
+		summary.LifetimeIncome += member.LifetimeIncome
+		switch member.Status {
+		case "INACTIVE": summary.InactiveCount++
+		case "NON_WORKING": summary.NonWorkingCount++
+		case "WORKING": summary.WorkingCount++
+		}
+	}
+	return breakdown, rows.Err()
 }

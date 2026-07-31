@@ -42,6 +42,8 @@ type Sponsorship struct {
 	TotalRewardEarned    float64    `json:"total_reward_earned" db:"total_reward_earned"`
 	CapLimit             float64    `json:"cap_limit" db:"cap_limit"`
 	WorkingCapAtCreation bool       `json:"working_cap_at_creation" db:"working_cap_at_creation"`
+	DepositTxHash        *string    `json:"deposit_tx_hash,omitempty" db:"deposit_tx_hash"`
+	DepositConfirmedAt   *time.Time `json:"deposit_confirmed_at,omitempty" db:"deposit_confirmed_at"`
 	CreatedAt            time.Time  `json:"created_at" db:"created_at"`
 	ClosedAt             *time.Time `json:"closed_at,omitempty" db:"closed_at"`
 }
@@ -110,6 +112,36 @@ type UserDepositAddress struct {
 	Address         string    `json:"address" db:"address"`
 	DerivationIndex int       `json:"derivation_index" db:"derivation_index"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+}
+
+type TeamLevelSummary struct {
+	Level              int     `json:"level"`
+	TotalMembers       int     `json:"total_members"`
+	InactiveCount      int     `json:"inactive_count"`
+	NonWorkingCount    int     `json:"non_working_count"`
+	WorkingCount       int     `json:"working_count"`
+	TotalInvestment    float64 `json:"total_investment"`
+	LifetimeIncome     float64 `json:"lifetime_income"`
+}
+
+type TeamMemberDetail struct {
+	ID                uuid.UUID `json:"id"`
+	Name              string    `json:"name"`
+	Email             string    `json:"email"`
+	Phone             string    `json:"phone"`
+	InviteCode        string    `json:"invite_code"`
+	Leg               string    `json:"leg"`
+	Status            string    `json:"status"`
+	Level             int       `json:"level"`
+	TotalInvestment   float64   `json:"total_investment"`
+	LifetimeIncome    float64   `json:"lifetime_income"`
+	DirectActiveCount int       `json:"direct_active_count"`
+	CreatedAt         time.Time `json:"created_at"`
+}
+
+type TeamBreakdown struct {
+	Levels  []*TeamLevelSummary `json:"levels"`
+	Members []*TeamMemberDetail `json:"members"`
 }
 
 type TransactionAuditLog struct {

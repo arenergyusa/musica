@@ -33,6 +33,7 @@ type InvestmentRepository interface {
 	GetActiveInvestmentsByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Sponsorship, error)
 	UpdateInvestmentStatus(ctx context.Context, id uuid.UUID, status string) error
 	UpdateInvestmentStatusAtomic(ctx context.Context, id uuid.UUID, fromStatus, toStatus string) (int64, error)
+	ConfirmDepositAtomic(ctx context.Context, id, userID uuid.UUID, txHash string) (int64, error)
 	// Track cap
 	UpdateCapTracker(ctx context.Context, investmentID uuid.UUID, rewardAmount float64) error
 	GetActiveCount(ctx context.Context) (int, error)
@@ -52,6 +53,7 @@ type WalletRepository interface {
 	GetTotalPaid(ctx context.Context) (float64, error)
 	// GetDailyIncomeBySource returns daily total income grouped by date for a given source (admin analytics)
 	GetDailyIncomeBySource(ctx context.Context, source string, days int) ([]map[string]interface{}, error)
+	GetLifetimeIncomeBySource(ctx context.Context, userID uuid.UUID, source string) (float64, error)
 }
 
 // MLMRepository handles invite tree and volume logic
@@ -59,12 +61,14 @@ type MLMRepository interface {
 	InsertNode(ctx context.Context, userID uuid.UUID, uplineID uuid.UUID) error
 	GetDirectReferrals(ctx context.Context, userID uuid.UUID) ([]*domain.User, error)
 	GetDownlineVolume(ctx context.Context, userID uuid.UUID) (float64, error)
+	GetDownlineTotalInvestment(ctx context.Context, userID uuid.UUID) (float64, error)
 	HasActiveDirectReferral(ctx context.Context, userID uuid.UUID) (bool, error)
 	GetDirectVolumeAndCount(ctx context.Context, userID uuid.UUID) (float64, int, error)
 	// GetUplineChain returns upline userIDs ordered from nearest (L1) to farthest (L15)
 	GetUplineChain(ctx context.Context, userID uuid.UUID, maxLevels int) ([]uuid.UUID, error)
 	// GetAncestorAtLevel returns the ancestor user_id at exactly `level` steps above
 	GetAncestorAtLevel(ctx context.Context, userID uuid.UUID, level int) (*uuid.UUID, error)
+	GetTeamBreakdown(ctx context.Context, userID uuid.UUID, maxLevel int) (*domain.TeamBreakdown, error)
 }
 
 // WithdrawalRepository handles withdrawal requests

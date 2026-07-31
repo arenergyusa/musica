@@ -67,17 +67,17 @@ func main() {
 	auditSvc := service.NewAuditService(dbPool)
 	usdtSvc := service.NewUSDTService(dbPool, auditSvc)
 	wdSvc := service.NewWithdrawalService(dbPool, withdrawalRepo, walletRepo, userRepo, settingsRepo, usdtSvc)
-	teamSvc := service.NewTeamService(mlmRepo, settingsRepo)
+	teamSvc := service.NewTeamService(mlmRepo, settingsRepo, walletRepo)
 	adminSvc := service.NewAdminService(dbPool, invRepo, withdrawalRepo, userRepo, walletRepo, settingsRepo, mlmRepo, usdtSvc)
 	userSvc := service.NewUserService(userRepo, walletRepo, invRepo, mlmRepo, settingsRepo)
 
 	// Initialize Handlers
 	authH := handler.NewAuthHandler(authSvc)
-	invH := handler.NewInvestmentHandler(invSvc)
 	walletH := handler.NewWalletHandler(walletSvc)
 	wdH := handler.NewWithdrawalHandler(wdSvc)
 	teamH := handler.NewTeamHandler(teamSvc)
 	adminH := handler.NewAdminHandler(adminSvc)
+	invH := handler.NewInvestmentHandler(invSvc, adminSvc)
 	userH := handler.NewUserHandler(userSvc)
 	usdtH := handler.NewUSDTHandler(usdtSvc, auditSvc)
 	salaryH := handler.NewSalaryHandler(salaryRepo)
@@ -288,6 +288,7 @@ func main() {
 		{
 			investment.GET("/plans", invH.GetPlans)
 			investment.POST("/create", invH.CreateInvestment)
+			investment.POST("/:id/confirm-deposit", invH.ConfirmDeposit)
 			investment.GET("/my", invH.GetMyInvestments)
 		}
 
@@ -303,7 +304,8 @@ func main() {
 		{
 			invites.GET("/direct", teamH.GetDirectReferrals)
 			invites.GET("/tree", teamH.GetTree)
-			invites.GET("/stats", teamH.GetTeamStats)
+		invites.GET("/stats", teamH.GetTeamStats)
+		invites.GET("/breakdown", teamH.GetTeamBreakdown)
 		}
 
 		team := api.Group("/team")
@@ -311,7 +313,8 @@ func main() {
 		{
 			team.GET("/direct", teamH.GetDirectReferrals)
 			team.GET("/tree", teamH.GetTree)
-			team.GET("/stats", teamH.GetTeamStats)
+		team.GET("/stats", teamH.GetTeamStats)
+		team.GET("/breakdown", teamH.GetTeamBreakdown)
 		}
 
 		withdrawal := api.Group("/withdrawal")

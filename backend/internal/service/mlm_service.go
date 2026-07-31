@@ -62,7 +62,8 @@ func GetUnlockedLevels(directsCount int, directBusiness float64, s *domain.Platf
 	} else if directsCount >= s.Level1To5Directs && directBusiness >= s.Level1To5Business {
 		return 5
 	}
-	return 0
+	// L1 level income is available to every eligible upline by default.
+	return 1
 }
 
 func EvaluateCapStatus(ctx context.Context, invRepo repository.InvestmentRepository, sponsorship *domain.Sponsorship) bool {

@@ -102,6 +102,36 @@ export interface TeamDirect {
   [key: string]: unknown;
 }
 
+export interface TeamLevelSummary {
+  level: number;
+  total_members: number;
+  inactive_count: number;
+  non_working_count: number;
+  working_count: number;
+  total_investment: number;
+  lifetime_income: number;
+}
+
+export interface TeamMemberDetail {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  invite_code: string;
+  leg: string;
+  status: "INACTIVE" | "NON_WORKING" | "WORKING";
+  level: number;
+  total_investment: number;
+  lifetime_income: number;
+  direct_active_count: number;
+  created_at: string;
+}
+
+export interface TeamBreakdown {
+  levels: TeamLevelSummary[];
+  members: TeamMemberDetail[];
+}
+
 export interface PlatformSettings {
   id?: number;
   monthly_reward_pct: number;

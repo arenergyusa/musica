@@ -20,12 +20,12 @@ func NewInvestmentRepository(db *pgxpool.Pool) InvestmentRepository {
 
 func (r *investmentRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Sponsorship, error) {
 	query := `
-		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, created_at, closed_at
+		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, deposit_tx_hash, deposit_confirmed_at, created_at, closed_at
 		FROM sponsorships
 		WHERE id = $1
 	`
 	i := &domain.Sponsorship{}
-	err := r.db.QueryRow(ctx, query, id).Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.CreatedAt, &i.ClosedAt)
+	err := r.db.QueryRow(ctx, query, id).Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.DepositTxHash, &i.DepositConfirmedAt, &i.CreatedAt, &i.ClosedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -83,7 +83,7 @@ func (r *investmentRepository) CreateInvestment(ctx context.Context, inv *domain
 
 func (r *investmentRepository) GetInvestmentsByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Sponsorship, error) {
 	query := `
-		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, created_at, closed_at
+		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, deposit_tx_hash, deposit_confirmed_at, created_at, closed_at
 		FROM sponsorships
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -97,7 +97,7 @@ func (r *investmentRepository) GetInvestmentsByUserID(ctx context.Context, userI
 	var invs []*domain.Sponsorship
 	for rows.Next() {
 		i := &domain.Sponsorship{}
-		if err := rows.Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.CreatedAt, &i.ClosedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.DepositTxHash, &i.DepositConfirmedAt, &i.CreatedAt, &i.ClosedAt); err != nil {
 			return nil, err
 		}
 		invs = append(invs, i)
@@ -110,7 +110,7 @@ func (r *investmentRepository) GetInvestmentsByUserID(ctx context.Context, userI
 
 func (r *investmentRepository) GetActiveInvestments(ctx context.Context) ([]*domain.Sponsorship, error) {
 	query := `
-		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, created_at, closed_at
+		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, deposit_tx_hash, deposit_confirmed_at, created_at, closed_at
 		FROM sponsorships
 		WHERE status = 'ACTIVE'
 	`
@@ -123,7 +123,7 @@ func (r *investmentRepository) GetActiveInvestments(ctx context.Context) ([]*dom
 	var invs []*domain.Sponsorship
 	for rows.Next() {
 		i := &domain.Sponsorship{}
-		if err := rows.Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.CreatedAt, &i.ClosedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.DepositTxHash, &i.DepositConfirmedAt, &i.CreatedAt, &i.ClosedAt); err != nil {
 			return nil, err
 		}
 		invs = append(invs, i)
@@ -152,6 +152,15 @@ func (r *investmentRepository) UpdateInvestmentStatusAtomic(ctx context.Context,
 	if err != nil {
 		return 0, err
 	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *investmentRepository) ConfirmDepositAtomic(ctx context.Context, id, userID uuid.UUID, txHash string) (int64, error) {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE sponsorships
+		SET status = 'ACTIVE', deposit_tx_hash = $1, deposit_confirmed_at = CURRENT_TIMESTAMP
+		WHERE id = $2 AND user_id = $3 AND status = 'PENDING'`, txHash, id, userID)
+	if err != nil { return 0, err }
 	return tag.RowsAffected(), nil
 }
 
@@ -218,7 +227,7 @@ func (r *investmentRepository) GetTotalActiveInvested(ctx context.Context) (floa
 // GetActiveInvestmentsByUserID returns all ACTIVE sponsorships for a specific user (used for cap tracking).
 func (r *investmentRepository) GetActiveInvestmentsByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Sponsorship, error) {
 	query := `
-		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, created_at, closed_at
+		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, deposit_tx_hash, deposit_confirmed_at, created_at, closed_at
 		FROM sponsorships
 		WHERE user_id = $1 AND status = 'ACTIVE'
 		ORDER BY created_at ASC
@@ -232,7 +241,7 @@ func (r *investmentRepository) GetActiveInvestmentsByUserID(ctx context.Context,
 	var invs []*domain.Sponsorship
 	for rows.Next() {
 		i := &domain.Sponsorship{}
-		if err := rows.Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.CreatedAt, &i.ClosedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.DepositTxHash, &i.DepositConfirmedAt, &i.CreatedAt, &i.ClosedAt); err != nil {
 			return nil, err
 		}
 		invs = append(invs, i)
@@ -243,7 +252,7 @@ func (r *investmentRepository) GetActiveInvestmentsByUserID(ctx context.Context,
 // GetAllWithFilters returns sponsorships with optional status filter for admin views.
 func (r *investmentRepository) GetAllWithFilters(ctx context.Context, limit, offset int, status string) ([]*domain.Sponsorship, error) {
 	query := `
-		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, created_at, closed_at
+		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, deposit_tx_hash, deposit_confirmed_at, created_at, closed_at
 		FROM sponsorships
 		WHERE ($1 = '' OR status = NULLIF($1, '')::investment_status)
 		ORDER BY created_at DESC
@@ -258,7 +267,7 @@ func (r *investmentRepository) GetAllWithFilters(ctx context.Context, limit, off
 	var invs []*domain.Sponsorship
 	for rows.Next() {
 		i := &domain.Sponsorship{}
-		if err := rows.Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.CreatedAt, &i.ClosedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.DepositTxHash, &i.DepositConfirmedAt, &i.CreatedAt, &i.ClosedAt); err != nil {
 			return nil, err
 		}
 		invs = append(invs, i)

@@ -19,6 +19,10 @@ type InvestRequest struct {
 	PaymentRef    string  `json:"payment_ref"`
 }
 
+type ConfirmDepositRequest struct {
+	TxHash string `json:"tx_hash" binding:"required"`
+}
+
 type WithdrawRequest struct {
 	Amount float64 `json:"amount" binding:"required,min=10"`
 }

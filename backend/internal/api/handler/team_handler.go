@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/arenergyusa/musica/backend/internal/service"
 	"github.com/arenergyusa/musica/backend/pkg/response"
@@ -63,4 +65,18 @@ func (h *TeamHandler) GetTree(c *gin.Context) {
 	}
 
 	response.Success(c, http.StatusOK, "Team tree retrieved successfully", tree)
+}
+
+func (h *TeamHandler) GetTeamBreakdown(c *gin.Context) {
+	userID, err := GetUserID(c)
+	if err != nil { response.Error(c, http.StatusUnauthorized, "Invalid user token", nil); return }
+	level := 0
+	if raw := c.Query("level"); raw != "" {
+		level, err = strconv.Atoi(raw)
+		if err != nil { response.Error(c, http.StatusBadRequest, "Invalid team level", nil); return }
+	}
+	status := strings.ToUpper(strings.TrimSpace(c.DefaultQuery("status", "ALL")))
+	breakdown, err := h.teamService.GetTeamBreakdown(c.Request.Context(), userID, level, status)
+	if err != nil { response.Error(c, http.StatusBadRequest, "Failed to get team breakdown", err); return }
+	response.Success(c, http.StatusOK, "Team breakdown retrieved successfully", breakdown)
 }

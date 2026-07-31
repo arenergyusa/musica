@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { toast } from "sonner";
-import { Loader2, Copy, CheckCircle2, ShieldCheck, Wallet } from "lucide-react";
+import { Loader2, Copy, Wallet } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 import { investSchema, type InvestInput } from "@/lib/validators";
@@ -26,6 +26,8 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
   const [isFetchingAddress, setIsFetchingAddress] = useState(true);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [depositAddress, setDepositAddress] = useState<string>("");
+  const [txHash, setTxHash] = useState("");
+  const [investmentId, setInvestmentId] = useState<string | null>(null);
 
   useEffect(() => {
     api.get("/user/deposit-address")
@@ -61,11 +63,18 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
   async function onSubmit(data: InvestInput) {
     setIsLoading(true);
     try {
-      await api.post("/investment/create", {
-        amount: data.amount,
-        payment_method: "USDT_BEP20",
-        payment_ref: depositAddress,
-      });
+      let pendingInvestmentId = investmentId;
+      if (!pendingInvestmentId) {
+        const createRes = await api.post("/investment/create", {
+          amount: data.amount,
+          payment_method: "USDT_BEP20",
+          payment_ref: depositAddress,
+        });
+        pendingInvestmentId = createRes.data?.data?.id;
+        if (!pendingInvestmentId) throw new Error("Investment ID missing from server response");
+        setInvestmentId(pendingInvestmentId);
+      }
+      await api.post(`/investment/${pendingInvestmentId}/confirm-deposit`, { tx_hash: txHash.trim() });
 
       toast.success("Investment request submitted!", {
         description: "Your USDT deposit will be credited automatically upon confirmation on the BSC network.",
@@ -139,6 +148,20 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
           </div>
         )}
 
+        <div className="space-y-2">
+          <label htmlFor="deposit-tx-hash" className="text-xs font-bold text-slate-700 dark:text-slate-300">
+            BSC transaction hash
+          </label>
+          <Input
+            id="deposit-tx-hash"
+            value={txHash}
+            onChange={(event) => setTxHash(event.target.value)}
+            placeholder="0x..."
+            className="font-mono text-xs"
+          />
+          <p className="text-[11px] text-slate-400">After sending USDT, paste the hash from your wallet. We verify the mined Transfer event automatically.</p>
+        </div>
+
         {/* Confirmation Checkbox */}
         <FormField
           control={form.control}
@@ -160,7 +183,7 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
 
         <Button
           type="submit"
-          disabled={isLoading || isFetchingAddress}
+          disabled={isLoading || isFetchingAddress || !txHash.trim()}
           className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl shadow-md transition-all"
         >
           {isLoading ? (

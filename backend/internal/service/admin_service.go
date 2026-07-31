@@ -10,11 +10,13 @@ import (
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/arenergyusa/musica/backend/internal/repository"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type AdminService interface {
 	ActivateInvestment(ctx context.Context, invID uuid.UUID) error
+	ConfirmDeposit(ctx context.Context, userID, invID uuid.UUID, txHash string) error
 	ChangeInvestmentStatus(ctx context.Context, invID uuid.UUID, status string) error
 	GetInvestments(ctx context.Context, limit, offset int, status string) ([]*domain.Sponsorship, error)
 	GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error)
@@ -114,6 +116,20 @@ func (s *adminService) ActivateInvestment(ctx context.Context, invID uuid.UUID) 
 	return nil
 }
 
+func (s *adminService) ConfirmDeposit(ctx context.Context, userID, invID uuid.UUID, txHash string) error {
+	inv, err := s.invRepo.GetByID(ctx, invID)
+	if err != nil { return err }
+	if inv == nil || inv.UserID != userID { return errors.New("investment not found") }
+	if inv.Status != "PENDING" { return errors.New("investment is not pending confirmation") }
+	if err := s.usdtService.VerifyDeposit(ctx, userID, txHash, inv.Amount); err != nil { return err }
+	rows, err := s.invRepo.ConfirmDepositAtomic(ctx, invID, userID, txHash)
+	if err != nil { return err }
+	if rows != 1 { return errors.New("investment was already confirmed") }
+	inv.Status = "ACTIVE"
+	s.payReferralIncome(ctx, inv)
+	return nil
+}
+
 // payReferralIncome distributes one-time invite bonuses when a sponsorship is activated.
 func (s *adminService) payReferralIncome(ctx context.Context, inv *domain.Sponsorship) {
 	settings, _ := s.settingsRepo.GetSettings(ctx)
@@ -160,6 +176,19 @@ func (s *adminService) payReferralIncome(ctx context.Context, inv *domain.Sponso
 		tx, err := s.dbPool.Begin(ctx)
 		if err != nil {
 			log.Printf("ADMIN: failed to begin transaction for invite reward distribution: %v", err)
+			continue
+		}
+
+		// Idempotency key: retries cannot pay the same sponsor/level twice.
+		var rewardLogID uuid.UUID
+		err = tx.QueryRow(ctx, `
+			INSERT INTO invite_reward_log (from_sponsorship_id, to_user_id, level, amount)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (from_sponsorship_id, to_user_id, level) DO NOTHING
+			RETURNING id`, inv.ID, *uplineID, level, rewardAmt).Scan(&rewardLogID)
+		if err != nil {
+			if err == pgx.ErrNoRows { _ = tx.Rollback(ctx); continue }
+			_ = tx.Rollback(ctx)
 			continue
 		}
 

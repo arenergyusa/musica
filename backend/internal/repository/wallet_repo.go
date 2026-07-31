@@ -216,3 +216,15 @@ func (r *walletRepository) GetDailyIncomeBySource(ctx context.Context, source st
 	}
 	return data, rows.Err()
 }
+
+func (r *walletRepository) GetLifetimeIncomeBySource(ctx context.Context, userID uuid.UUID, source string) (float64, error) {
+	var total float64
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(SUM(amount), 0)
+		FROM transactions
+		WHERE user_id = $1
+		  AND type = 'CREDIT'
+		  AND source = $2
+		  AND description ~ '^L[1-3] invite bonus'`, userID, source).Scan(&total)
+	return total, err
+}

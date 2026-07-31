@@ -11,6 +11,8 @@ export interface User {
   phone: string;
   role: UserRole;
   referralCode?: string;
+  invite_code?: string;
+  referral_code?: string;
   usdtAddress?: string;
   usdt_address?: string;
 }
