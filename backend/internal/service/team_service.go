@@ -79,10 +79,14 @@ func (s *teamService) GetTeamStats(ctx context.Context, userID uuid.UUID) (map[s
 	inviteIncome, err := s.walletRepo.GetLifetimeIncomeBySource(ctx, userID, "INVITE")
 	if err != nil { return nil, err }
 
+	levelIncome, err := s.walletRepo.GetLifetimeIncomeBySource(ctx, userID, "LEVEL")
+	if err != nil { return nil, err }
+
 	return map[string]interface{}{
 		"active_volume": volume,
 		"team_value": volume,
 		"invite_income": inviteIncome,
+		"level_income": levelIncome,
 		"levels_unlocked": levels,
 		"is_working": hasActiveDirect,
 	}, nil

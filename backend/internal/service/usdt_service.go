@@ -110,12 +110,16 @@ type MasterWalletBalance struct {
 type usdtService struct {
 	db           *pgxpool.Pool
 	auditService AuditService
+	masterKeyPresent bool // true if MASTER_PRIVATE_KEY is set in environment
 }
 
 func NewUSDTService(db *pgxpool.Pool, auditService AuditService) USDTService {
+	masterHex := strings.TrimPrefix(os.Getenv("MASTER_PRIVATE_KEY"), "0x")
+	present := masterHex != ""
 	return &usdtService{
-		db:           db,
-		auditService: auditService,
+		db:               db,
+		auditService:     auditService,
+		masterKeyPresent: present,
 	}
 }
 
@@ -166,22 +170,20 @@ func (s *usdtService) GetOrCreateDepositAddress(ctx context.Context, userID uuid
 		nextIndex = 1
 	}
 
-	masterHex := os.Getenv("MASTER_PRIVATE_KEY")
-	masterHex = strings.TrimPrefix(masterHex, "0x")
-	var derivedAddress string
-
-	if masterHex != "" {
-		// Derive child bytes deterministically using keccak256
-		childSeed := keccak256([]byte(masterHex), []byte(fmt.Sprintf("_user_%s_idx_%d", userID.String(), nextIndex)))
-		childKey, err := hexToPrivateKey(hex.EncodeToString(childSeed))
-		if err == nil {
-			derivedAddress = pubkeyToAddress(&childKey.PublicKey)
-		}
+	if !s.masterKeyPresent {
+		return nil, fmt.Errorf("MASTER_PRIVATE_KEY not configured in environment; cannot generate deposit address")
 	}
 
-	if derivedAddress == "" {
-    return nil, fmt.Errorf("CRITICAL ERROR: KEY is not loaded in server environment")
-    }
+	masterHex := strings.TrimPrefix(os.Getenv("MASTER_PRIVATE_KEY"), "0x")
+	var derivedAddress string
+
+	// Derive child bytes deterministically using keccak256
+	childSeed := keccak256([]byte(masterHex), []byte(fmt.Sprintf("_user_%s_idx_%d", userID.String(), nextIndex)))
+	childKey, err := hexToPrivateKey(hex.EncodeToString(childSeed))
+	if err != nil {
+		return nil, fmt.Errorf("failed to derive child key: %w", err)
+	}
+	derivedAddress = pubkeyToAddress(&childKey.PublicKey)
 
 	// Save to DB
 	insertQuery := `
@@ -205,13 +207,11 @@ func (s *usdtService) GetOrCreateDepositAddress(ctx context.Context, userID uuid
 
 // ProcessAutoWithdrawal executes automatic USDT transfer on BSC network using master private key from .env
 func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, userID uuid.UUID, recipientAddress string, amountUSD float64) (string, error) {
-	masterHex := os.Getenv("MASTER_PRIVATE_KEY")
-	masterHex = strings.TrimPrefix(masterHex, "0x")
-
-	if masterHex == "" {
-		return "", fmt.Errorf("MASTER_PRIVATE_KEY not configured in .env")
+	if !s.masterKeyPresent {
+		return "", fmt.Errorf("MASTER_PRIVATE_KEY not configured in environment; cannot process auto withdrawal")
 	}
 
+	masterHex := strings.TrimPrefix(os.Getenv("MASTER_PRIVATE_KEY"), "0x")
 	privKey, err := hexToPrivateKey(masterHex)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse master private key: %v", err)
@@ -314,10 +314,11 @@ func commonAddressBytes(address string) []byte {
 // GetMasterWalletBalance reads the native BNB and BEP-20 USDT balances from BSC.
 // It deliberately returns only the public address and balances, never the private key.
 func (s *usdtService) GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error) {
-	masterHex := strings.TrimPrefix(os.Getenv("MASTER_PRIVATE_KEY"), "0x")
-	if masterHex == "" {
-		return nil, fmt.Errorf("MASTER_PRIVATE_KEY not configured")
+	if !s.masterKeyPresent {
+		return nil, fmt.Errorf("MASTER_PRIVATE_KEY not configured in environment; cannot fetch master wallet balance")
 	}
+
+	masterHex := strings.TrimPrefix(os.Getenv("MASTER_PRIVATE_KEY"), "0x")
 	privKey, err := hexToPrivateKey(masterHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse master private key: %v", err)

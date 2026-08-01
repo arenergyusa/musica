@@ -111,9 +111,11 @@ func (r *walletRepository) GetTransactions(ctx context.Context, userID uuid.UUID
 		SELECT id, user_id, type, amount, source, reference_id, description, created_at
 		FROM transactions
 		WHERE user_id = $1
+			AND type = 'DEBIT'
+			AND source = 'WITHDRAWAL'
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
-	`
+		`
 	rows, err := r.db.Query(ctx, query, userID, limit, offset)
 	if err != nil {
 		return nil, err
@@ -219,12 +221,23 @@ func (r *walletRepository) GetDailyIncomeBySource(ctx context.Context, source st
 
 func (r *walletRepository) GetLifetimeIncomeBySource(ctx context.Context, userID uuid.UUID, source string) (float64, error) {
 	var total float64
-	err := r.db.QueryRow(ctx, `
+	var query string
+	if source == "INVITE" {
+		query = `
 		SELECT COALESCE(SUM(amount), 0)
 		FROM transactions
 		WHERE user_id = $1
 		  AND type = 'CREDIT'
 		  AND source = $2
-		  AND description ~ '^L[1-3] invite bonus'`, userID, source).Scan(&total)
+		  AND description ~ '^L[1-3] invite bonus'`
+	} else {
+		query = `
+		SELECT COALESCE(SUM(amount), 0)
+		FROM transactions
+		WHERE user_id = $1
+		  AND type = 'CREDIT'
+		  AND source = $2`
+	}
+	err := r.db.QueryRow(ctx, query, userID, source).Scan(&total)
 	return total, err
 }
