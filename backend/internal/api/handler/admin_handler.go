@@ -289,3 +289,23 @@ func (h *AdminHandler) UpdateSettings(c *gin.Context) {
 	}
 	response.Success(c, http.StatusOK, "Settings updated successfully", nil)
 }
+
+func (h *AdminHandler) CreateManualInvestment(c *gin.Context) {
+	var req struct {
+		Email  string  `json:"email" binding:"required,email"`
+		Amount float64 `json:"amount" binding:"required,gt=0"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid request payload. Valid email and positive amount required.", err)
+		return
+	}
+
+	inv, err := h.adminService.CreateManualInvestment(c.Request.Context(), req.Email, req.Amount)
+	if err != nil {
+		handleServiceError(c, err, "Failed to create manual investment")
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Manual investment created and referral rewards distributed successfully", inv)
+}
+

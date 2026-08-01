@@ -13,7 +13,8 @@ import {
   Settings,
   Sparkles,
   ShieldCheck,
-  TrendingUp
+  UserPlus,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/store/useAuthStore";
@@ -30,6 +31,11 @@ const navItems = [
     title: "User Management",
     href: "/admin/users",
     icon: Users,
+  },
+  {
+    title: "Manual Investment",
+    href: "/admin/manual-investment",
+    icon: UserPlus,
   },
   {
     title: "Investment Queue",

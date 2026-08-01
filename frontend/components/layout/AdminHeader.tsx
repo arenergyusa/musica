@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, Search, Bell, Sparkles, LogOut, LayoutDashboard, Users, ArrowUpRight, Settings } from "lucide-react";
+import { Menu, Search, Bell, Sparkles, LogOut, LayoutDashboard, Users, ArrowUpRight, Settings, UserPlus } from "lucide-react";
 import { APP } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 const navItems = [
   { title: "Overview", href: "/admin/dashboard", icon: LayoutDashboard },
   { title: "User Management", href: "/admin/users", icon: Users },
+  { title: "Manual Investment", href: "/admin/manual-investment", icon: UserPlus },
   { title: "Withdrawal Payouts", href: "/admin/withdrawals", icon: ArrowUpRight },
   { title: "Platform Settings", href: "/admin/settings", icon: Settings },
 ];

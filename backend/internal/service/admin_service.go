@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strings"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/arenergyusa/musica/backend/internal/repository"
@@ -32,6 +33,7 @@ type AdminService interface {
 	UpdateSettings(ctx context.Context, settings *domain.PlatformSettings) error
 	GetUserSummary(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error)
 	GetAnalytics(ctx context.Context) (map[string]interface{}, error)
+	CreateManualInvestment(ctx context.Context, email string, amount float64) (*domain.Sponsorship, error)
 }
 
 type adminService struct {
@@ -486,3 +488,64 @@ func (s *adminService) GetAnalytics(ctx context.Context) (map[string]interface{}
 		"daily_referral_income": dailyReferralIncome,
 	}, nil
 }
+
+// CreateManualInvestment allows admins to directly invest on behalf of a user using their email.
+// It activates the investment immediately and distributes L1, L2, L3 invite rewards to active uplines.
+func (s *adminService) CreateManualInvestment(ctx context.Context, email string, amount float64) (*domain.Sponsorship, error) {
+	trimmedEmail := strings.TrimSpace(email)
+	if trimmedEmail == "" {
+		return nil, errors.New("valid email address is required")
+	}
+	if amount < 100 || math.Mod(amount, 100) != 0 {
+		return nil, errors.New("investment amount must be a multiple of $100 USD (e.g., $100, $200, $300...)")
+	}
+
+	user, err := s.userRepo.GetByEmail(ctx, trimmedEmail)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, fmt.Errorf("user with email '%s' not found", trimmedEmail)
+	}
+	if user.Status == "BLOCKED" {
+		return nil, errors.New("cannot create investment for a blocked user")
+	}
+
+	isWorking, err := s.mlmRepo.HasActiveDirectReferral(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	settings, err := s.settingsRepo.GetSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	capMultiplier := GetIncomeCap(isWorking, settings)
+	capLimit := amount * capMultiplier
+	dailyRate := settings.MonthlyRewardPct / 30.0
+
+	inv := &domain.Sponsorship{
+		UserID:               user.ID,
+		Amount:               amount,
+		DailyRatePct:         dailyRate,
+		Status:               "ACTIVE",
+		CapLimit:             capLimit,
+		WorkingCapAtCreation: isWorking,
+	}
+
+	if err := s.invRepo.CreateInvestment(ctx, inv); err != nil {
+		return nil, err
+	}
+
+	if user.Status != "ACTIVE" {
+		user.Status = "ACTIVE"
+		_ = s.userRepo.Update(ctx, user)
+	}
+
+	// Trigger automatic distribution of invite rewards (L1, L2, L3) to active uplines
+	s.payReferralIncome(ctx, inv)
+
+	return inv, nil
+}
+

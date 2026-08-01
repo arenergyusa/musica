@@ -51,17 +51,17 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
   const form = useForm<InvestInput>({
     resolver: zodResolver(investSchema),
     defaultValues: {
-      amount,
+      amount: amount ?? 0,
       paymentMethod: "USDT_BEP20",
       paymentRef: "",
       confirmedPayment: false,
     },
   });
   const selectedAmount = form.watch("amount");
-  const sliderAmount = selectedAmount ?? MIN_AMOUNT;
+  const currentAmt = selectedAmount ?? 0;
 
   const adjustAmount = (delta: number) => {
-    const nextAmount = Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, (selectedAmount ?? MIN_AMOUNT) + delta));
+    const nextAmount = Math.min(MAX_AMOUNT, Math.max(0, currentAmt + delta));
     form.setValue("amount", nextAmount, { shouldDirty: true, shouldValidate: true });
   };
 
@@ -109,7 +109,7 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 w-full px-0 mx-0">
 
         <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 p-5 space-y-5">
           <div className="flex items-center justify-between gap-3">
@@ -118,31 +118,34 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
               variant="outline"
               size="icon"
               onClick={() => adjustAmount(-STEP_AMOUNT)}
-              disabled={isLoading || selectedAmount === undefined || selectedAmount <= MIN_AMOUNT}
-              className="h-11 w-11 rounded-xl"
+              disabled={isLoading || currentAmt <= 0}
+              className="h-11 w-11 rounded-xl shrink-0"
             >
               <Minus className="h-4 w-4" />
             </Button>
-            <div className="text-center">
+            <div className="text-center flex-1">
               <p className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
-                {selectedAmount === undefined ? "$0.00" : formatCurrency(selectedAmount)}
+                {formatCurrency(currentAmt)}
               </p>
+              {currentAmt > 0 && currentAmt < MIN_AMOUNT && (
+                <p className="text-xs text-amber-500 font-medium mt-1">Minimum investment is ${MIN_AMOUNT}</p>
+              )}
             </div>
             <Button
               type="button"
               variant="outline"
               size="icon"
               onClick={() => adjustAmount(STEP_AMOUNT)}
-              disabled={isLoading || selectedAmount === undefined || selectedAmount >= MAX_AMOUNT}
-              className="h-11 w-11 rounded-xl"
+              disabled={isLoading || currentAmt >= MAX_AMOUNT}
+              className="h-11 w-11 rounded-xl shrink-0"
             >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
 
           <Slider
-            value={[sliderAmount]}
-            min={MIN_AMOUNT}
+            value={[currentAmt]}
+            min={0}
             max={MAX_AMOUNT}
             step={STEP_AMOUNT}
             disabled={isLoading}
@@ -153,35 +156,10 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
             className="w-full"
           />
           <div className="flex justify-between text-[10px] font-bold text-slate-400">
-            <span>$100</span>
+            <span>$0</span>
             <span>$10,000</span>
           </div>
         </div>
-
-        <FormField
-          control={form.control}
-          name="amount"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-xs font-bold text-slate-700 dark:text-slate-300">Investment Amount (USD)</FormLabel>
-              <FormControl>
-                <Input
-                  {...field}
-                  type="number"
-                  min={100}
-                  step={100}
-                  inputMode="decimal"
-                  value={field.value ?? ""}
-                  placeholder="Enter amount"
-                  disabled={isLoading}
-                  className="h-11 rounded-xl text-sm font-bold"
-                  onChange={(event) => field.onChange(event.target.valueAsNumber || undefined)}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         {/* Payment Summary Box */}
         <div className="bg-blue-50/70 dark:bg-blue-950/40 rounded-xl p-4 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between shadow-sm">

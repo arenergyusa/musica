@@ -118,7 +118,7 @@ export function WithdrawForm({ availableBalance, onSuccess }: WithdrawFormProps)
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-        
+
         {/* USDT Address Card / Warning */}
         {hasUsdtAddress ? (
           <div className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-2 shadow-sm border-l-4 border-l-blue-600">
@@ -159,19 +159,19 @@ export function WithdrawForm({ availableBalance, onSuccess }: WithdrawFormProps)
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-slate-400 text-xs font-bold">$</span>
                 <FormControl>
-                  <Input 
+                  <Input
                     type="number"
-                    placeholder="10" 
+                    placeholder="10"
                     className="pl-7 pr-16 text-xs h-10 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-2 focus-visible:ring-blue-600"
                     disabled={isLoading || !hasUsdtAddress}
                     {...field}
                     onChange={(e) => field.onChange(e.target.valueAsNumber || undefined)}
                   />
                 </FormControl>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   className="absolute right-1 h-7 text-xs font-bold text-blue-600 hover:text-blue-700"
                   onClick={handleMaxAmount}
                   disabled={isLoading || availableBalance <= 0 || !hasUsdtAddress}
@@ -210,7 +210,7 @@ export function WithdrawForm({ availableBalance, onSuccess }: WithdrawFormProps)
             </>
           ) : (
             <>
-            Withdraw &amp; Auto-Pay <ArrowRightCircle className="ml-2 h-4 w-4" />
+              Withdraw <ArrowRightCircle className="ml-2 h-4 w-4" />
             </>
           )}
         </Button>

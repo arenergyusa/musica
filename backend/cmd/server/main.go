@@ -348,6 +348,7 @@ func main() {
 			admin.PUT("/users/:id/unblock", adminH.UnblockUser)
 			admin.POST("/investments/:id/activate", adminH.ActivateInvestment)
 			admin.POST("/sponsorships/:id/activate", adminH.ActivateInvestment)
+			admin.POST("/investments/manual", adminH.CreateManualInvestment)
 			admin.GET("/withdrawals", adminH.GetAllWithdrawals)
 			admin.PUT("/withdrawals/:id/approve", adminH.ApproveWithdrawal)
 			admin.PUT("/withdrawals/:id/reject", adminH.RejectWithdrawal)
