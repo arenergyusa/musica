@@ -15,7 +15,6 @@ import {
   UserCircle,
   Briefcase,
   ShieldCheck,
-  PlayCircle,
   Sparkles,
   Zap
 } from "lucide-react";
@@ -29,15 +28,14 @@ const navSections = [
     title: "MAIN MENU",
     links: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/watch", label: "Media Hub", icon: PlayCircle },
-      { href: "/investments", label: "My Investments", icon: Briefcase },
+      { href: "/investments", label: "Investments", icon: Briefcase },
     ]
   },
   {
     title: "FINANCE & TEAM",
     links: [
       { href: "/wallet", label: "Wallet", icon: Wallet },
-      { href: "/team", label: "My Team", icon: Users },
+      { href: "/team", label: "Team", icon: Users },
       { href: "/income", label: "History", icon: History },
     ]
   },

@@ -58,6 +58,7 @@ export const investSchema = z.object({
   amount: z
     .number({ message: "Amount must be a valid number" })
     .min(100, "Minimum investment amount is $100")
+    .max(10000, "Maximum investment amount is $10,000")
     .refine((val) => val % 100 === 0, {
       message: "Investment amount must be a multiple of $100",
     }),

@@ -39,11 +39,11 @@ func (r *investmentRepository) GetPlans(ctx context.Context) ([]*domain.Sponsors
 	// Returning a static dynamic plan since we removed the table
 	plans := []*domain.SponsorshipPlan{
 		{
-			ID:           uuid.New(),
+			ID:           uuid.MustParse("6f9d2a2d-9c4d-5d11-b8a0-40f6a0f8a001"),
 			Name:         "Dynamic Music Sponsorship Pool",
-			MinAmount:    10000,
+			MinAmount:    100,
 			DailyRatePct: 0.3333,
-			Description:  "Sponsor in multiples of 10,000 INR",
+			Description:  "USDT BEP-20 investment in multiples of $100 USD",
 			IsActive:     true,
 		},
 	}

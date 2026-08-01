@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { toast } from "sonner";
-import { Loader2, Copy, Wallet } from "lucide-react";
+import { Loader2, Copy, Wallet, Minus, Plus } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 import { investSchema, type InvestInput } from "@/lib/validators";
@@ -15,9 +15,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+
+const MIN_AMOUNT = 100;
+const MAX_AMOUNT = 10000;
+const STEP_AMOUNT = 100;
 
 interface InvestFormProps {
-  amount: number;
+  amount?: number;
   onSuccess?: () => void;
 }
 
@@ -46,12 +51,19 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
   const form = useForm<InvestInput>({
     resolver: zodResolver(investSchema),
     defaultValues: {
-      amount: amount,
+      amount,
       paymentMethod: "USDT_BEP20",
       paymentRef: "",
       confirmedPayment: false,
     },
   });
+  const selectedAmount = form.watch("amount");
+  const sliderAmount = selectedAmount ?? MIN_AMOUNT;
+
+  const adjustAmount = (delta: number) => {
+    const nextAmount = Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, (selectedAmount ?? MIN_AMOUNT) + delta));
+    form.setValue("amount", nextAmount, { shouldDirty: true, shouldValidate: true });
+  };
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -98,12 +110,84 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-        
+
+        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 p-5 space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => adjustAmount(-STEP_AMOUNT)}
+              disabled={isLoading || selectedAmount === undefined || selectedAmount <= MIN_AMOUNT}
+              className="h-11 w-11 rounded-xl"
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <div className="text-center">
+              <p className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
+                {selectedAmount === undefined ? "$0.00" : formatCurrency(selectedAmount)}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => adjustAmount(STEP_AMOUNT)}
+              disabled={isLoading || selectedAmount === undefined || selectedAmount >= MAX_AMOUNT}
+              className="h-11 w-11 rounded-xl"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <Slider
+            value={[sliderAmount]}
+            min={MIN_AMOUNT}
+            max={MAX_AMOUNT}
+            step={STEP_AMOUNT}
+            disabled={isLoading}
+            onValueChange={(values) => {
+              const nextAmount = Array.isArray(values) ? values[0] : values;
+              form.setValue("amount", nextAmount, { shouldDirty: true, shouldValidate: true });
+            }}
+            className="w-full"
+          />
+          <div className="flex justify-between text-[10px] font-bold text-slate-400">
+            <span>$100</span>
+            <span>$10,000</span>
+          </div>
+        </div>
+
+        <FormField
+          control={form.control}
+          name="amount"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs font-bold text-slate-700 dark:text-slate-300">Investment Amount (USD)</FormLabel>
+              <FormControl>
+                <Input
+                  {...field}
+                  type="number"
+                  min={100}
+                  step={100}
+                  inputMode="decimal"
+                  value={field.value ?? ""}
+                  placeholder="Enter amount"
+                  disabled={isLoading}
+                  className="h-11 rounded-xl text-sm font-bold"
+                  onChange={(event) => field.onChange(event.target.valueAsNumber || undefined)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         {/* Payment Summary Box */}
         <div className="bg-blue-50/70 dark:bg-blue-950/40 rounded-xl p-4 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between shadow-sm">
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Total Investment</p>
-            <p className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{formatCurrency(amount)}</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{selectedAmount === undefined ? "$0.00" : formatCurrency(selectedAmount)}</p>
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">
             <Wallet className="h-3.5 w-3.5" />
@@ -173,7 +257,7 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
               </FormControl>
               <div className="space-y-1 leading-none">
                 <FormLabel className="text-xs font-bold text-slate-900 dark:text-white">
-                  I have sent exactly {formatCurrency(amount)} USDT to the address above.
+                  I have sent exactly {selectedAmount === undefined ? "$0.00" : formatCurrency(selectedAmount)} USDT to the address above.
                 </FormLabel>
                 <FormMessage />
               </div>
@@ -192,7 +276,7 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
               Verifying Deposit...
             </>
           ) : (
-            `Submit ${formatCurrency(amount)} Investment`
+            `Submit ${selectedAmount === undefined ? "$0.00" : formatCurrency(selectedAmount)} Investment`
           )}
         </Button>
 

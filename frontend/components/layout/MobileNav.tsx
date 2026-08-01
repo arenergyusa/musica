@@ -3,18 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { 
-  LayoutDashboard, 
-  PlayCircle,
-  Briefcase, 
-  Wallet, 
-  Users 
+import {
+  LayoutDashboard,
+  Briefcase,
+  Wallet,
+  Users
 } from "lucide-react";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Media Hub", href: "/watch", icon: PlayCircle },
-  { label: "Sponsor", href: "/investments", icon: Briefcase },
+  { label: "Invest", href: "/invest", icon: Briefcase },
+  { label: "Investments", href: "/investments", icon: Briefcase },
   { label: "Wallet", href: "/wallet", icon: Wallet },
   { label: "Team", href: "/team", icon: Users },
 ];
@@ -35,8 +34,8 @@ export function MobileNav() {
               href={item.href}
               className={cn(
                 "flex flex-col items-center justify-center flex-1 h-full py-1 text-[11px] font-extrabold transition-colors relative",
-                isActive 
-                  ? "text-blue-600 dark:text-blue-400" 
+                isActive
+                  ? "text-blue-600 dark:text-blue-400"
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               )}
             >

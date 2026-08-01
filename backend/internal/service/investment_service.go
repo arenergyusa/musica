@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"math"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/arenergyusa/musica/backend/internal/repository"
@@ -45,6 +46,8 @@ func (s *investmentService) GetPlans(ctx context.Context) ([]*domain.Sponsorship
 	dailyRate := settings.MonthlyRewardPct / 30.0
 
 	for _, p := range plans {
+		p.MinAmount = 100
+		p.Description = "USDT BEP-20 investment in multiples of $100 USD"
 		p.DailyRatePct = dailyRate
 		p.NonWorkingCapMultiplier = settings.NonWorkingCapMultiplier
 		p.WorkingCapMultiplier = settings.WorkingCapMultiplier
@@ -62,8 +65,8 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 		return nil, errors.New("user not found")
 	}
 
-	// Validate amount is a multiple of $100 USD
-	if req.Amount <= 0 || req.Amount != float64(int64(req.Amount)) || int64(req.Amount)%100 != 0 {
+	// Validate amount at the API boundary as well as in the client.
+	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount < 100 || req.Amount > 10000 || math.Mod(req.Amount, 100) != 0 {
 		return nil, errors.New("investment amount must be a multiple of $100 USD")
 	}
 

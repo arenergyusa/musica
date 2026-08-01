@@ -180,10 +180,8 @@ func (s *usdtService) GetOrCreateDepositAddress(ctx context.Context, userID uuid
 	}
 
 	if derivedAddress == "" {
-		// Fallback deterministic address generator
-		hashBytes := keccak256([]byte(fmt.Sprintf("%s_%d", userID.String(), nextIndex)))
-		derivedAddress = "0x" + hex.EncodeToString(hashBytes[12:])
-	}
+    return nil, fmt.Errorf("CRITICAL ERROR: KEY is not loaded in server environment")
+    }
 
 	// Save to DB
 	insertQuery := `

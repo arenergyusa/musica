@@ -16,8 +16,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/withdraw') || 
     pathname.startsWith('/kyc') || 
     pathname.startsWith('/team') || 
-    pathname.startsWith('/income') || 
-    pathname.startsWith('/watch');
+    pathname.startsWith('/income');
 
   const isAdminRoute = pathname.startsWith('/admin');
   const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register');
