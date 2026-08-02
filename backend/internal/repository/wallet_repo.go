@@ -111,8 +111,6 @@ func (r *walletRepository) GetTransactions(ctx context.Context, userID uuid.UUID
 		SELECT id, user_id, type, amount, source, reference_id, description, created_at
 		FROM transactions
 		WHERE user_id = $1
-			AND type = 'DEBIT'
-			AND source = 'WITHDRAWAL'
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 		`

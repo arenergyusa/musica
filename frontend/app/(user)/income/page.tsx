@@ -43,7 +43,11 @@ export default function IncomeHistoryPage() {
   }, []);
 
   const filteredHistory = useMemo(() => transactions.filter(tx => {
-    const matchesType = typeFilter === "ALL" || tx.source === typeFilter;
+    const matchesType = typeFilter === "ALL" || 
+      tx.source === typeFilter || 
+      (typeFilter === "DAILY_ROI" && (tx.source === "DAILY_REWARD" || tx.source === "DAILY_ROI")) ||
+      (typeFilter === "REFERRAL" && (tx.source === "INVITE" || tx.source === "REFERRAL")) ||
+      (typeFilter === "SALARY_INCOME" && (tx.source === "SALARY" || tx.source === "SALARY_INCOME"));
     const matchesSearch = (tx.description || tx.source).toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
   }), [transactions, typeFilter, searchQuery]);
@@ -51,8 +55,10 @@ export default function IncomeHistoryPage() {
   const getTypeBadge = (type: string) => {
     switch (type) {
       case "DAILY_ROI":
+      case "DAILY_REWARD":
         return <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 text-xs font-semibold">📈 Daily Income</Badge>;
       case "REFERRAL":
+      case "INVITE":
         return <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border-blue-200 text-xs font-semibold">👥 Invite Income</Badge>;
       case "LEVEL_INCOME":
         return <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/50 text-amber-600 border-amber-200 text-xs font-semibold">🌐 Level Income</Badge>;
