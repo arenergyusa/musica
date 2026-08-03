@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Musica — Official Haryanvi Music Videos & Audio Hub",
     description: "Watch latest Haryanvi music videos & official song releases on Musica by Pure Desi Music (OPC) Private Limited.",
-    url: "https://themusica.in",
+    url: "https://the-musica.com",
     siteName: "Musica",
     locale: "en_IN",
     type: "website",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     description: "Stream trending Haryanvi music videos & official song releases on Musica.",
   },
   alternates: {
-    canonical: "https://themusica.in",
+    canonical: "https://the-musica.com",
   },
 };
 
@@ -46,13 +46,13 @@ const jsonLd = [
     "@type": "WebSite",
     "name": "Musica",
     "alternateName": ["Musica Streaming", "Musica Haryanvi", "The Musica", "Musica Music"],
-    "url": "https://themusica.in",
+    "url": "https://the-musica.com",
     "description": "Official Haryanvi Music Video Streaming Platform by Pure Desi Music (OPC) Private Limited.",
     "publisher": {
       "@type": "Organization",
       "name": "Pure Desi Music (OPC) Private Limited",
-      "url": "https://themusica.in",
-      "logo": "https://themusica.in/icon.png"
+      "url": "https://the-musica.com",
+      "logo": "https://the-musica.com/icon.png"
     }
   },
   {
@@ -60,7 +60,7 @@ const jsonLd = [
     "@type": "Organization",
     "name": "Pure Desi Music (OPC) Private Limited",
     "alternateName": "Musica",
-    "url": "https://themusica.in",
+    "url": "https://the-musica.com",
     "identifier": {
       "@type": "PropertyValue",
       "name": "CIN",

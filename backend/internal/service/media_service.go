@@ -24,7 +24,7 @@ func (s *mediaService) GetProtectedPlaybackURL(rawURL, token string) string {
 	q := parsed.Query()
 	q.Set("token", token)
 	q.Set("enablejsapi", "1")
-	q.Set("origin", "https://themusica.in")
+	q.Set("origin", "https://the-musica.com")
 	parsed.RawQuery = q.Encode()
 	return parsed.String()
 }

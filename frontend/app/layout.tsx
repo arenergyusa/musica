@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     siteName: "Musica",
     title: "Musica — Official Haryanvi Music Videos & Tracks",
     description: "Stream official Haryanvi music videos & studio song releases on Musica by Pure Desi Music (OPC) Private Limited.",
-    url: "https://themusica.in",
+    url: "https://the-musica.com",
     images: [
       {
         url: "/og-image.png",

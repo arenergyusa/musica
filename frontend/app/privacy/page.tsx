@@ -46,7 +46,7 @@ export default function PrivacyPage() {
                 1. Introduction
               </h2>
               <p>
-                <strong>Pure Desi Music</strong> (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) respects your privacy and is committed to protecting your personal data. This privacy policy explains how we collect, process, and safeguard your personal information when you use our Haryanvi music streaming platform, <strong>Musica</strong> (https://themusica.in).
+                <strong>Pure Desi Music</strong> (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) respects your privacy and is committed to protecting your personal data. This privacy policy explains how we collect, process, and safeguard your personal information when you use our Haryanvi music streaming platform, <strong>Musica</strong> (https://the-musica.com).
               </p>
             </section>
 

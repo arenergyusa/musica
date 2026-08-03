@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: ["/", "/privacy", "/terms"],
       disallow: ["/admin/", "/dashboard/", "/income/", "/invest/", "/investments/", "/login/", "/profile/", "/register/", "/team/", "/wallet/", "/withdraw/", "/forgot-password/"],
     },
-    sitemap: "https://themusica.in/sitemap.xml",
+    sitemap: "https://the-musica.com/sitemap.xml",
   };
 }

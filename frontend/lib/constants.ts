@@ -111,7 +111,7 @@ export const APP = {
   NAME: "Musica",
   TAGLINE: "Pure Desi Haryanvi Music Videos.",
   DESCRIPTION: "Official Haryanvi Music Video Streaming Platform by Pure Desi Music (OPC) Private Limited.",
-  URL: "https://themusica.in",
+  URL: "https://the-musica.com",
   CURRENCY: "INR",
   LOCALE: "en-IN",
 } as const;
