@@ -34,18 +34,18 @@ func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, a
 	}
 	defer tx.Rollback(ctx)
 
-	// Update wallet atomically
+	// Ensure wallet exists or update atomically
 	walletQuery := `
-		UPDATE reward_wallet 
-		SET balance = balance + $1, total_credited = total_credited + $1, updated_at = CURRENT_TIMESTAMP
-		WHERE user_id = $2
+		INSERT INTO reward_wallet (id, user_id, balance, total_credited, total_withdrawn)
+		VALUES (uuid_generate_v4(), $2, $1, $1, 0)
+		ON CONFLICT (user_id) DO UPDATE
+		SET balance = reward_wallet.balance + EXCLUDED.balance,
+		    total_credited = reward_wallet.total_credited + EXCLUDED.total_credited,
+		    updated_at = CURRENT_TIMESTAMP
 	`
-	res, err := tx.Exec(ctx, walletQuery, amount, userID)
+	_, err = tx.Exec(ctx, walletQuery, amount, userID)
 	if err != nil {
 		return err
-	}
-	if res.RowsAffected() == 0 {
-		return errors.New("wallet not found")
 	}
 
 	// Insert transaction log
