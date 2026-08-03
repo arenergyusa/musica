@@ -64,6 +64,16 @@ func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, a
 		return err
 	}
 
+	// Insert daily_reward_log entry for idempotency and tracking if source is DAILY_REWARD
+	if source == "DAILY_REWARD" && ref != nil {
+		logQuery := `
+			INSERT INTO daily_reward_log (investment_id, user_id, amount, date, processed_at)
+			VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIMESTAMP)
+			ON CONFLICT DO NOTHING
+		`
+		_, _ = tx.Exec(ctx, logQuery, ref, userID, amount)
+	}
+
 	return tx.Commit(ctx)
 }
 
@@ -238,4 +248,11 @@ func (r *walletRepository) GetLifetimeIncomeBySource(ctx context.Context, userID
 	}
 	err := r.db.QueryRow(ctx, query, userID, source).Scan(&total)
 	return total, err
+}
+
+func (r *walletRepository) HasDailyRewardBeenProcessed(ctx context.Context, investmentID uuid.UUID, dateStr string) (bool, error) {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM daily_reward_log WHERE investment_id = $1 AND date = $2)`
+	err := r.db.QueryRow(ctx, query, investmentID, dateStr).Scan(&exists)
+	return exists, err
 }

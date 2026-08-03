@@ -62,7 +62,13 @@ func NewJobRunner(
 }
 
 func (j *JobRunner) Start() {
-	// Daily Reward + Level Income at 00:00:00 IST (18:30:00 UTC)
+	// 1. Run catchup check asynchronously on startup so container restarts/rebuilds never miss any past or current day's ROI
+	go func() {
+		log.Println("Running startup catch-up check for daily rewards...")
+		j.distributeDailyRewardAndLevelIncome()
+	}()
+
+	// 2. Scheduled Daily Reward + Level Income at 00:00:00 IST (18:30:00 UTC)
 	_, err := j.cron.AddFunc("0 30 18 * * *", func() {
 		j.distributeDailyRewardAndLevelIncome()
 	})
@@ -135,6 +141,12 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 		}
 		if roiAmount > remaining {
 			roiAmount = remaining
+		}
+
+		// Idempotency check: Skip if daily reward for today was already processed for this investment
+		processed, err := j.walletRepo.HasDailyRewardBeenProcessed(ctx, freshInv.ID, today)
+		if err == nil && processed {
+			continue
 		}
 
 		roiDesc := fmt.Sprintf("Daily promotional reward for %s", today)

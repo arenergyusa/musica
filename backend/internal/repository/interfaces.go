@@ -54,6 +54,7 @@ type WalletRepository interface {
 	// GetDailyIncomeBySource returns daily total income grouped by date for a given source (admin analytics)
 	GetDailyIncomeBySource(ctx context.Context, source string, days int) ([]map[string]interface{}, error)
 	GetLifetimeIncomeBySource(ctx context.Context, userID uuid.UUID, source string) (float64, error)
+	HasDailyRewardBeenProcessed(ctx context.Context, investmentID uuid.UUID, dateStr string) (bool, error)
 }
 
 // MLMRepository handles invite tree and volume logic
