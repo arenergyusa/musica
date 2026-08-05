@@ -221,16 +221,25 @@ func (r *mlmRepository) GetTeamBreakdown(ctx context.Context, userID uuid.UUID, 
 				(SELECT COUNT(DISTINCT direct.id)
 				 FROM users direct
 				 WHERE direct.invited_by = u.id
-				   AND EXISTS (SELECT 1 FROM sponsorships ds WHERE ds.user_id = direct.id AND ds.status = 'ACTIVE')) AS direct_active_count
+				   AND EXISTS (SELECT 1 FROM sponsorships ds WHERE ds.user_id = direct.id AND ds.status = 'ACTIVE')) AS direct_active_count,
+				COALESCE((SELECT SUM(ds.amount)
+				 FROM users direct
+				 JOIN sponsorships ds ON ds.user_id = direct.id AND ds.status = 'ACTIVE'
+				 WHERE direct.invited_by = u.id), 0) AS direct_business
 			FROM team
 			JOIN users u ON u.id = team.id
+		), settings AS (
+			SELECT level1_to_15_directs, level1_to_15_business FROM platform_settings WHERE id = 1
 		)
 		SELECT id, name, email, phone, invite_code, leg, created_at, team_level,
 		       total_investment, lifetime_income, direct_active_count,
-		       CASE WHEN total_investment <= 0 THEN 'INACTIVE'
-		            WHEN direct_active_count > 0 THEN 'WORKING'
-		            ELSE 'NON_WORKING' END AS member_status
-		FROM classified
+		       CASE
+		            WHEN total_investment <= 0 THEN 'INACTIVE'
+		            WHEN direct_active_count >= s.level1_to_15_directs
+		             AND direct_business >= s.level1_to_15_business THEN 'WORKING'
+		            ELSE 'ACTIVE'
+		       END AS member_status
+		FROM classified, settings s
 		ORDER BY team_level ASC, created_at DESC`
 	rows, err := r.db.Query(ctx, query, userID, maxLevel)
 	if err != nil { return nil, err }
@@ -248,7 +257,7 @@ func (r *mlmRepository) GetTeamBreakdown(ctx context.Context, userID uuid.UUID, 
 		summary.LifetimeIncome += member.LifetimeIncome
 		switch member.Status {
 		case "INACTIVE": summary.InactiveCount++
-		case "NON_WORKING": summary.NonWorkingCount++
+		case "ACTIVE": summary.NonWorkingCount++
 		case "WORKING": summary.WorkingCount++
 		}
 	}

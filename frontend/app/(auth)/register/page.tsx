@@ -63,7 +63,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="text-[11px] text-slate-400 relative z-10 pt-8 border-t border-slate-800/80 font-mono">
-            Pure Desi Music
+            Musica
           </div>
         </div>
 

@@ -20,7 +20,7 @@ func (s *teamService) GetTeamBreakdown(ctx context.Context, userID uuid.UUID, le
 	if level < 0 || level > 15 {
 		return nil, fmt.Errorf("level must be between 1 and 15")
 	}
-	if status != "" && status != "ALL" && status != "INACTIVE" && status != "NON_WORKING" && status != "WORKING" {
+	if status != "" && status != "ALL" && status != "INACTIVE" && status != "ACTIVE" && status != "WORKING" {
 		return nil, fmt.Errorf("invalid team status")
 	}
 	breakdown, err := s.mlmRepo.GetTeamBreakdown(ctx, userID, 15)
@@ -38,13 +38,15 @@ func (s *teamService) GetTeamBreakdown(ctx context.Context, userID uuid.UUID, le
 
 type teamService struct {
 	mlmRepo      repository.MLMRepository
+	invRepo      repository.InvestmentRepository
 	settingsRepo repository.SettingsRepository
 	walletRepo   repository.WalletRepository
 }
 
-func NewTeamService(mlmRepo repository.MLMRepository, settingsRepo repository.SettingsRepository, walletRepo repository.WalletRepository) TeamService {
+func NewTeamService(invRepo repository.InvestmentRepository, mlmRepo repository.MLMRepository, settingsRepo repository.SettingsRepository, walletRepo repository.WalletRepository) TeamService {
 	return &teamService{
 		mlmRepo:      mlmRepo,
+		invRepo:      invRepo,
 		settingsRepo: settingsRepo,
 		walletRepo:   walletRepo,
 	}
@@ -72,6 +74,11 @@ func (s *teamService) GetTeamStats(ctx context.Context, userID uuid.UUID) (map[s
 
 	levels := GetUnlockedLevels(directCount, directVolume, settings)
 
+	status := UserStatusInactive
+	if settings != nil {
+		status, _ = GetUserStatus(ctx, s.invRepo, s.mlmRepo, userID, settings)
+	}
+
 	hasActiveDirect, err := s.mlmRepo.HasActiveDirectReferral(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -89,6 +96,7 @@ func (s *teamService) GetTeamStats(ctx context.Context, userID uuid.UUID) (map[s
 		"level_income": levelIncome,
 		"levels_unlocked": levels,
 		"is_working": hasActiveDirect,
+		"status": status,
 	}, nil
 }
 

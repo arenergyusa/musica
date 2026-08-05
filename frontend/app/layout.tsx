@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     default: "Musica — Official Haryanvi Music Videos & Song Streaming",
     template: "%s | Musica",
   },
-  description: "Official Musica streaming platform operated by Pure Desi Music (OPC) Private Limited. Watch trending Haryanvi music videos, audio releases, and studio tracks in high definition.",
+  description: "Official Musica streaming platform. Watch trending Haryanvi music videos, audio releases, and studio tracks in high definition.",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -28,8 +28,6 @@ export const metadata: Metadata = {
     "Musica Streaming",
     "Musica Haryanvi",
     "Musica Music Videos",
-    "The Musica",
-    "Pure Desi Music",
     "Haryanvi Music Videos",
     "Haryanvi Songs",
   ],
@@ -38,7 +36,7 @@ export const metadata: Metadata = {
     locale: "en_IN",
     siteName: "Musica",
     title: "Musica — Official Haryanvi Music Videos & Tracks",
-    description: "Stream official Haryanvi music videos & studio song releases on Musica by Pure Desi Music (OPC) Private Limited.",
+    description: "Stream official Haryanvi music videos & studio song releases on Musica.",
     url: "https://the-musica.com",
     images: [
       {
@@ -52,7 +50,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Musica — Haryanvi Music Streaming",
-    description: "Official Haryanvi music video releases on Musica by Pure Desi Music (OPC) Private Limited.",
+    description: "Official Haryanvi music video releases on Musica.",
   },
   robots: {
     index: true,

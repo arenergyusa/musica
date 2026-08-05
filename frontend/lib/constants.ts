@@ -51,7 +51,7 @@ export const LEVEL_THRESHOLDS = [
 // Income Cap Multipliers
 // ============================================================
 export const CAP_MULTIPLIER = {
-  NON_WORKING: 2,   // 2x of invested amount
+  ACTIVE: 2,        // 2x of invested amount (INACTIVE & ACTIVE accounts)
   WORKING: 3,       // 3x of invested amount
 } as const;
 
@@ -109,8 +109,8 @@ export const INCOME_TYPE = {
 // ============================================================
 export const APP = {
   NAME: "Musica",
-  TAGLINE: "Pure Desi Haryanvi Music Videos.",
-  DESCRIPTION: "Official Haryanvi Music Video Streaming Platform by Pure Desi Music (OPC) Private Limited.",
+  TAGLINE: "Official Haryanvi Music Videos.",
+  DESCRIPTION: "Official Haryanvi Music Video Streaming Platform.",
   URL: "https://the-musica.com",
   CURRENCY: "INR",
   LOCALE: "en-IN",

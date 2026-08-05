@@ -36,6 +36,7 @@ export default function TeamPage() {
     direct_count: 0,
     direct_volume: 0,
     invite_income: 0,
+    status: "INACTIVE",
   });
   const [levelIncomeStats, setLevelIncomeStats] = useState<Record<number, number>>({});
   const [breakdown, setBreakdown] = useState<TeamBreakdown>({ levels: [], members: [] });
@@ -160,7 +161,6 @@ export default function TeamPage() {
     window.open(`https://wa.me/?text=${msg}`, "_blank");
   };
 
-  const isWorking = stats.is_working;
   const levelsUnlocked = Math.max(1, stats.levels_unlocked || 0);
 
   const nextThreshold = LEVEL_THRESHOLDS.find(t => t.levels > levelsUnlocked);
@@ -265,17 +265,17 @@ export default function TeamPage() {
 
       {/* Working Status + Level Unlock Progress */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Working Status */}
-        <Card className={`rounded-2xl shadow-sm ${isWorking ? "bg-gradient-to-br from-emerald-500/10 to-white dark:to-slate-900 border-emerald-500/20" : "bg-gradient-to-br from-slate-100/70 to-white dark:from-slate-900 dark:to-slate-950 border-slate-200/80 dark:border-slate-800"}`}>
+        {/* Account Status */}
+        <Card className={`rounded-2xl shadow-sm ${stats.status === "WORKING" ? "bg-gradient-to-br from-emerald-500/10 to-white dark:to-slate-900 border-emerald-500/20" : stats.status === "ACTIVE" ? "bg-gradient-to-br from-blue-500/10 to-white dark:to-slate-900 border-blue-200/70 dark:border-slate-800" : "bg-gradient-to-br from-amber-500/10 to-white dark:to-slate-900 border-amber-200/70 dark:border-slate-800"}`}>
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-full ${isWorking ? "bg-emerald-500/15" : "bg-slate-100 dark:bg-slate-800"}`}>
-                <Zap className={`h-5 w-5 ${isWorking ? "text-emerald-500" : "text-slate-400"}`} />
+              <div className={`p-2.5 rounded-full ${stats.status === "WORKING" ? "bg-emerald-500/15" : stats.status === "ACTIVE" ? "bg-blue-500/15" : "bg-amber-500/15"}`}>
+                <Zap className={`h-5 w-5 ${stats.status === "WORKING" ? "text-emerald-500" : stats.status === "ACTIVE" ? "text-blue-500" : "text-amber-500"}`} />
               </div>
               <div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Working Status</p>
-                <p className={`font-bold text-base ${isWorking ? "text-emerald-600 dark:text-emerald-400" : "text-slate-900 dark:text-white"}`}>
-                  {isWorking ? "⚡ Working" : "Non-Working"}
+                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Account Status</p>
+                <p className={`font-bold text-base ${stats.status === "WORKING" ? "text-emerald-600 dark:text-emerald-400" : stats.status === "ACTIVE" ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"}`}>
+                  {stats.status === "WORKING" ? "⚡ Working" : stats.status === "ACTIVE" ? "Active" : "Inactive"}
                 </p>
               </div>
             </div>
@@ -367,21 +367,21 @@ export default function TeamPage() {
               <span className="text-xs text-slate-600 dark:text-slate-300">{Math.max(level.total_members, breakdown.members.filter((member) => member.level === level.level).length)} members</span>
               <span className="hidden sm:block text-xs text-slate-500">Invested {formatCurrency(level.total_investment)}</span>
               <span className="hidden sm:block text-xs text-slate-500">Income {formatCurrency(level.lifetime_income)}</span>
-              <span className="text-[11px] text-slate-500 whitespace-nowrap">I {level.inactive_count} · N {level.non_working_count} · W {level.working_count}</span>
+              <span className="text-[11px] text-slate-500 whitespace-nowrap">I {level.inactive_count} · A {level.non_working_count} · W {level.working_count}</span>
             </button>
 
             {selectedLevel === level.level && (
               <div className="pb-4 pl-1 pr-1 sm:pl-[70px]">
                 <div className="flex flex-wrap gap-1 border-b border-slate-100 dark:border-slate-800 pb-2">
-                  {["ALL", "INACTIVE", "NON_WORKING", "WORKING"].map((status) => (
+                  {["ALL", "INACTIVE", "ACTIVE", "WORKING"].map((status) => (
                     <button
                       key={status}
                       type="button"
                       onClick={() => { setMemberStatus(status); setExpandedMemberId(null); }}
                       className={`px-3 py-1.5 rounded-md text-[11px] font-bold ${memberStatus === status ? "bg-blue-600 text-white" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
                     >
-                      {status === "ALL" ? "All" : status === "NON_WORKING" ? "Non-Working" : status.charAt(0) + status.slice(1).toLowerCase()}
-                      <span className="ml-1 opacity-70">{status === "ALL" ? Math.max(level.total_members, breakdown.members.filter((member) => member.level === level.level).length) : status === "INACTIVE" ? level.inactive_count : status === "NON_WORKING" ? level.non_working_count : level.working_count}</span>
+                      {status === "ALL" ? "All" : status.charAt(0) + status.slice(1).toLowerCase()}
+                      <span className="ml-1 opacity-70">{status === "ALL" ? Math.max(level.total_members, breakdown.members.filter((member) => member.level === level.level).length) : status === "INACTIVE" ? level.inactive_count : status === "ACTIVE" ? level.non_working_count : level.working_count}</span>
                     </button>
                   ))}
                 </div>
@@ -396,7 +396,7 @@ export default function TeamPage() {
                         </span>
                         <span className="hidden sm:block text-xs text-slate-500">{formatCurrency(member.total_investment)}</span>
                         <span className="hidden sm:block text-xs text-emerald-600">{formatCurrency(member.lifetime_income)}</span>
-                        <Badge variant="outline" className={`text-[10px] ${member.status === "WORKING" ? "text-emerald-600 border-emerald-200" : member.status === "NON_WORKING" ? "text-blue-600 border-blue-200" : "text-slate-500"}`}>{member.status === "NON_WORKING" ? "Non-Working" : member.status}</Badge>
+                        <Badge variant="outline" className={`text-[10px] ${member.status === "WORKING" ? "text-emerald-600 border-emerald-200" : member.status === "ACTIVE" ? "text-blue-600 border-blue-200" : "text-amber-600 border-amber-200"}`}>{member.status}</Badge>
                       </button>
                       {expandedMemberId === member.id && (
                         <div className="mb-3 grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-md bg-slate-50 dark:bg-slate-900/70 px-3 py-3 text-xs">

@@ -6,8 +6,10 @@ import { toast } from 'sonner';
 // we default to /api/v1 which will be proxied or directly accessed.
 let baseURL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 if (typeof window === 'undefined' && baseURL.startsWith('/')) {
-  // On the server (SSR), we need an absolute URL. Route to backend container internally.
-  baseURL = 'http://backend:8080/api/v1';
+  // On the server (SSR), we need an absolute URL. Route to backend container
+  // internally. API_URL_INTERNAL is set in docker-compose; fall back to the
+  // compose-internal backend hostname for local dev.
+  baseURL = `${process.env.API_URL_INTERNAL || 'http://backend:8080'}/api/v1`;
 }
 
 export const api = axios.create({

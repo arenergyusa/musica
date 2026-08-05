@@ -218,6 +218,12 @@ func (r *investmentRepository) GetPendingCount(ctx context.Context) (int, error)
 	return count, err
 }
 
+func (r *investmentRepository) HasActiveInvestment(ctx context.Context, userID uuid.UUID) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM sponsorships WHERE user_id = $1 AND status = 'ACTIVE')`, userID).Scan(&exists)
+	return exists, err
+}
+
 func (r *investmentRepository) GetTotalActiveInvested(ctx context.Context) (float64, error) {
 	var total float64
 	err := r.db.QueryRow(ctx, "SELECT COALESCE(SUM(amount), 0) FROM sponsorships WHERE status = 'ACTIVE'").Scan(&total)

@@ -14,12 +14,36 @@ import { Badge } from "@/components/ui/badge";
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
+  const [salaryTiers, setSalaryTiers] = useState<Record<number, { min_volume_usd: number; monthly_salary_usd: number; max_strong_leg_pct: number; min_weaker_leg_pct: number; monthly_increment_pct: number }>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchSettings();
+    fetchSalaryTiers();
   }, []);
+
+  const fetchSalaryTiers = async () => {
+    try {
+      const res = await api.get("/admin/salary/tiers");
+      if (Array.isArray(res.data.data)) {
+        const byTier: Record<number, any> = {};
+        for (const t of res.data.data) {
+          byTier[t.tier] = {
+            min_volume_usd: Number(t.min_volume_usd) || 0,
+            monthly_salary_usd: Number(t.monthly_salary_usd) || 0,
+            max_strong_leg_pct: Number(t.max_strong_leg_pct) || 60,
+            min_weaker_leg_pct: Number(t.min_weaker_leg_pct) || 40,
+            monthly_increment_pct: Number(t.monthly_increment_pct) || 25,
+          };
+        }
+        setSalaryTiers(byTier);
+      }
+    } catch (error) {
+      console.error("Failed to load salary tiers:", error);
+      toast.error("Failed to load salary tiers");
+    }
+  };
 
   const fetchSettings = async () => {
     setIsLoading(true);
@@ -178,7 +202,7 @@ export default function AdminSettingsPage() {
             {/* Cap Multipliers */}
             <div className="grid grid-cols-2 gap-3 pt-2">
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Non-Working Cap (Multiplier)</Label>
+                <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">INACTIVE/ACTIVE Cap (Multiplier)</Label>
                 <Input 
                   type="number" 
                   step="0.1" 
@@ -387,80 +411,74 @@ export default function AdminSettingsPage() {
 
           <CardContent className="pt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { tier: 1, volume: 50000, salary: 100 },
-                { tier: 2, volume: 150000, salary: 250 },
-                { tier: 3, volume: 350000, salary: 500 },
-                { tier: 4, volume: 750000, salary: 700 },
-                { tier: 5, volume: 1000000, salary: 1000 },
-                { tier: 6, volume: 2500000, salary: 2500 },
-                { tier: 7, volume: 5000000, salary: 5000 },
-                { tier: 8, volume: 10000000, salary: 11000 },
-              ].map((t) => (
-                <div key={t.tier} className="bg-slate-50/70 dark:bg-slate-800/40 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-extrabold">
-                    <span className="text-purple-600 dark:text-purple-400">Tier {t.tier}</span>
-                    <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
-                      ${t.salary}/mo
-                    </Badge>
-                  </div>
+              {Array.from({ length: 8 }, (_, i) => i + 1).map((tierNo) => {
+                const tier = salaryTiers[tierNo] || {
+                  min_volume_usd: 0,
+                  monthly_salary_usd: 0,
+                  max_strong_leg_pct: 60,
+                  min_weaker_leg_pct: 40,
+                  monthly_increment_pct: 25,
+                };
+                const updateTier = async (patch: Partial<typeof tier>) => {
+                  try {
+                    await api.put("/admin/salary/tiers", {
+                      tier: tierNo,
+                      min_volume_usd: patch.min_volume_usd ?? tier.min_volume_usd,
+                      monthly_salary_usd: patch.monthly_salary_usd ?? tier.monthly_salary_usd,
+                      max_strong_leg_pct: tier.max_strong_leg_pct,
+                      min_weaker_leg_pct: tier.min_weaker_leg_pct,
+                      monthly_increment_pct: tier.monthly_increment_pct,
+                    });
+                    setSalaryTiers((prev) => ({ ...prev, [tierNo]: { ...tier, ...patch } }));
+                    toast.success(`Tier ${tierNo} updated successfully!`);
+                  } catch (err: any) {
+                    toast.error("Failed to update salary tier");
+                  }
+                };
+                return (
+                  <div key={tierNo} className="bg-slate-50/70 dark:bg-slate-800/40 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-extrabold">
+                      <span className="text-purple-600 dark:text-purple-400">Tier {tierNo}</span>
+                      <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
+                        ${tier.monthly_salary_usd}/mo
+                      </Badge>
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-slate-500 font-bold">Min Volume ($ USD)</Label>
-                    <Input
-                      type="number"
-                      defaultValue={t.volume}
-                      className="h-8 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-                      onBlur={async (e) => {
-                        const newVol = parseFloat(e.target.value) || t.volume;
-                        try {
-                          await api.put("/admin/salary/tiers", {
-                            tier: t.tier,
-                            min_volume_usd: newVol,
-                            monthly_salary_usd: t.salary,
-                            max_strong_leg_pct: 60,
-                            min_weaker_leg_pct: 40,
-                            monthly_increment_pct: 25
-                          });
-                          toast.success(`Tier ${t.tier} updated successfully!`);
-                        } catch (err: any) {
-                          toast.error("Failed to update salary tier");
-                        }
-                      }}
-                    />
-                  </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-slate-500 font-bold">Min Volume ($ USD)</Label>
+                      <Input
+                        type="number"
+                        defaultValue={tier.min_volume_usd}
+                        key={`vol-${tierNo}-${tier.min_volume_usd}`}
+                        className="h-8 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        onBlur={(e) => {
+                          const newVol = parseFloat(e.target.value) || tier.min_volume_usd;
+                          if (newVol !== tier.min_volume_usd) updateTier({ min_volume_usd: newVol });
+                        }}
+                      />
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-slate-500 font-bold">Monthly Salary ($ USD)</Label>
-                    <Input
-                      type="number"
-                      defaultValue={t.salary}
-                      className="h-8 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-                      onBlur={async (e) => {
-                        const newSal = parseFloat(e.target.value) || t.salary;
-                        try {
-                          await api.put("/admin/salary/tiers", {
-                            tier: t.tier,
-                            min_volume_usd: t.volume,
-                            monthly_salary_usd: newSal,
-                            max_strong_leg_pct: 60,
-                            min_weaker_leg_pct: 40,
-                            monthly_increment_pct: 25
-                          });
-                          toast.success(`Tier ${t.tier} monthly salary updated!`);
-                        } catch (err: any) {
-                          toast.error("Failed to update monthly salary");
-                        }
-                      }}
-                    />
-                  </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-slate-500 font-bold">Monthly Salary ($ USD)</Label>
+                      <Input
+                        type="number"
+                        defaultValue={tier.monthly_salary_usd}
+                        key={`sal-${tierNo}-${tier.monthly_salary_usd}`}
+                        className="h-8 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        onBlur={(e) => {
+                          const newSal = parseFloat(e.target.value) || tier.monthly_salary_usd;
+                          if (newSal !== tier.monthly_salary_usd) updateTier({ monthly_salary_usd: newSal });
+                        }}
+                      />
+                    </div>
 
-                  <div className="text-[10px] text-slate-400 font-semibold pt-1 flex justify-between">
-                    <span>60:40 Leg Ratio</span>
-                    <span>25% Maintenance</span>
+                    <div className="text-[10px] text-slate-400 font-semibold pt-1 flex justify-between">
+                      <span>{tier.max_strong_leg_pct}:{tier.min_weaker_leg_pct} Leg Ratio</span>
+                      <span>{tier.monthly_increment_pct}% Maintenance</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

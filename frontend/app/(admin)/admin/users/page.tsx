@@ -69,6 +69,7 @@ export default function AdminUsersPage() {
     user?: { id: string; name: string; email: string; phone: string; status: string; created_at: string; usdt_address?: string };
     wallet?: { balance: number; total_credited: number };
     investments?: Array<{ id: string; amount: number; total_reward_earned: number; cap_limit: number; status: string }>;
+    status?: "INACTIVE" | "ACTIVE" | "WORKING";
   } | null>(null);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [subWalletBalance, setSubWalletBalance] = useState<{ address: string; bnb: number; usdt: number } | null>(null);
@@ -334,9 +335,16 @@ export default function AdminUsersPage() {
                     <p className="text-xs text-slate-500 font-mono">{userSummary.user?.email}</p>
                     <p className="text-xs text-slate-500 font-mono mt-0.5">{userSummary.user?.phone}</p>
                   </div>
-                  <Badge variant="outline" className={`text-[10px] font-bold ${userSummary.user?.status === "BLOCKED" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
-                    {userSummary.user?.status}
-                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="outline" className={`text-[10px] font-bold ${userSummary.user?.status === "BLOCKED" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
+                      {userSummary.user?.status}
+                    </Badge>
+                    {userSummary.status && (
+                      <Badge variant="outline" className={`text-[10px] font-bold ${userSummary.status === "WORKING" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : userSummary.status === "ACTIVE" ? "bg-blue-50 text-blue-600 border-blue-200" : "bg-amber-50 text-amber-600 border-amber-200"}`}>
+                        {userSummary.status}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
 

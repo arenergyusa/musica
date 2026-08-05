@@ -65,7 +65,8 @@ export function WithdrawForm({ availableBalance, onSuccess }: WithdrawFormProps)
 
   const handleMaxAmount = () => {
     if (availableBalance > 0) {
-      form.setValue("amount", Math.floor(availableBalance), { shouldValidate: true });
+      const maxWithCents = Math.round(availableBalance * 100) / 100;
+      form.setValue("amount", maxWithCents, { shouldValidate: true });
     }
   };
 

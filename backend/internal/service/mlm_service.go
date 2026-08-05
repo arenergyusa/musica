@@ -8,9 +8,41 @@ import (
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/arenergyusa/musica/backend/internal/repository"
+	"github.com/google/uuid"
 )
 
 // Community Sponsorship & Reward Core Logic
+
+// User statuses derived from investment activity and level unlocks.
+const (
+	UserStatusInactive = "INACTIVE"
+	UserStatusActive   = "ACTIVE"
+	UserStatusWorking  = "WORKING"
+)
+
+// GetUserStatus computes the combined account status for a user:
+//   - INACTIVE: no ACTIVE sponsorship
+//   - WORKING:  has an ACTIVE sponsorship and all 15 levels unlocked
+//   - ACTIVE:   has an ACTIVE sponsorship but levels below 15
+func GetUserStatus(ctx context.Context, invRepo repository.InvestmentRepository, mlmRepo repository.MLMRepository, userID uuid.UUID, s *domain.PlatformSettings) (string, error) {
+	hasActive, err := invRepo.HasActiveInvestment(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if !hasActive {
+		return UserStatusInactive, nil
+	}
+
+	directVolume, directCount, err := mlmRepo.GetDirectVolumeAndCount(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	if GetUnlockedLevels(directCount, directVolume, s) >= 15 {
+		return UserStatusWorking, nil
+	}
+	return UserStatusActive, nil
+}
 
 func CalculateNetWithdrawal(amount float64, s *domain.PlatformSettings) (float64, float64, error) {
 	if amount < s.WithdrawalMinAmount {

@@ -6,8 +6,14 @@ import (
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrAlreadyProcessed is returned by CreditReward when a DAILY_REWARD credit for
+// the same investment+date was already applied. Callers should treat it as a
+// benign duplicate, never as a failure.
+var ErrAlreadyProcessed = errors.New("reward already processed for this investment and day")
 
 type walletRepository struct {
 	db *pgxpool.Pool
@@ -18,9 +24,9 @@ func NewWalletRepository(db *pgxpool.Pool) WalletRepository {
 }
 
 func (r *walletRepository) GetBalance(ctx context.Context, userID uuid.UUID) (*domain.RewardWallet, error) {
-	query := `SELECT id, user_id, balance, total_credited, total_withdrawn FROM reward_wallet WHERE user_id = $1`
+	query := `SELECT id, user_id, balance, total_credited, total_withdrawn, COALESCE(salary_income, 0) FROM reward_wallet WHERE user_id = $1`
 	var w domain.RewardWallet
-	err := r.db.QueryRow(ctx, query, userID).Scan(&w.ID, &w.UserID, &w.Balance, &w.TotalCredited, &w.TotalWithdrawn)
+	err := r.db.QueryRow(ctx, query, userID).Scan(&w.ID, &w.UserID, &w.Balance, &w.TotalCredited, &w.TotalWithdrawn, &w.SalaryIncome)
 	if err != nil {
 		return nil, err
 	}
@@ -33,6 +39,32 @@ func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, a
 		return err
 	}
 	defer tx.Rollback(ctx)
+
+	// Handle empty refID correctly if UUID
+	var ref interface{} = refID
+	if refID == "" {
+		ref = nil
+	}
+
+	// For DAILY_REWARD the idempotency log insert gates the credit: if this
+	// investment+date was already processed (concurrent cron run, restart, etc.)
+	// the insert conflicts, no row is returned and the whole transaction aborts
+	// before the wallet or transactions tables are touched.
+	if source == "DAILY_REWARD" && ref != nil {
+		logQuery := `
+			INSERT INTO daily_reward_log (investment_id, user_id, amount, date, processed_at)
+			VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIMESTAMP)
+			ON CONFLICT (investment_id, date) DO NOTHING
+			RETURNING id
+		`
+		var logID uuid.UUID
+		if err := tx.QueryRow(ctx, logQuery, ref, userID, amount).Scan(&logID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrAlreadyProcessed
+			}
+			return err
+		}
+	}
 
 	// Ensure wallet exists or update atomically
 	walletQuery := `
@@ -53,25 +85,9 @@ func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, a
 		INSERT INTO transactions (user_id, type, amount, source, reference_id, description)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`
-	// Handle empty refID correctly if UUID
-	var ref interface{} = refID
-	if refID == "" {
-		ref = nil
-	}
-
 	_, err = tx.Exec(ctx, txQuery, userID, txType, amount, source, ref, desc)
 	if err != nil {
 		return err
-	}
-
-	// Insert daily_reward_log entry for idempotency and tracking if source is DAILY_REWARD
-	if source == "DAILY_REWARD" && ref != nil {
-		logQuery := `
-			INSERT INTO daily_reward_log (investment_id, user_id, amount, date, processed_at)
-			VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIMESTAMP)
-			ON CONFLICT DO NOTHING
-		`
-		_, _ = tx.Exec(ctx, logQuery, ref, userID, amount)
 	}
 
 	return tx.Commit(ctx)

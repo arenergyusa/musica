@@ -119,7 +119,7 @@ export interface TeamMemberDetail {
   phone: string;
   invite_code: string;
   leg: string;
-  status: "INACTIVE" | "NON_WORKING" | "WORKING";
+  status: "INACTIVE" | "ACTIVE" | "WORKING";
   level: number;
   total_investment: number;
   lifetime_income: number;

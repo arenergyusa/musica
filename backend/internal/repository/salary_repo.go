@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"math"
+	"time"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/google/uuid"
@@ -90,15 +92,30 @@ func (r *salaryRepository) UpdateSalaryTier(ctx context.Context, tier *domain.Sa
 }
 
 func (r *salaryRepository) SetDownlineLeg(ctx context.Context, sponsorID uuid.UUID, downlineID uuid.UUID, leg string) error {
-    // Update the leg field for the downline user in the users table
-    // Assuming the users table has a 'leg' column (LEFT or RIGHT)
-    query := `
-        UPDATE users
-        SET leg = $1
-        WHERE invited_by = $2 AND id = $3
-    `
-    _, err := r.db.Exec(ctx, query, leg, sponsorID, downlineID)
-    return err
+	// Legs are locked once the downline has an ACTIVE sponsorship or a salary
+	// qualification — otherwise a sponsor could keep re-arranging legs to game
+	// the 60:40 leg ratio after business has accumulated.
+	query := `
+		UPDATE users
+		SET leg = $1
+		WHERE invited_by = $2 AND id = $3
+		  AND NOT EXISTS (
+			SELECT 1 FROM sponsorships s
+			WHERE s.user_id = $3 AND s.status = 'ACTIVE'
+		  )
+		  AND NOT EXISTS (
+			SELECT 1 FROM salary_qualifications sq
+			WHERE sq.user_id = $3
+		  )
+	`
+	res, err := r.db.Exec(ctx, query, leg, sponsorID, downlineID)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		return errors.New("leg assignment locked: downline already has active business")
+	}
+	return nil
 }
 
 func (r *salaryRepository) GetBinaryLegVolumes(ctx context.Context, userID uuid.UUID) (float64, float64, error) {
@@ -176,8 +193,11 @@ func (r *salaryRepository) UpsertSalaryQualification(ctx context.Context, qual *
 
 func (r *salaryRepository) GetSalaryProgress(ctx context.Context, userID uuid.UUID) (*domain.SalaryProgressResponse, error) {
 	tiers, err := r.GetSalaryTiers(ctx)
-	if err != nil || len(tiers) == 0 {
+	if err != nil {
 		return nil, err
+	}
+	if len(tiers) == 0 {
+		return nil, errors.New("salary tiers not configured")
 	}
 
 	leftVol, rightVol, err := r.GetBinaryLegVolumes(ctx, userID)
@@ -192,12 +212,14 @@ func (r *salaryRepository) GetSalaryProgress(ctx context.Context, userID uuid.UU
 	// Determine current qualified tier and next target tier
 	currentTier := 0
 	currentSalary := 0.0
+	var currentTierObj *domain.SalaryTier
 
 	for _, t := range tiers {
 		weakerReq := t.MinVolumeUSD * (t.MinWeakerLegPct / 100.0)
 		if totalVol >= t.MinVolumeUSD && weakerLegVol >= weakerReq {
 			currentTier = t.Tier
 			currentSalary = t.MonthlySalaryUSD
+			currentTierObj = t
 		}
 	}
 
@@ -222,7 +244,22 @@ func (r *salaryRepository) GetSalaryProgress(ctx context.Context, userID uuid.UU
 	weakerRemaining := math.Max(0, weakerRequired-weakerLegVol)
 	legRatioMet := weakerLegVol >= weakerRequired && totalVol >= targetVolume
 
-	// Calculate 25% monthly incremental business in past 30 days
+	// Calculate 25% monthly incremental business: target is based on the CURRENT
+	// qualified tier's min volume (not the next tier's), so a tier-1 earner needs
+	// 25% of $50k = $12.5k of new ACTIVE downline business per month to continue.
+	monthlyIncTarget := 0.0
+	if currentTierObj != nil {
+		monthlyIncTarget = currentTierObj.MinVolumeUSD * (currentTierObj.MonthlyIncrementPct / 100.0)
+	}
+
+	// Measure new ACTIVE downline business since the start of the current cycle
+	// (the last payout), so the same volume is never counted twice.
+	qual, _ := r.GetSalaryQualification(ctx, userID)
+	since := time.Now().AddDate(0, 0, -30)
+	if qual != nil {
+		since = qual.CycleStartDate
+	}
+
 	var cycleNewVol float64
 	incQuery := `
 		WITH my_downline AS (
@@ -233,15 +270,22 @@ func (r *salaryRepository) GetSalaryProgress(ctx context.Context, userID uuid.UU
 		SELECT COALESCE(SUM(amount), 0)
 		FROM sponsorships
 		WHERE user_id IN (SELECT user_id FROM my_downline)
-		  AND created_at >= NOW() - INTERVAL '30 days'
+		  AND status = 'ACTIVE'
+		  AND created_at >= $2
 	`
-	_ = r.db.QueryRow(ctx, incQuery, userID).Scan(&cycleNewVol)
+	_ = r.db.QueryRow(ctx, incQuery, userID, since).Scan(&cycleNewVol)
 
-	monthlyIncTarget := targetVolume * (targetTier.MonthlyIncrementPct / 100.0)
 	monthlyIncRemaining := math.Max(0, monthlyIncTarget-cycleNewVol)
 
-	// Days remaining in 30 day cycle
-	daysRemaining := 30
+	// Days remaining in the 30 day cycle
+	cycleEnd := since.AddDate(0, 0, 30)
+	daysRemaining := int(math.Ceil(cycleEnd.Sub(time.Now()).Hours() / 24))
+	if daysRemaining < 0 {
+		daysRemaining = 0
+	}
+	if daysRemaining > 30 {
+		daysRemaining = 30
+	}
 
 	status := "IN_PROGRESS"
 	if currentTier > 0 {
@@ -279,13 +323,25 @@ func (r *salaryRepository) ProcessMonthlySalaryPayouts(ctx context.Context) (int
 		return 0, 0, err
 	}
 
-	// Fetch all users with downline volume >= tier 1 min volume ($50k)
+	// Fetch users whose downline has ACTIVE volume >= tier 1 min volume, plus
+	// users who already hold a salary qualification (past earners can still be
+	// re-qualified). This avoids calling GetSalaryProgress for every active user.
 	query := `
-		SELECT u.id
+		SELECT DISTINCT u.id
 		FROM users u
 		WHERE u.status = 'ACTIVE'
+		  AND (
+			EXISTS (SELECT 1 FROM salary_qualifications sq WHERE sq.user_id = u.id)
+			OR COALESCE((
+				SELECT SUM(s.amount)
+				FROM invite_tree my_node
+				JOIN invite_tree sub_tree ON sub_tree.path <@ my_node.path AND sub_tree.user_id != u.id
+				JOIN sponsorships s ON s.user_id = sub_tree.user_id AND s.status = 'ACTIVE'
+				WHERE my_node.user_id = u.id
+			), 0) >= $1
+		  )
 	`
-	rows, err := r.db.Query(ctx, query)
+	rows, err := r.db.Query(ctx, query, tiers[0].MinVolumeUSD)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -309,8 +365,12 @@ func (r *salaryRepository) ProcessMonthlySalaryPayouts(ctx context.Context) (int
 			continue
 		}
 
-		// Verify 25% monthly increment requirement for existing salary earners
-		if progress.MonthlyIncrementAchieved < progress.MonthlyIncrementTarget {
+		// Verify 25% monthly increment requirement for existing salary earners.
+		// First-time qualifiers (no prior payout) are paid without the growth
+		// requirement — they only need to meet the tier's volume/leg criteria.
+		qual, qualErr := r.GetSalaryQualification(ctx, uid)
+		isExistingEarner := qualErr == nil && qual != nil && qual.LastPayoutAt != nil
+		if isExistingEarner && progress.MonthlyIncrementAchieved < progress.MonthlyIncrementTarget {
 			// Skip if 25% monthly increment target is not met
 			continue
 		}
@@ -328,15 +388,37 @@ func (r *salaryRepository) ProcessMonthlySalaryPayouts(ctx context.Context) (int
 			continue
 		}
 
-		// Update RewardWallet
-		_, err = tx.Exec(ctx, `
-			UPDATE reward_wallet
-			SET balance = balance + $1,
-			    total_credited = total_credited + $1,
-			    salary_income = salary_income + $1
-			WHERE user_id = $2
-		`, salaryAmount, uid)
+		// Idempotency guard: reserve this user's payout for the current calendar
+		// month first. If a previous trigger already paid them this cycle, the
+		// insert conflicts and the whole transaction aborts before any credit.
+		var logID uuid.UUID
+		err = tx.QueryRow(ctx, `
+			INSERT INTO salary_payout_logs (user_id, tier, amount_usd, total_volume, left_leg_volume, right_leg_volume, cycle_new_volume, cycle_month)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, date_trunc('month', CURRENT_TIMESTAMP)::date)
+			ON CONFLICT (user_id, cycle_month) DO NOTHING
+			RETURNING id
+		`, uid, progress.CurrentTier, salaryAmount, progress.TotalVolume, progress.LeftLegVolume, progress.RightLegVolume, progress.MonthlyIncrementAchieved).Scan(&logID)
 		if err != nil {
+			if err == pgx.ErrNoRows {
+				_ = tx.Rollback(ctx)
+				continue // already paid this cycle
+			}
+			_ = tx.Rollback(ctx)
+			continue
+		}
+
+		// Update RewardWallet (upsert so a missing wallet row is created, and
+		// verify the credit actually applied)
+		res, err := tx.Exec(ctx, `
+			INSERT INTO reward_wallet (id, user_id, balance, total_credited, total_withdrawn, salary_income)
+			VALUES (uuid_generate_v4(), $1, $2, $2, 0, $2)
+			ON CONFLICT (user_id) DO UPDATE
+			SET balance = reward_wallet.balance + EXCLUDED.balance,
+			    total_credited = reward_wallet.total_credited + EXCLUDED.total_credited,
+			    salary_income = reward_wallet.salary_income + EXCLUDED.salary_income,
+			    updated_at = CURRENT_TIMESTAMP
+		`, uid, salaryAmount)
+		if err != nil || res.RowsAffected() != 1 {
 			_ = tx.Rollback(ctx)
 			continue
 		}
@@ -346,16 +428,6 @@ func (r *salaryRepository) ProcessMonthlySalaryPayouts(ctx context.Context) (int
 			INSERT INTO transactions (user_id, type, source, amount, description)
 			VALUES ($1, 'CREDIT', 'SALARY_INCOME', $2, $3)
 		`, uid, salaryAmount, "Monthly Downline Business Salary Income")
-		if err != nil {
-			_ = tx.Rollback(ctx)
-			continue
-		}
-
-		// Insert Salary Payout Log
-		_, err = tx.Exec(ctx, `
-			INSERT INTO salary_payout_logs (user_id, tier, amount_usd, total_volume, left_leg_volume, right_leg_volume, cycle_new_volume)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-		`, uid, progress.CurrentTier, salaryAmount, progress.TotalVolume, progress.LeftLegVolume, progress.RightLegVolume, progress.MonthlyIncrementAchieved)
 		if err != nil {
 			_ = tx.Rollback(ctx)
 			continue

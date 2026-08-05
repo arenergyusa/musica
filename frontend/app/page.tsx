@@ -3,7 +3,6 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { HeroSection } from "@/components/sections/HeroSection";
 import { GenreGrid } from "@/components/sections/GenreGrid";
-import { VideoShowcase } from "@/components/sections/VideoShowcase";
 import { HowItWorks } from "@/components/sections/HowItWorks";
 import { WhyMusica } from "@/components/sections/WhyMusica";
 import { FaqSection } from "@/components/sections/FaqSection";
@@ -11,20 +10,18 @@ import { CtaBanner } from "@/components/sections/CtaBanner";
 
 export const metadata: Metadata = {
   title: "Musica — Official Haryanvi Music Streaming & Video Platform",
-  description: "Official Musica streaming hub operated by Pure Desi Music (OPC) Private Limited. Discover trending Haryanvi music videos, audio releases, and studio tracks.",
+  description: "Official Musica streaming hub. Discover trending Haryanvi music videos, audio releases, and studio tracks.",
   keywords: [
     "Musica",
     "Musica Streaming",
     "Musica Haryanvi",
     "Musica Songs",
     "Musica Music Videos",
-    "The Musica",
-    "Pure Desi Music",
     "Haryanvi Music Videos",
   ],
   openGraph: {
     title: "Musica — Official Haryanvi Music Videos & Audio Hub",
-    description: "Watch latest Haryanvi music videos & official song releases on Musica by Pure Desi Music (OPC) Private Limited.",
+    description: "Watch latest Haryanvi music videos & official song releases on Musica.",
     url: "https://the-musica.com",
     siteName: "Musica",
     locale: "en_IN",
@@ -47,10 +44,10 @@ const jsonLd = [
     "name": "Musica",
     "alternateName": ["Musica Streaming", "Musica Haryanvi", "The Musica", "Musica Music"],
     "url": "https://the-musica.com",
-    "description": "Official Haryanvi Music Video Streaming Platform by Pure Desi Music (OPC) Private Limited.",
+    "description": "Official Haryanvi Music Video Streaming Platform.",
     "publisher": {
       "@type": "Organization",
-      "name": "Pure Desi Music (OPC) Private Limited",
+      "name": "Musica",
       "url": "https://the-musica.com",
       "logo": "https://the-musica.com/icon.png"
     }
@@ -58,8 +55,8 @@ const jsonLd = [
   {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "Pure Desi Music (OPC) Private Limited",
-    "alternateName": "Musica",
+    "name": "Musica",
+    "alternateName": "Musica Streaming",
     "url": "https://the-musica.com",
     "identifier": {
       "@type": "PropertyValue",
@@ -69,7 +66,6 @@ const jsonLd = [
     "taxID": "AALCP6210F",
     "email": "hello@themusica.in",
     "sameAs": [
-      "https://www.youtube.com/@puredesiharyanvi"
     ]
   }
 ];
@@ -86,7 +82,6 @@ export default function LandingPage() {
       <main id="main-content" className="flex-grow">
         <HeroSection />
         <GenreGrid />
-        <VideoShowcase />
         <HowItWorks />
         <WhyMusica />
         <FaqSection />

@@ -463,6 +463,12 @@ func (s *adminService) GetUserSummary(ctx context.Context, userID uuid.UUID) (ma
 	investments, _ := s.invRepo.GetInvestmentsByUserID(ctx, userID)
 	withdrawals, _ := s.wdRepo.GetByUserID(ctx, userID)
 
+	settings, _ := s.settingsRepo.GetSettings(ctx)
+	status := UserStatusInactive
+	if settings != nil {
+		status, _ = GetUserStatus(ctx, s.invRepo, s.mlmRepo, userID, settings)
+	}
+
 	// Scrub sensitive data
 	user.PasswordHash = ""
 
@@ -471,6 +477,7 @@ func (s *adminService) GetUserSummary(ctx context.Context, userID uuid.UUID) (ma
 		"wallet":      wallet,
 		"investments": investments,
 		"withdrawals": withdrawals,
+		"status":      status,
 	}, nil
 }
 
@@ -511,15 +518,16 @@ func (s *adminService) CreateManualInvestment(ctx context.Context, email string,
 		return nil, errors.New("cannot create investment for a blocked user")
 	}
 
-	isWorking, err := s.mlmRepo.HasActiveDirectReferral(ctx, user.ID)
-	if err != nil {
-		return nil, err
-	}
-
 	settings, err := s.settingsRepo.GetSettings(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	status, err := GetUserStatus(ctx, s.invRepo, s.mlmRepo, user.ID, settings)
+	if err != nil {
+		return nil, err
+	}
+	isWorking := status == UserStatusWorking
 
 	capMultiplier := GetIncomeCap(isWorking, settings)
 	capLimit := amount * capMultiplier

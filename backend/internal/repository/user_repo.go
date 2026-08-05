@@ -119,12 +119,12 @@ func (r *userRepository) GetByInviteCode(ctx context.Context, code string) (*dom
 func (r *userRepository) Update(ctx context.Context, user *domain.User) error {
 	query := `
 		UPDATE users
-		SET name = $1, phone = $2, usdt_address = $3, status = $4, role = $5, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $6
+		SET name = $1, phone = $2, usdt_address = $3, status = $4, role = $5, password_hash = $6, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $7
 		RETURNING updated_at
 	`
 	err := r.db.QueryRow(ctx, query,
-		user.Name, user.Phone, user.UsdtAddress, user.Status, user.Role, user.ID,
+		user.Name, user.Phone, user.UsdtAddress, user.Status, user.Role, user.PasswordHash, user.ID,
 	).Scan(&user.UpdatedAt)
 	return err
 }

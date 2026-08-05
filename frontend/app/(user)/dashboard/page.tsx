@@ -74,9 +74,9 @@ const itemVariants = {
 export default function DashboardPage() {
   const { user, fetchUser } = useAuthStore();
   const [dashboardData, setDashboardData] = useState<{
-    wallet?: { balance: number; total_credited: number; total_withdrawn: number };
+    wallet?: { balance: number; total_credited: number; total_withdrawn: number; salary_income?: number };
     investments?: { active_amount: number; active_count?: number; total_plans: number };
-    team?: { direct_count: number; active_volume: number; is_working: boolean; levels_unlocked: number };
+    team?: { direct_count: number; active_volume: number; is_working: boolean; levels_unlocked: number; status: string };
     recent_transactions?: Transaction[];
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -114,9 +114,9 @@ export default function DashboardPage() {
 
   const wallet = dashboardData?.wallet || { balance: 0, total_credited: 0, total_withdrawn: 0 };
   const investments = dashboardData?.investments || { active_amount: 0, total_plans: 0 };
-  const team = dashboardData?.team || { direct_count: 0, active_volume: 0, is_working: false, levels_unlocked: 0 };
-  const isWorking = team.is_working || false;
+  const team = dashboardData?.team || { direct_count: 0, active_volume: 0, is_working: false, levels_unlocked: 0, status: "INACTIVE" };
   const levelsUnlocked = team.levels_unlocked || 0;
+  const accountStatus: "INACTIVE" | "ACTIVE" | "WORKING" = team.status === "WORKING" ? "WORKING" : team.status === "ACTIVE" ? "ACTIVE" : "INACTIVE";
 
   const userName = user?.name ? user.name.split(' ')[0] : "User";
 
@@ -139,9 +139,19 @@ export default function DashboardPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               Welcome back, <span className="text-blue-400">{userName}</span>!
             </h1>
-            {isWorking && (
+            {accountStatus === "WORKING" && (
               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
-                <Zap className="h-3.5 w-3.5 text-emerald-400" /> Active
+                <Zap className="h-3.5 w-3.5 text-emerald-400" /> Working
+              </span>
+            )}
+            {accountStatus === "ACTIVE" && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0">
+                <Zap className="h-3.5 w-3.5 text-blue-400" /> Active
+              </span>
+            )}
+            {accountStatus === "INACTIVE" && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                <Zap className="h-3.5 w-3.5 text-amber-400" /> Inactive
               </span>
             )}
           </div>
@@ -156,6 +166,7 @@ export default function DashboardPage() {
           balance={wallet.balance}
           totalEarned={wallet.total_credited}
           totalWithdrawn={wallet.total_withdrawn}
+          salaryIncome={wallet.salary_income ?? 0}
         />
       </motion.div>
 
@@ -164,9 +175,9 @@ export default function DashboardPage() {
 
         {/* Sponsorship Tier Card */}
         {(() => {
-          const accountStatus = investments.active_amount === 0 ? "Inactive" : team.direct_count > 0 ? "Working" : "No-working";
-          const isInactive = accountStatus === "Inactive";
-          const isWorkingStatus = accountStatus === "Working";
+          const isInactive = accountStatus === "INACTIVE";
+          const isWorkingStatus = accountStatus === "WORKING";
+          const statusLabel = accountStatus === "INACTIVE" ? "Inactive" : accountStatus === "WORKING" ? "Working" : "Active";
           return (
             <Card className={`border rounded-lg shadow-sm transition-all ${isWorkingStatus ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/60" : isInactive ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/60" : "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/60"}`}>
               <CardContent className="p-4 flex items-center justify-between">
@@ -177,7 +188,7 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Account Status</p>
                     <p className="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">
-                      {accountStatus}
+                      {statusLabel}
                     </p>
                   </div>
                 </div>

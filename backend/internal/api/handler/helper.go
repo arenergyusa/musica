@@ -23,8 +23,8 @@ func ParsePagination(c *gin.Context) (int, int) {
 	limit, errLimit := strconv.Atoi(limitStr)
 	if errLimit != nil || limit <= 0 {
 		limit = 20
-	} else if limit > 100 {
-		limit = 100
+	} else if limit > 500 {
+		limit = 500
 	}
 	
 	offset, errOffset := strconv.Atoi(offsetStr)

@@ -1,6 +1,6 @@
 # Musica
 
-> Official Haryanvi music streaming platform operated by Pure Desi Music (OPC) Private Limited.
+> Official Haryanvi music streaming platform by Musica.
 
 Musica publishes official Haryanvi music videos, studio audio releases, and artist tracks. Public content is available at https://the-musica.com.
 
@@ -12,7 +12,7 @@ Musica publishes official Haryanvi music videos, studio audio releases, and arti
 
 ## Organization
 
-- Name: Pure Desi Music (OPC) Private Limited
+- Name: Musica
 - Brand: Musica
 - Contact: hello@themusica.in
 - Website: https://the-musica.com

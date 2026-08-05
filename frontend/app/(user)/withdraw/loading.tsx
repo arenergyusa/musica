@@ -3,92 +3,48 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export default function WithdrawLoading() {
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      
-      {/* Header Skeleton */}
+    <div className="max-w-xl mx-auto space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      {/* PageHeader Skeleton */}
       <div>
         <Skeleton className="h-9 w-48 mb-2" />
         <Skeleton className="h-5 w-80" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Form & Balance */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="shadow-sm">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Skeleton className="h-12 w-12 rounded-full" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-8 w-40" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader>
-              <Skeleton className="h-6 w-48 mb-2" />
-              <Skeleton className="h-4 w-64" />
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4 bg-muted/20 p-4 rounded-lg">
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-              </div>
+      {/* Withdrawal Form Card Skeleton */}
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm">
+        <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+          <Skeleton className="h-5 w-56" />
+        </CardHeader>
+        <CardContent className="pt-5 space-y-6">
+          {/* Balance Row Skeleton */}
+          <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-full" />
               <div className="space-y-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-6 w-32" />
               </div>
-              <Skeleton className="h-10 w-full mt-4" />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column: Rules Info */}
-        <div className="space-y-6">
-          <Card className="shadow-sm">
-            <CardHeader className="pb-4 border-b">
-              <Skeleton className="h-6 w-40" />
-            </CardHeader>
-            <CardContent className="pt-4 space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex gap-2 items-start">
-                  <Skeleton className="h-2 w-2 rounded-full mt-1.5 shrink-0" />
-                  <Skeleton className="h-4 w-full" />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* History Table Skeleton */}
-      <Card className="shadow-sm border">
-        <div className="p-6 border-b bg-muted/10">
-          <Skeleton className="h-6 w-48" />
-        </div>
-        <CardContent className="p-0">
-          <div className="border-b bg-muted/30 p-4 flex gap-4">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-24 mx-auto" />
-            <Skeleton className="h-4 w-32 mx-auto" />
-            <Skeleton className="h-4 w-24 ml-auto" />
+            </div>
+            <Skeleton className="h-4 w-16" />
           </div>
-          <div className="p-4 space-y-6">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex gap-4 items-center justify-between">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-6 w-24 rounded-full" />
-              </div>
-            ))}
+
+          {/* Amount Input Skeleton */}
+          <div className="space-y-2">
+            <Skeleton className="h-3.5 w-32" />
+            <Skeleton className="h-11 w-full rounded-lg" />
           </div>
+
+          {/* TDS Note Skeleton */}
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+
+          <Skeleton className="h-11 w-full rounded-lg" />
         </CardContent>
       </Card>
-
     </div>
   );
 }

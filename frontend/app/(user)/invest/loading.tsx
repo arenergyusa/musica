@@ -1,50 +1,57 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export default function InvestLoading() {
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <Skeleton className="h-9 w-72 mb-2" />
-          <Skeleton className="h-5 w-96" />
-        </div>
-        <Skeleton className="h-10 w-64 rounded-full" />
+    <div className="w-full max-w-3xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      {/* PageHeader Skeleton */}
+      <div>
+        <Skeleton className="h-9 w-64 mb-2" />
+        <Skeleton className="h-5 w-96" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[1, 2, 3, 4].map((i) => (
-          <Card key={i} className="border-2 border-muted">
-            <CardHeader>
-              <Skeleton className="h-6 w-24 mb-2" />
-              <Skeleton className="h-10 w-32 mt-2" />
-              <Skeleton className="h-4 w-40 mt-1" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                {[1, 2, 3, 4, 5].map((j) => (
-                  <div key={j} className="flex items-center">
-                    <Skeleton className="h-4 w-4 mr-2 shrink-0 rounded-full" />
-                    <Skeleton className="h-4 w-full" />
-                  </div>
-                ))}
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm">
+        <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+          <Skeleton className="h-6 w-52" />
+          <Skeleton className="h-4 w-72 mt-1" />
+        </CardHeader>
+        <CardContent className="pt-5 space-y-6">
+          {/* Amount Selector Skeleton */}
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-24" />
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-11 w-11 rounded-xl" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-11 w-11 rounded-xl" />
+            </div>
+            <Skeleton className="h-2 w-full rounded-full" />
+          </div>
+
+          {/* Payment Summary Skeleton */}
+          <div className="bg-blue-50/70 dark:bg-blue-950/40 rounded-xl p-4 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-7 w-32" />
+            </div>
+            <Skeleton className="h-7 w-32 rounded-full" />
+          </div>
+
+          {/* Deposit Address Skeleton */}
+          <div className="bg-slate-50 dark:bg-slate-900/70 rounded-xl p-5 border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <Skeleton className="h-[126px] w-[126px] rounded-lg shrink-0" />
+              <div className="space-y-2 flex-1 w-full">
+                <Skeleton className="h-3.5 w-64" />
+                <Skeleton className="h-10 w-full rounded-lg" />
+                <Skeleton className="h-3 w-72" />
               </div>
-            </CardContent>
-            <CardFooter>
-              <Skeleton className="h-12 w-full" />
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
+            </div>
+          </div>
 
-      <div className="mt-12 space-y-6">
-        <Skeleton className="h-7 w-48" />
-        <Card className="border-dashed">
-          <CardContent className="h-48 flex items-center justify-center">
-            <Skeleton className="h-8 w-8 rounded-full mb-4" />
-          </CardContent>
-        </Card>
-      </div>
+          <Skeleton className="h-11 w-full rounded-lg" />
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -29,7 +29,7 @@ const TOUR_STEPS = [
     title: "2. Income Cap System",
     badge: "2x or 3x Cap",
     color: "text-amber-500 bg-amber-500/10",
-    description: "Total earnings (Reward + Invite + Level Income) are capped at 2x for Non-Working members, and extended to 3x once you invite active members."
+    description: "Total earnings (Reward + Invite + Level Income) are capped at 2x for INACTIVE & ACTIVE members, and extended to 3x once you unlock all 15 levels (Working)."
   },
   {
     icon: Network,

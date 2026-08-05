@@ -39,6 +39,8 @@ type InvestmentRepository interface {
 	GetActiveCount(ctx context.Context) (int, error)
 	GetTotalActiveInvested(ctx context.Context) (float64, error)
 	GetPendingCount(ctx context.Context) (int, error)
+	// HasActiveInvestment reports whether the user owns at least one ACTIVE sponsorship.
+	HasActiveInvestment(ctx context.Context, userID uuid.UUID) (bool, error)
 	// Search by user for admin
 	GetAllWithFilters(ctx context.Context, limit, offset int, status string) ([]*domain.Sponsorship, error)
 }

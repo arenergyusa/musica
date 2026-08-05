@@ -15,7 +15,6 @@ import (
 type WithdrawalService interface {
 	RequestWithdrawal(ctx context.Context, userID uuid.UUID, req *domain.WithdrawRequest) (*domain.Withdrawal, error)
 	GetMyWithdrawals(ctx context.Context, userID uuid.UUID) ([]*domain.Withdrawal, error)
-	GetNextWithdrawalDate() time.Time
 }
 
 type withdrawalService struct {
@@ -43,14 +42,6 @@ func NewWithdrawalService(
 		settingsRepo: settingsRepo,
 		usdtService:  usdtService,
 	}
-}
-
-func (s *withdrawalService) GetNextWithdrawalDate() time.Time {
-	return time.Now()
-}
-
-func daysInMonth(year int, month time.Month) int {
-	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
 func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.UUID, req *domain.WithdrawRequest) (*domain.Withdrawal, error) {
@@ -135,6 +126,30 @@ func (s *withdrawalService) RequestWithdrawal(ctx context.Context, userID uuid.U
 	}
 	txHash, payoutErr := s.usdtService.ProcessAutoWithdrawal(ctx, wd.ID, userID, user.UsdtAddress, netAmount)
 	if payoutErr != nil || txHash == "" {
+		// A broadcast may have landed on-chain even when the RPC response was lost
+		// (timeout / connection reset). Before refunding, verify the locally
+		// computed tx hash on the chain with a detached context so a client
+		// disconnect cannot abort the reconciliation.
+		if txHash != "" {
+			verifyCtx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			defer cancel()
+			for i := 0; i < 5; i++ {
+				mined, checkErr := s.usdtService.IsTransactionMined(verifyCtx, txHash)
+				if checkErr == nil && mined {
+					wd.PaymentRef = txHash
+					wd.Status = "PROCESSED"
+					_ = s.wdRepo.UpdateRequestStatusWithRef(verifyCtx, wd.ID, "PROCESSED", txHash, "Automatic BEP-20 payout verified on-chain after broadcast ambiguity")
+					return wd, nil
+				}
+				select {
+				case <-time.After(3 * time.Second):
+				case <-verifyCtx.Done():
+				}
+				if verifyCtx.Err() != nil {
+					break
+				}
+			}
+		}
 		reason := "automatic payout failed"
 		if payoutErr != nil {
 			reason = payoutErr.Error()

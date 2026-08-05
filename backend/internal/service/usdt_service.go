@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -28,10 +30,21 @@ type USDTService interface {
 	GetDepositWalletBalance(ctx context.Context, userID uuid.UUID) (*MasterWalletBalance, error)
 	VerifyDeposit(ctx context.Context, userID uuid.UUID, txHash string, expectedAmount float64) error
 	ProcessAutoWithdrawal(ctx context.Context, withdrawalID, userID uuid.UUID, recipientAddress string, amountUSD float64) (string, error)
+	IsTransactionMined(ctx context.Context, txHash string) (bool, error)
 	GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error)
 }
 
 const transferTopic = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+
+// payoutMu serializes all automatic payouts so that BSC nonces are allocated
+// sequentially and two concurrent withdrawals can never use the same nonce.
+var payoutMu sync.Mutex
+
+// txHashForRawTx computes the on-chain transaction hash for a signed raw
+// transaction (EIP-155 legacy: hash = keccak256(RLP(signed tx))).
+func txHashForRawTx(rawTx []byte) string {
+	return "0x" + hex.EncodeToString(keccak256(rawTx))
+}
 
 type bscReceipt struct {
 	Status string `json:"status"`
@@ -40,6 +53,21 @@ type bscReceipt struct {
 		Topics  []string `json:"topics"`
 		Data    string   `json:"data"`
 	} `json:"logs"`
+}
+
+// usdToUnits converts a USD amount (at most 2 decimal places) into raw token
+// units for the given token decimals using integer cents, avoiding float string
+// formatting and precision drift.
+func usdToUnits(amount float64, decimals int) (*big.Int, error) {
+	cents := int64(math.Round(amount * 100))
+	if cents < 0 {
+		return nil, fmt.Errorf("amount must be non-negative")
+	}
+	units := new(big.Int).Mul(
+		new(big.Int).SetInt64(cents),
+		new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals-2)), nil),
+	)
+	return units, nil
 }
 
 // VerifyDeposit validates an actual mined BEP-20 Transfer event. The server never
@@ -73,12 +101,10 @@ func (s *usdtService) VerifyDeposit(ctx context.Context, userID uuid.UUID, txHas
 			decimals = parsed
 		}
 	}
-	expectedUnits := new(big.Int)
-	amountCents := strings.Replace(fmt.Sprintf("%.2f", expectedAmount), ".", "", 1)
-	if _, ok := expectedUnits.SetString(amountCents, 10); !ok {
+	expectedUnits, err := usdToUnits(expectedAmount, decimals)
+	if err != nil {
 		return fmt.Errorf("invalid investment amount")
 	}
-	expectedUnits.Mul(expectedUnits, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals-2)), nil))
 
 	for _, logItem := range receipt.Logs {
 		if strings.ToLower(strings.TrimPrefix(logItem.Address, "0x")) != contract || len(logItem.Topics) < 3 {
@@ -230,6 +256,11 @@ func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, u
 	}
 	fromAddress := gethcrypto.PubkeyToAddress(privKey.PublicKey).Hex()
 
+	// Serialize the nonce-fetch -> sign -> broadcast sequence so concurrent
+	// withdrawals cannot read the same nonce and overwrite each other on-chain.
+	payoutMu.Lock()
+	defer payoutMu.Unlock()
+
 	nonceHex, err := callBSC(ctx, rpcURL, "eth_getTransactionCount", []interface{}{fromAddress, "pending"})
 	if err != nil {
 		return "", err
@@ -261,12 +292,10 @@ func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, u
 			decimals = parsed
 		}
 	}
-	amountUnits := new(big.Int)
-	amountCents := strings.Replace(fmt.Sprintf("%.2f", amountUSD), ".", "", 1)
-	if _, ok := amountUnits.SetString(amountCents, 10); !ok {
+	amountUnits, err := usdToUnits(amountUSD, decimals)
+	if err != nil {
 		return "", fmt.Errorf("invalid payout amount")
 	}
-	amountUnits.Mul(amountUnits, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals-2)), nil))
 
 	// ERC-20 transfer(address,uint256) calldata.
 	methodID := keccak256([]byte("transfer(address,uint256)"))[:4]
@@ -289,7 +318,10 @@ func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, u
 	}
 	txHash, err := callBSC(ctx, rpcURL, "eth_sendRawTransaction", []interface{}{"0x" + hex.EncodeToString(rawTx)})
 	if err != nil {
-		return "", fmt.Errorf("failed to broadcast payout transaction: %w", err)
+		// The transaction may still have been accepted and mined even though the
+		// RPC response was lost (timeout / connection reset). Return the locally
+		// computed hash so the caller can verify on-chain before deciding to refund.
+		return txHashForRawTx(rawTx), fmt.Errorf("failed to broadcast payout transaction: %w", err)
 	}
 
 	// Audit log for withdrawal payout execution
@@ -309,6 +341,23 @@ func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, u
 
 func commonAddressBytes(address string) []byte {
 	return gethcommon.HexToAddress(address).Bytes()
+}
+
+// IsTransactionMined reports whether a transaction hash has a mined and
+// successful on-chain receipt. A not-yet-mined transaction returns (false, nil).
+func (s *usdtService) IsTransactionMined(ctx context.Context, txHash string) (bool, error) {
+	rpcURL := os.Getenv("BSC_RPC_URL")
+	if rpcURL == "" {
+		return false, fmt.Errorf("BSC_RPC_URL not configured")
+	}
+	var receipt bscReceipt
+	if err := callBSCJSON(ctx, rpcURL, "eth_getTransactionReceipt", []interface{}{txHash}, &receipt); err != nil {
+		if strings.Contains(err.Error(), "transaction not mined yet") {
+			return false, nil
+		}
+		return false, err
+	}
+	return receipt.Status == "0x1", nil
 }
 
 // GetMasterWalletBalance reads the native BNB and BEP-20 USDT balances from BSC.

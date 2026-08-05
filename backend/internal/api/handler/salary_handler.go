@@ -20,6 +20,7 @@ func NewSalaryHandler(salaryRepo repository.SalaryRepository) *SalaryHandler {
 // GetUserSalaryProgress returns live progress, remaining volume ("kitna baki hai"), 60:40 balance meter & 25% monthly increment for authenticated user
 
 // DivideDownlines assign left/right leg positions for a user's downline IDs in alternating order (1-left,2-right,3-left,...)
+// Legs are locked once a downline has active business (ACTIVE sponsorship or salary qualification).
 func (h *SalaryHandler) DivideDownlines(c *gin.Context) {
     userID, err := GetUserID(c)
     if err != nil {
@@ -34,6 +35,8 @@ func (h *SalaryHandler) DivideDownlines(c *gin.Context) {
         return
     }
     // Assign legs alternating left/right
+    assigned := 0
+    locked := 0
     for i, idStr := range payload.DownlineIDs {
         downID, parseErr := uuid.Parse(idStr)
         if parseErr != nil {
@@ -45,11 +48,12 @@ func (h *SalaryHandler) DivideDownlines(c *gin.Context) {
         }
         // Update in repository
         if updErr := h.salaryRepo.SetDownlineLeg(c.Request.Context(), userID, downID, leg); updErr != nil {
-            // Log but continue processing other IDs
-            // (logging omitted for brevity)
+            locked++
+        } else {
+            assigned++
         }
     }
-    c.JSON(http.StatusOK, gin.H{"message": "Downlines assigned"})
+    c.JSON(http.StatusOK, gin.H{"message": "Downlines assigned", "assigned": assigned, "locked": locked})
 }
 
 // GetUserSalaryProgress returns live progress, remaining volume ("kitna baki hai"), 60:40 balance meter & 25% monthly increment for authenticated user

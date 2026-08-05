@@ -98,18 +98,23 @@ func (s *userService) GetDashboard(ctx context.Context, userID uuid.UUID) (map[s
 	// Fetch Team Stats & Levels Unlocked
 	volume, _ := s.mlmRepo.GetDownlineVolume(ctx, userID)
 	directs, _ := s.mlmRepo.GetDirectReferrals(ctx, userID)
-	isWorking, _ := s.mlmRepo.HasActiveDirectReferral(ctx, userID)
 	settings, _ := s.settingsRepo.GetSettings(ctx)
 	levelsUnlocked := 0
 	if settings != nil {
 		levelsUnlocked = GetUnlockedLevels(len(directs), volume, settings)
 	}
 
-	var bal, totalW, totalC float64
+	status := UserStatusInactive
+	if settings != nil {
+		status, _ = GetUserStatus(ctx, s.invRepo, s.mlmRepo, userID, settings)
+	}
+
+	var bal, totalW, totalC, salaryInc float64
 	if wallet != nil {
 		bal = wallet.Balance
 		totalW = wallet.TotalWithdrawn
 		totalC = wallet.TotalCredited
+		salaryInc = wallet.SalaryIncome
 	}
 
 	// Fetch Recent Transactions
@@ -133,6 +138,7 @@ func (s *userService) GetDashboard(ctx context.Context, userID uuid.UUID) (map[s
 			"balance":         bal,
 			"total_withdrawn": totalW,
 			"total_credited":  totalC,
+			"salary_income":   salaryInc,
 		},
 		"investments": map[string]interface{}{
 			"active_amount": activeInvestments,
@@ -142,7 +148,8 @@ func (s *userService) GetDashboard(ctx context.Context, userID uuid.UUID) (map[s
 		"team": map[string]interface{}{
 			"direct_count":    len(directs),
 			"active_volume":   volume,
-			"is_working":      isWorking,
+			"is_working":      status == UserStatusWorking,
+			"status":          status,
 			"levels_unlocked": levelsUnlocked,
 		},
 		"recent_transactions": recentTxs,

@@ -23,14 +23,14 @@ export default function TermsPage() {
           setNonWorkingCap(data.non_working_cap_multiplier);
           setWorkingCap(data.working_cap_multiplier);
         } else {
-          setNonWorkingCap(CAP_MULTIPLIER.NON_WORKING);
+          setNonWorkingCap(CAP_MULTIPLIER.ACTIVE);
           setWorkingCap(CAP_MULTIPLIER.WORKING);
         }
       })
       .catch(err => {
         console.error("Failed to load terms settings", err);
         setError("Failed to load dynamic terms settings. Presenting guaranteed default parameters.");
-        setNonWorkingCap(CAP_MULTIPLIER.NON_WORKING);
+        setNonWorkingCap(CAP_MULTIPLIER.ACTIVE);
         setWorkingCap(CAP_MULTIPLIER.WORKING);
       })
       .finally(() => {
@@ -63,7 +63,7 @@ export default function TermsPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[#F8F9FA] dark:bg-slate-800/60 rounded-lg border border-slate-200/80 dark:border-slate-800 gap-3 text-xs">
               <div className="flex items-center gap-2.5">
                 <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                <span className="font-bold text-slate-900 dark:text-white">Pure Desi Music </span>
+                <span className="font-bold text-slate-900 dark:text-white">Musica</span>
               </div>
               <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400">
 
@@ -79,7 +79,7 @@ export default function TermsPage() {
                 1. Acceptance of Terms &amp; Corporate Details
               </h2>
               <p>
-                By accessing and using the Musica platform (<strong>https://the-musica.com</strong>), operated exclusively by <strong>Pure Desi Music</strong>, you agree to be bound by these Terms of Service. The company operates exclusively in Haryanvi music video production, audio recording, and official music distribution. If you do not agree with any portion of these terms, please discontinue platform use immediately.
+                By accessing and using the Musica platform (<strong>https://the-musica.com</strong>), operated exclusively by <strong>Musica</strong>, you agree to be bound by these Terms of Service. The company operates exclusively in Haryanvi music video production, audio recording, and official music distribution. If you do not agree with any portion of these terms, please discontinue platform use immediately.
               </p>
             </section>
 
@@ -121,8 +121,8 @@ export default function TermsPage() {
                     </div>
                   )}
                   <ul className="list-disc pl-5 space-y-2 text-xs">
-                    <li><strong>Standard (Passive) Sponsors:</strong> Accumulated rewards are capped at <strong>{nonWorkingCap}x</strong> ({(nonWorkingCap ?? CAP_MULTIPLIER.NON_WORKING) * 100}%) of the sponsorship value.</li>
-                    <li><strong>Affiliate (Active) Sponsors:</strong> Total rewards from all sources are extended up to a maximum cap of <strong>{workingCap}x</strong> ({(workingCap ?? CAP_MULTIPLIER.WORKING) * 100}%) of the sponsorship value.</li>
+                    <li><strong>INACTIVE &amp; ACTIVE Sponsors:</strong> Accumulated rewards are capped at <strong>{nonWorkingCap}x</strong> ({(nonWorkingCap ?? CAP_MULTIPLIER.ACTIVE) * 100}%) of the sponsorship value.</li>
+                    <li><strong>WORKING Sponsors (15 levels unlocked):</strong> Total rewards from all sources are extended up to a maximum cap of <strong>{workingCap}x</strong> ({(workingCap ?? CAP_MULTIPLIER.WORKING) * 100}%) of the sponsorship value.</li>
                   </ul>
                   <p className="text-xs text-slate-500">
                     Upon reaching the cap ({nonWorkingCap}x or {workingCap}x), the sponsorship cycle completes automatically.

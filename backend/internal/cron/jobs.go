@@ -2,6 +2,7 @@ package cron
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -11,8 +12,14 @@ import (
 	"github.com/arenergyusa/musica/backend/internal/repository"
 	"github.com/arenergyusa/musica/backend/internal/service"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/robfig/cron/v3"
 )
+
+// dailyRewardLockKey is a fixed Postgres advisory lock id that serializes the
+// daily reward job across the startup catch-up goroutine, the scheduled cron
+// and any additional backend replicas.
+const dailyRewardLockKey int64 = 738572190
 
 // getLevelIncomePct returns the percentage for the given level from PlatformSettings.
 func getLevelIncomePct(level int, s *domain.PlatformSettings) float64 {
@@ -37,6 +44,7 @@ func getLevelIncomePct(level int, s *domain.PlatformSettings) float64 {
 
 type JobRunner struct {
 	cron         *cron.Cron
+	dbPool       *pgxpool.Pool
 	invRepo      repository.InvestmentRepository
 	mlmRepo      repository.MLMRepository
 	walletRepo   repository.WalletRepository
@@ -44,6 +52,7 @@ type JobRunner struct {
 }
 
 func NewJobRunner(
+	dbPool *pgxpool.Pool,
 	invRepo repository.InvestmentRepository,
 	mlmRepo repository.MLMRepository,
 	walletRepo repository.WalletRepository,
@@ -54,6 +63,7 @@ func NewJobRunner(
 	)))
 	return &JobRunner{
 		cron:         c,
+		dbPool:       dbPool,
 		invRepo:      invRepo,
 		mlmRepo:      mlmRepo,
 		walletRepo:   walletRepo,
@@ -93,6 +103,29 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 	log.Println("=== Starting Daily Reward + Level Income Distribution Job ===")
 	ctx := context.Background()
 
+	// Serialize across concurrent runners (startup catch-up + scheduled cron +
+	// multiple replicas). Advisory locks are session-scoped, so hold a single
+	// pooled connection for both lock and unlock.
+	conn, err := j.dbPool.Acquire(ctx)
+	if err != nil {
+		log.Printf("CRON ERROR: failed to acquire db connection for job lock: %v", err)
+		return
+	}
+	defer conn.Release()
+
+	var gotLock bool
+	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock($1)`, dailyRewardLockKey).Scan(&gotLock); err != nil {
+		log.Printf("CRON ERROR: failed to acquire advisory lock: %v", err)
+		return
+	}
+	if !gotLock {
+		log.Println("=== Daily ROI Job SKIPPED: another run already in progress ===")
+		return
+	}
+	defer func() {
+		_, _ = conn.Exec(context.Background(), `SELECT pg_advisory_unlock($1)`, dailyRewardLockKey)
+	}()
+
 	// Load platform settings once for level income percentages and unlock thresholds
 	settings, err := j.settingsRepo.GetSettings(ctx)
 	if err != nil {
@@ -126,7 +159,7 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 			monthlyPct = 10.0
 		}
 		firstDayOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		isFullMonth := freshInv.CreatedAt.Before(firstDayOfMonth) || freshInv.CreatedAt.Day() == 1
+		isFullMonth := !freshInv.CreatedAt.After(firstDayOfMonth)
 		isFinalDay := now.Day() == daysInCurrentMonth && isFullMonth
 
 		roiAmount := service.CalculateDailyRewardForMonth(freshInv.Amount, monthlyPct, daysInCurrentMonth, isFinalDay)
@@ -155,6 +188,10 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 			"CREDIT", "DAILY_REWARD", freshInv.ID.String(), roiDesc,
 		)
 		if err != nil {
+			if errors.Is(err, repository.ErrAlreadyProcessed) {
+				// Another concurrent run already credited this investment+day.
+				continue
+			}
 			log.Printf("CRON ERROR: Failed to credit ROI for inv %s: %v", freshInv.ID, err)
 			continue
 		}

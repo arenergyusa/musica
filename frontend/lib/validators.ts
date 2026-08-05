@@ -103,11 +103,12 @@ export const rejectWithReasonSchema = z.object({
 });
 
 export const approveWithdrawalSchema = z.object({
-  paymentRef: z
+  adminNote: z
     .string()
-    .min(4, "Payment reference required")
-    .max(100, "Invalid reference"),
-  paymentDate: z.string().min(1, "Payment date required"),
+    .optional()
+    .refine((v) => v === undefined || v.trim().length <= 500, {
+      message: "Admin note must be at most 500 characters",
+    }),
 });
 
 // ============================================================

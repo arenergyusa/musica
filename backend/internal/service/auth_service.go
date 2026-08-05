@@ -10,15 +10,19 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
-	"github.com/arenergyusa/musica/backend/internal/pkg/email"
+	emailpkg "github.com/arenergyusa/musica/backend/internal/pkg/email"
 	"github.com/arenergyusa/musica/backend/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
+
+const otpMaxAttempts = 5
 
 func hashOTP(otp, secret string) string {
 	h := hmac.New(sha256.New, []byte(secret))
@@ -40,17 +44,19 @@ type authService struct {
 	userRepo    repository.UserRepository
 	mlmRepo     repository.MLMRepository
 	otpRepo     repository.OTPRepository
-	emailSender email.EmailSender
+	emailSender emailpkg.EmailSender
+	redis       *redis.Client
 	jwtSecret   string
 }
 
-func NewAuthService(userRepo repository.UserRepository, mlmRepo repository.MLMRepository, otpRepo repository.OTPRepository, emailSender email.EmailSender, jwtSecret string) AuthService {
+func NewAuthService(userRepo repository.UserRepository, mlmRepo repository.MLMRepository, otpRepo repository.OTPRepository, emailSender emailpkg.EmailSender, jwtSecret string, redis *redis.Client) AuthService {
 	return &authService{
 		userRepo:    userRepo,
 		mlmRepo:     mlmRepo,
 		otpRepo:     otpRepo,
 		emailSender: emailSender,
 		jwtSecret:   jwtSecret,
+		redis:       redis,
 	}
 }
 
@@ -62,6 +68,42 @@ func generateOTP() (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+func otpAttemptsKey(email, purpose string) string {
+	return "otp:attempts:" + strings.ToLower(strings.TrimSpace(email)) + ":" + purpose
+}
+
+// isOtpLocked reports whether this email+purpose has exceeded the OTP attempt budget.
+func (s *authService) isOtpLocked(ctx context.Context, email, purpose string) bool {
+	if s.redis == nil {
+		return false
+	}
+	val, err := s.redis.Get(ctx, otpAttemptsKey(email, purpose)).Int()
+	return err == nil && val > otpMaxAttempts
+}
+
+// registerFailedAttempt records a failed verification and returns true when the
+// email becomes locked out. Fail-open if Redis is unavailable.
+func (s *authService) registerFailedAttempt(ctx context.Context, email, purpose string) bool {
+	if s.redis == nil {
+		return false
+	}
+	val, err := s.redis.Incr(ctx, otpAttemptsKey(email, purpose)).Result()
+	if err != nil {
+		return false
+	}
+	if val == 1 {
+		s.redis.Expire(ctx, otpAttemptsKey(email, purpose), 10*time.Minute)
+	}
+	return val > otpMaxAttempts
+}
+
+// clearAttempts resets the failure counter after a successful verification.
+func (s *authService) clearAttempts(ctx context.Context, email, purpose string) {
+	if s.redis != nil {
+		s.redis.Del(ctx, otpAttemptsKey(email, purpose))
+	}
 }
 
 func (s *authService) Register(ctx context.Context, req *domain.RegisterRequest) (*domain.User, error) {
@@ -179,7 +221,11 @@ func (s *authService) Register(ctx context.Context, req *domain.RegisterRequest)
 	}
 
 	// Send Email
-	body := fmt.Sprintf("<h1>Welcome to Musica!</h1><p>Your registration OTP is: <strong>%s</strong></p><p>It expires in 10 minutes.</p>", otpCode)
+	body := emailpkg.RenderOTPEmail(
+		"Verify your email",
+		"Welcome to Musica! Use the code below to verify your email address and complete your registration.",
+		otpCode,
+	)
 	go func(email, subject, body string) {
 		defer func() {
 			if r := recover(); r != nil {
@@ -195,10 +241,17 @@ func (s *authService) Register(ctx context.Context, req *domain.RegisterRequest)
 }
 
 func (s *authService) VerifyRegisterOTP(ctx context.Context, email, otp string) error {
+	if s.isOtpLocked(ctx, email, "REGISTER") {
+		return errors.New("too many invalid OTP attempts. Please request a new OTP.")
+	}
 	err := s.otpRepo.ConsumeOTP(ctx, email, hashOTP(otp, s.jwtSecret), "REGISTER")
 	if err != nil {
+		if s.registerFailedAttempt(ctx, email, "REGISTER") {
+			return errors.New("too many invalid OTP attempts. Please request a new OTP.")
+		}
 		return errors.New("invalid or expired OTP")
 	}
+	s.clearAttempts(ctx, email, "REGISTER")
 
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil || user == nil {
@@ -274,7 +327,11 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 		return err
 	}
 
-	body := fmt.Sprintf("<h1>Password Reset</h1><p>Your OTP to reset your password is: <strong>%s</strong></p><p>It expires in 10 minutes.</p>", otpCode)
+	body := emailpkg.RenderOTPEmail(
+		"Reset your password",
+		"Use the code below to reset your Musica account password.",
+		otpCode,
+	)
 	go func(email, subject, body string) {
 		defer func() {
 			if r := recover(); r != nil {
@@ -290,7 +347,18 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 }
 
 func (s *authService) VerifyForgotPasswordOTP(ctx context.Context, email, otp string) error {
-	return s.otpRepo.VerifyOTP(ctx, email, hashOTP(otp, s.jwtSecret), "FORGOT_PASSWORD")
+	if s.isOtpLocked(ctx, email, "FORGOT_PASSWORD") {
+		return errors.New("too many invalid OTP attempts. Please request a new OTP.")
+	}
+	err := s.otpRepo.VerifyOTP(ctx, email, hashOTP(otp, s.jwtSecret), "FORGOT_PASSWORD")
+	if err != nil {
+		if s.registerFailedAttempt(ctx, email, "FORGOT_PASSWORD") {
+			return errors.New("too many invalid OTP attempts. Please request a new OTP.")
+		}
+		return errors.New("invalid or expired OTP")
+	}
+	s.clearAttempts(ctx, email, "FORGOT_PASSWORD")
+	return nil
 }
 
 func (s *authService) ResetPassword(ctx context.Context, req *domain.ResetPasswordRequest) error {
@@ -310,10 +378,17 @@ func (s *authService) ResetPassword(ctx context.Context, req *domain.ResetPasswo
 		return errors.New("password must contain at least one uppercase letter and one number")
 	}
 
+	if s.isOtpLocked(ctx, req.Email, "FORGOT_PASSWORD") {
+		return errors.New("too many invalid OTP attempts. Please request a new OTP.")
+	}
 	err := s.otpRepo.ConsumeOTP(ctx, req.Email, hashOTP(req.OTP, s.jwtSecret), "FORGOT_PASSWORD")
 	if err != nil {
+		if s.registerFailedAttempt(ctx, req.Email, "FORGOT_PASSWORD") {
+			return errors.New("too many invalid OTP attempts. Please request a new OTP.")
+		}
 		return errors.New("invalid or expired OTP")
 	}
+	s.clearAttempts(ctx, req.Email, "FORGOT_PASSWORD")
 
 	user, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil || user == nil {

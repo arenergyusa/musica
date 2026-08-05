@@ -55,10 +55,3 @@ func (h *WithdrawalHandler) GetHistory(c *gin.Context) {
 
 	response.Success(c, http.StatusOK, "Withdrawals retrieved successfully", wds)
 }
-
-func (h *WithdrawalHandler) GetNextDates(c *gin.Context) {
-	nextDate := h.wdService.GetNextWithdrawalDate()
-	response.Success(c, http.StatusOK, "Next withdrawal date", gin.H{
-		"next_date": nextDate.Format("2006-01-02"),
-	})
-}

@@ -70,16 +70,17 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 		return nil, errors.New("investment amount must be a multiple of $100 USD")
 	}
 
-	// Check working vs non-working
-	isWorking, err := s.mlmRepo.HasActiveDirectReferral(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
+	// Check working vs non-working based on 15-level unlock rule
 	settings, err := s.settingsRepo.GetSettings(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	status, err := GetUserStatus(ctx, s.invRepo, s.mlmRepo, userID, settings)
+	if err != nil {
+		return nil, err
+	}
+	isWorking := status == UserStatusWorking
 
 	capMultiplier := GetIncomeCap(isWorking, settings)
 	capLimit := req.Amount * capMultiplier

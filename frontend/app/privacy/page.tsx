@@ -30,7 +30,7 @@ export default function PrivacyPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[#F8F9FA] dark:bg-slate-800/60 rounded-lg border border-slate-200/80 dark:border-slate-800 gap-3 text-xs">
               <div className="flex items-center gap-2.5">
                 <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                <span className="font-bold text-slate-900 dark:text-white">Pure Desi Music</span>
+                <span className="font-bold text-slate-900 dark:text-white">Musica</span>
               </div>
               <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400">
 
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
                 1. Introduction
               </h2>
               <p>
-                <strong>Pure Desi Music</strong> (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) respects your privacy and is committed to protecting your personal data. This privacy policy explains how we collect, process, and safeguard your personal information when you use our Haryanvi music streaming platform, <strong>Musica</strong> (https://the-musica.com).
+                <strong>Musica</strong> (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) respects your privacy and is committed to protecting your personal data. This privacy policy explains how we collect, process, and safeguard your personal information when you use our Haryanvi music streaming platform, <strong>Musica</strong> (https://the-musica.com).
               </p>
             </section>
 
