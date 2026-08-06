@@ -106,7 +106,9 @@ func (s *userService) GetDashboard(ctx context.Context, userID uuid.UUID) (map[s
 
 	status := UserStatusInactive
 	if settings != nil {
-		status, _ = GetUserStatus(ctx, s.invRepo, s.mlmRepo, userID, settings)
+		if st, err := GetUserStatus(ctx, s.invRepo, s.mlmRepo, userID, settings); err == nil {
+			status = st
+		}
 	}
 
 	var bal, totalW, totalC, salaryInc float64

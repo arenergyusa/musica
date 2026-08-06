@@ -148,6 +148,9 @@ func (r *investmentRepository) UpdateInvestmentStatusAtomic(ctx context.Context,
 	if toStatus == "CLOSED" {
 		query = `UPDATE sponsorships SET status = $1, closed_at = CURRENT_TIMESTAMP WHERE id = $2 AND status = $3`
 	}
+	if toStatus == "ACTIVE" {
+		query = `UPDATE sponsorships SET status = $1, activated_at = CURRENT_TIMESTAMP WHERE id = $2 AND status = $3`
+	}
 	tag, err := r.db.Exec(ctx, query, toStatus, id, fromStatus)
 	if err != nil {
 		return 0, err
@@ -155,10 +158,21 @@ func (r *investmentRepository) UpdateInvestmentStatusAtomic(ctx context.Context,
 	return tag.RowsAffected(), nil
 }
 
-func (r *investmentRepository) ConfirmDepositAtomic(ctx context.Context, id, userID uuid.UUID, txHash string) (int64, error) {
-	tag, err := r.db.Exec(ctx, `
+// UpdateInvestmentCap rewrites a sponsorship's cap limit and its working flag.
+// Used to upgrade the multiplier once an owner's WORKING status can be proven
+// at activation time (M7).
+func (r *investmentRepository) UpdateInvestmentCap(ctx context.Context, id uuid.UUID, capLimit float64, isWorking bool) (int64, error) {
+	tag, err := r.db.Exec(ctx, `UPDATE sponsorships SET cap_limit = $1, working_cap_at_creation = $2 WHERE id = $3`, capLimit, isWorking, id)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *investmentRepository) ConfirmDepositAtomic(ctx context.Context, id, userID uuid.UUID, txHash string) (int64, error) {	tag, err := r.db.Exec(ctx, `
 		UPDATE sponsorships
-		SET status = 'ACTIVE', deposit_tx_hash = $1, deposit_confirmed_at = CURRENT_TIMESTAMP
+		SET status = 'ACTIVE', deposit_tx_hash = $1, deposit_confirmed_at = CURRENT_TIMESTAMP,
+		    activated_at = CURRENT_TIMESTAMP
 		WHERE id = $2 AND user_id = $3 AND status = 'PENDING'`, txHash, id, userID)
 	if err != nil { return 0, err }
 	return tag.RowsAffected(), nil

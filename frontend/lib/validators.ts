@@ -105,8 +105,9 @@ export const rejectWithReasonSchema = z.object({
 export const approveWithdrawalSchema = z.object({
   adminNote: z
     .string()
+    .trim()
     .optional()
-    .refine((v) => v === undefined || v.trim().length <= 500, {
+    .refine((v) => v === undefined || v.length <= 500, {
       message: "Admin note must be at most 500 characters",
     }),
 });

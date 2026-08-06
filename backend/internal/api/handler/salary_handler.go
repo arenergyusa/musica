@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
@@ -40,6 +41,7 @@ func (h *SalaryHandler) DivideDownlines(c *gin.Context) {
     for i, idStr := range payload.DownlineIDs {
         downID, parseErr := uuid.Parse(idStr)
         if parseErr != nil {
+            log.Printf("salary: divide-downlines: skipping invalid downline id %q: %v", idStr, parseErr)
             continue // skip invalid IDs
         }
         leg := "LEFT"
@@ -48,6 +50,7 @@ func (h *SalaryHandler) DivideDownlines(c *gin.Context) {
         }
         // Update in repository
         if updErr := h.salaryRepo.SetDownlineLeg(c.Request.Context(), userID, downID, leg); updErr != nil {
+            log.Printf("salary: divide-downlines: failed to set leg %s for downline %s: %v", leg, downID, updErr)
             locked++
         } else {
             assigned++

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
@@ -49,6 +50,9 @@ type JobRunner struct {
 	mlmRepo      repository.MLMRepository
 	walletRepo   repository.WalletRepository
 	settingsRepo repository.SettingsRepository
+	salaryRepo   repository.SalaryRepository
+	wdSvc        service.WithdrawalService
+	startupWG    sync.WaitGroup
 }
 
 func NewJobRunner(
@@ -57,6 +61,8 @@ func NewJobRunner(
 	mlmRepo repository.MLMRepository,
 	walletRepo repository.WalletRepository,
 	settingsRepo repository.SettingsRepository,
+	salaryRepo repository.SalaryRepository,
+	wdSvc service.WithdrawalService,
 ) *JobRunner {
 	c := cron.New(cron.WithParser(cron.NewParser(
 		cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
@@ -68,12 +74,17 @@ func NewJobRunner(
 		mlmRepo:      mlmRepo,
 		walletRepo:   walletRepo,
 		settingsRepo: settingsRepo,
+		salaryRepo:   salaryRepo,
+		wdSvc:        wdSvc,
 	}
 }
 
 func (j *JobRunner) Start() {
-	// 1. Run catchup check asynchronously on startup so container restarts/rebuilds never miss any past or current day's ROI
+	// 1. Run catchup check asynchronously on startup so container restarts/rebuilds never miss any past or current day's ROI.
+	//    Track it in startupWG so graceful shutdown (H14) waits for the credit to finish instead of dying mid-transaction.
+	j.startupWG.Add(1)
 	go func() {
+		defer j.startupWG.Done()
 		log.Println("Running startup catch-up check for daily rewards...")
 		j.distributeDailyRewardAndLevelIncome()
 	}()
@@ -86,12 +97,46 @@ func (j *JobRunner) Start() {
 		log.Printf("ERROR: Failed to schedule daily reward cron job: %v", err)
 	}
 
+	// 3. Withdrawal reconciliation every 5 minutes: finalize PROCESSING rows by
+	//    checking their tx on-chain and refund confirmed-absent payouts.
+	if j.wdSvc != nil {
+		_, err = j.cron.AddFunc("0 */5 * * * *", func() {
+			log.Println("Running withdrawal reconciliation...")
+			if rerr := j.wdSvc.ReconcilePendingWithdrawals(context.Background()); rerr != nil {
+				log.Printf("CRON ERROR: withdrawal reconciliation failed: %v", rerr)
+			}
+		})
+		if err != nil {
+			log.Printf("ERROR: Failed to schedule withdrawal reconciliation cron job: %v", err)
+		}
+	}
+
+	// 4. Monthly salary payout on the 1st of each month at 00:05 UTC (M11).
+	//    Payouts are idempotent per (user, cycle_month) so an overlapping manual
+	//    admin trigger can never double-pay.
+	if j.salaryRepo != nil {
+		_, err = j.cron.AddFunc("0 5 0 1 * *", func() {
+			log.Println("Running monthly salary payout job...")
+			count, total, serr := j.salaryRepo.ProcessMonthlySalaryPayouts(context.Background())
+			if serr != nil {
+				log.Printf("CRON ERROR: monthly salary payout failed: %v", serr)
+				return
+			}
+			log.Printf("Monthly salary payout done: %d payouts, total $%.2f", count, total)
+		})
+		if err != nil {
+			log.Printf("ERROR: Failed to schedule salary payout cron job: %v", err)
+		}
+	}
+
 	j.cron.Start()
-	log.Println("Cron JobRunner started. Daily Reward scheduled for 00:00 IST (18:30 UTC).")
+	log.Println("Cron JobRunner started. Daily Reward scheduled for 00:00 IST (18:30 UTC); withdrawal reconciliation every 5 min; salary payout 1st of month.")
 }
 
 func (j *JobRunner) Stop() {
 	j.cron.Stop()
+	// Wait for any in-flight startup catch-up credit to land (H14).
+	j.startupWG.Wait()
 }
 
 // distributeDailyRewardAndLevelIncome is the main daily cron job that:
@@ -140,9 +185,14 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 		return
 	}
 
-	now := time.Now()
+	// Daily rewards are scheduled at 00:00 IST, so derive all calendar boundaries
+	// (today, days-in-month, first day of month) in IST and compare the
+	// investment's creation time in the same zone to avoid mixing local and UTC
+	// boundaries in the full-month calculation.
+	loc := time.FixedZone("IST", 5*60*60+30*60)
+	now := time.Now().In(loc)
 	today := now.Format("2006-01-02")
-	daysInCurrentMonth := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	daysInCurrentMonth := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, loc).Day()
 	var roiProcessed, levelIncomeDistributed int
 
 	for _, inv := range investments {
@@ -158,8 +208,8 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 		if monthlyPct <= 0 {
 			monthlyPct = 10.0
 		}
-		firstDayOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		isFullMonth := !freshInv.CreatedAt.After(firstDayOfMonth)
+		firstDayOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
+		isFullMonth := !freshInv.CreatedAt.In(loc).After(firstDayOfMonth)
 		isFinalDay := now.Day() == daysInCurrentMonth && isFullMonth
 
 		roiAmount := service.CalculateDailyRewardForMonth(freshInv.Amount, monthlyPct, daysInCurrentMonth, isFinalDay)
@@ -196,11 +246,10 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 			continue
 		}
 
-		// Update cap tracker (also auto-marks CAPPED/CLOSED if cap reached)
-		if err = j.invRepo.UpdateCapTracker(ctx, freshInv.ID, roiAmount); err != nil {
-			log.Printf("CRON ERROR: Failed to update cap tracker for inv %s: %v", freshInv.ID, err)
-		}
-
+		// Cap accounting for this reward is done atomically inside
+		// CreditReward's transaction (C4): the daily_reward_log gate ensures
+		// this credit runs exactly once, and the same tx consumes the
+		// investment's cap with a row lock and flips it to CLOSED when reached.
 		freshInv.TotalRewardEarned += roiAmount
 		roiProcessed++
 
@@ -292,12 +341,16 @@ func (j *JobRunner) distributeLevelIncome(
 
 		desc := fmt.Sprintf("Level %d income from network activity (%s)", levelNum, today)
 
-		// Credit bounded reward to upline's wallet
-		err = j.walletRepo.CreditReward(
-			ctx, uplineUserID, levelIncomeAmt,
-			"CREDIT", "LEVEL_INCOME", sourceInvID.String(), desc,
+		// Credit bounded reward to upline's wallet. The level_income_log unique
+		// index gates this so a duplicate run never double-credits (C5); on
+		// ErrAlreadyProcessed we skip BOTH the credit and the cap consumption.
+		err = j.walletRepo.CreditLevelIncomeWithLog(
+			ctx, uplineUserID, downlineUserID, sourceInvID, levelNum, levelIncomeAmt, desc,
 		)
 		if err != nil {
+			if errors.Is(err, repository.ErrAlreadyProcessed) {
+				continue
+			}
 			log.Printf("CRON ERROR: level income: failed to credit user %s: %v", uplineUserID, err)
 			continue
 		}

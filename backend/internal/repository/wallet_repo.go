@@ -40,17 +40,11 @@ func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, a
 	}
 	defer tx.Rollback(ctx)
 
-	// Handle empty refID correctly if UUID
-	var ref interface{} = refID
-	if refID == "" {
-		ref = nil
-	}
-
 	// For DAILY_REWARD the idempotency log insert gates the credit: if this
 	// investment+date was already processed (concurrent cron run, restart, etc.)
 	// the insert conflicts, no row is returned and the whole transaction aborts
 	// before the wallet or transactions tables are touched.
-	if source == "DAILY_REWARD" && ref != nil {
+	if source == "DAILY_REWARD" && refID != "" {
 		logQuery := `
 			INSERT INTO daily_reward_log (investment_id, user_id, amount, date, processed_at)
 			VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIMESTAMP)
@@ -58,12 +52,42 @@ func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, a
 			RETURNING id
 		`
 		var logID uuid.UUID
-		if err := tx.QueryRow(ctx, logQuery, ref, userID, amount).Scan(&logID); err != nil {
+		if err := tx.QueryRow(ctx, logQuery, refID, userID, amount).Scan(&logID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrAlreadyProcessed
 			}
 			return err
 		}
+	}
+
+	if err := creditWalletTx(ctx, tx, userID, amount, txType, source, refID, desc); err != nil {
+		return err
+	}
+
+	// C4: consume the investment's income cap in the SAME transaction as the
+	// wallet credit so a crash can never leave a credited reward without cap
+	// accounting (previously the cron updated income_cap_tracker in a separate
+	// transaction, which could desync). The daily_reward_log gate above already
+	// guarantees this credit runs exactly once, and applyCapInTx locks the
+	// sponsorship row so concurrent cap updates serialize.
+	if source == "DAILY_REWARD" && refID != "" {
+		invID, uuidErr := uuid.Parse(refID)
+		if uuidErr == nil {
+			if err := applyCapInTx(ctx, tx, invID, amount); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+// creditWalletTx atomically upserts the wallet balance and appends a
+// transaction row inside an already-open transaction.
+func creditWalletTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, amount float64, txType string, source string, refID string, desc string) error {
+	var ref interface{} = refID
+	if refID == "" {
+		ref = nil
 	}
 
 	// Ensure wallet exists or update atomically
@@ -75,8 +99,7 @@ func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, a
 		    total_credited = reward_wallet.total_credited + EXCLUDED.total_credited,
 		    updated_at = CURRENT_TIMESTAMP
 	`
-	_, err = tx.Exec(ctx, walletQuery, amount, userID)
-	if err != nil {
+	if _, err := tx.Exec(ctx, walletQuery, amount, userID); err != nil {
 		return err
 	}
 
@@ -85,12 +108,94 @@ func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, a
 		INSERT INTO transactions (user_id, type, amount, source, reference_id, description)
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`
-	_, err = tx.Exec(ctx, txQuery, userID, txType, amount, source, ref, desc)
+	_, err := tx.Exec(ctx, txQuery, userID, txType, amount, source, ref, desc)
+	return err
+}
+
+// CreditLevelIncomeWithLog credits level income to a beneficiary's wallet and
+// records the payout in level_income_log atomically. The unique index on
+// (beneficiary_user_id, source_sponsorship_id, level, date) makes the credit
+// idempotent: a retry of the same cron run (restart, concurrent replica)
+// returns ErrAlreadyProcessed instead of double-crediting the wallet or
+// double-consuming the upline's cap (C5).
+func (r *walletRepository) CreditLevelIncomeWithLog(ctx context.Context, beneficiaryID uuid.UUID, sourceUserID uuid.UUID, sourceInvID uuid.UUID, level int, amount float64, desc string) error {
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	logQuery := `
+		INSERT INTO level_income_log (beneficiary_user_id, source_user_id, source_sponsorship_id, level, amount, date)
+		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE)
+		ON CONFLICT (beneficiary_user_id, source_sponsorship_id, level, date) DO NOTHING
+		RETURNING id
+	`
+	var logID uuid.UUID
+	if err := tx.QueryRow(ctx, logQuery, beneficiaryID, sourceUserID, sourceInvID, level, amount).Scan(&logID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrAlreadyProcessed
+		}
+		return err
+	}
+
+	if err := creditWalletTx(ctx, tx, beneficiaryID, amount, "CREDIT", "LEVEL_INCOME", sourceInvID.String(), desc); err != nil {
 		return err
 	}
 
 	return tx.Commit(ctx)
+}
+
+// applyCapInTx consumes `amount` from an investment's income cap inside an
+// already-open transaction. It locks both the income_cap_tracker and the
+// sponsorship row so concurrent cap updates serialize, then keeps
+// income_cap_tracker.total_reward_earned and sponsorships.total_reward_earned
+// in sync (bounded at cap_limit) and flips the investment to CLOSED once the
+// cap is reached. Missing tracker rows are treated as no-ops so pre-existing
+// data cannot block a credit.
+func applyCapInTx(ctx context.Context, tx pgx.Tx, investmentID uuid.UUID, amount float64) error {
+	var total, cap float64
+	err := tx.QueryRow(ctx, `
+		SELECT ic.total_reward_earned, ic.cap_limit
+		FROM income_cap_tracker ic
+		JOIN sponsorships s ON s.id = ic.sponsorship_id
+		WHERE ic.sponsorship_id = $1
+		FOR UPDATE OF ic, s
+	`, investmentID).Scan(&total, &cap)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+
+	newTotal := total + amount
+	if newTotal > cap {
+		newTotal = cap
+	}
+	capped := newTotal >= cap && cap > 0
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE income_cap_tracker
+		SET total_reward_earned = $1,
+		    is_capped = $2,
+		    capped_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE capped_at END,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE sponsorship_id = $3
+	`, newTotal, capped, investmentID); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE sponsorships
+		SET total_reward_earned = $1,
+		    status = CASE WHEN $2 THEN 'CLOSED' ELSE status END,
+		    closed_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE closed_at END
+		WHERE id = $3
+	`, newTotal, capped, investmentID); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *walletRepository) DebitWithdrawal(ctx context.Context, userID uuid.UUID, amount float64, refID string, desc string) error {
@@ -200,9 +305,18 @@ func (r *walletRepository) GetIncomeChartData(ctx context.Context, userID uuid.U
 	return data, nil
 }
 
+// GetTotalPaid returns total platform income paid to users. Only genuine income
+// sources count — withdrawal refunds (CREDIT + source WITHDRAWAL) and any other
+// non-income credits are excluded so the admin "total paid" figure is not
+// inflated (H11).
 func (r *walletRepository) GetTotalPaid(ctx context.Context) (float64, error) {
 	var total float64
-	err := r.db.QueryRow(ctx, "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type = 'CREDIT'").Scan(&total)
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(SUM(amount), 0)
+		FROM transactions
+		WHERE type = 'CREDIT'
+		  AND source IN ('DAILY_REWARD', 'LEVEL_INCOME', 'INVITE', 'SALARY_INCOME')
+	`).Scan(&total)
 	return total, err
 }
 

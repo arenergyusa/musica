@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -240,8 +241,8 @@ type UpdateSettingsRequest struct {
 	LevelIncomeL3Pct        *float64 `json:"level_income_l3_pct" binding:"required,min=0,max=100"`
 	LevelIncomeL4ToL10Pct   *float64 `json:"level_income_l4_to_l10_pct" binding:"required,min=0,max=100"`
 	LevelIncomeL11ToL15Pct  *float64 `json:"level_income_l11_to_l15_pct" binding:"required,min=0,max=100"`
-	NonWorkingCapMultiplier *float64 `json:"non_working_cap_multiplier" binding:"required,min=1"`
-	WorkingCapMultiplier    *float64 `json:"working_cap_multiplier" binding:"required,min=1"`
+	NonWorkingCapMultiplier *float64 `json:"non_working_cap_multiplier" binding:"required,min=1,max=20"`
+	WorkingCapMultiplier    *float64 `json:"working_cap_multiplier" binding:"required,min=1,max=20"`
 }
 
 func (h *AdminHandler) UpdateSettings(c *gin.Context) {
@@ -287,6 +288,14 @@ func (h *AdminHandler) UpdateSettings(c *gin.Context) {
 		handleServiceError(c, err, "Failed to update settings")
 		return
 	}
+	// Settings changes are financially sensitive; keep an audit trail (M12).
+	log.Printf(
+		"ADMIN AUDIT: settings updated by actor=%s | monthly_pct=%.4f | nonworking_cap=%.1fx | working_cap=%.1fx",
+		c.GetString("user_id"),
+		*req.MonthlyRewardPct,
+		*req.NonWorkingCapMultiplier,
+		*req.WorkingCapMultiplier,
+	)
 	response.Success(c, http.StatusOK, "Settings updated successfully", nil)
 }
 

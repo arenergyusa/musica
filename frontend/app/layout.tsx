@@ -11,10 +11,10 @@ import { AutoLogout } from "@/components/AutoLogout";
 export const metadata: Metadata = {
   metadataBase: new URL(APP.URL),
   title: {
-    default: "Musica — Official Haryanvi Music Videos & Song Streaming",
+    default: "Musica — Community Rewards & Income Platform",
     template: "%s | Musica",
   },
-  description: "Official Musica streaming platform. Watch trending Haryanvi music videos, audio releases, and studio tracks in high definition.",
+  description: "Musica is a community-driven rewards platform. Earn daily rewards, level income, and monthly salary through sponsorships and team building.",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -25,32 +25,33 @@ export const metadata: Metadata = {
   },
   keywords: [
     "Musica",
-    "Musica Streaming",
-    "Musica Haryanvi",
-    "Musica Music Videos",
-    "Haryanvi Music Videos",
-    "Haryanvi Songs",
+    "Musica Rewards",
+    "Musica Income",
+    "Community Rewards",
+    "Sponsorship Plans",
+    "Level Income",
+    "Monthly Salary",
   ],
   openGraph: {
     type: "website",
     locale: "en_IN",
     siteName: "Musica",
-    title: "Musica — Official Haryanvi Music Videos & Tracks",
-    description: "Stream official Haryanvi music videos & studio song releases on Musica.",
+    title: "Musica — Community Rewards & Income Platform",
+    description: "Earn daily rewards, level income, and monthly salary by building your Musica team.",
     url: "https://the-musica.com",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Musica — Official Haryanvi Music Streaming Platform",
+        alt: "Musica — Community Rewards Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Musica — Haryanvi Music Streaming",
-    description: "Official Haryanvi music video releases on Musica.",
+    title: "Musica — Community Rewards",
+    description: "Earn daily rewards, level income, and monthly salary with Musica.",
   },
   robots: {
     index: true,

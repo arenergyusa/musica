@@ -128,7 +128,7 @@ export const NAV_LINKS = [
 export const USER_NAV = [
   { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
   { label: "Invest", href: "/invest", icon: "TrendingUp" },
-  { label: "My Investments", href: "/investments", icon: "Wallet" },
+  { label: "My Investments", href: "/investments", icon: "Briefcase" },
   { label: "Wallet", href: "/wallet", icon: "Wallet" },
   { label: "Withdraw", href: "/withdraw", icon: "ArrowDownToLine" },
   { label: "Team & Network", href: "/team", icon: "Users" },

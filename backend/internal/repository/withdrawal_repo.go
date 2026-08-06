@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/google/uuid"
@@ -80,20 +81,55 @@ func (r *withdrawalRepository) UpdateRequestStatus(ctx context.Context, id uuid.
 	query := `
 		UPDATE withdrawals 
 		SET status = $1, admin_note = $2, processed_at = CURRENT_TIMESTAMP
-		WHERE id = $3
+		WHERE id = $3 AND status = 'PENDING'
 	`
-	_, err := r.db.Exec(ctx, query, status, adminNote, id)
-	return err
+	tag, err := r.db.Exec(ctx, query, status, adminNote, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return errors.New("withdrawal is not pending")
+	}
+	return nil
 }
 
 func (r *withdrawalRepository) UpdateRequestStatusWithRef(ctx context.Context, id uuid.UUID, status string, paymentRef string, adminNote string) error {
+	// Only PENDING/PROCESSING rows may transition to PROCESSED — a REJECTED
+	// (refunded) or already-PROCESSED row must never be flipped again.
 	query := `
 		UPDATE withdrawals 
 		SET status = $1, payment_ref = $2, admin_note = $3, processed_at = CURRENT_TIMESTAMP
-		WHERE id = $4
+		WHERE id = $4 AND status IN ('PENDING', 'PROCESSING')
 	`
 	_, err := r.db.Exec(ctx, query, status, paymentRef, adminNote, id)
 	return err
+}
+
+func (r *withdrawalRepository) GetProcessing(ctx context.Context) ([]*domain.Withdrawal, error) {
+	query := `
+		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, payment_ref, scheduled_date, processed_at, admin_note, created_at
+		FROM withdrawals
+		WHERE status = 'PROCESSING' AND payment_ref IS NOT NULL AND payment_ref != ''
+		ORDER BY created_at ASC
+	`
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var wds []*domain.Withdrawal
+	for rows.Next() {
+		w := &domain.Withdrawal{}
+		if err := rows.Scan(&w.ID, &w.UserID, &w.AmountRequested, &w.TDSAmount, &w.NetAmount, &w.Status, &w.PaymentRef, &w.ScheduledDate, &w.ProcessedAt, &w.AdminNote, &w.CreatedAt); err != nil {
+			return nil, err
+		}
+		wds = append(wds, w)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return wds, nil
 }
 
 func (r *withdrawalRepository) GetPendingCount(ctx context.Context) (int, error) {
@@ -103,7 +139,16 @@ func (r *withdrawalRepository) GetPendingCount(ctx context.Context) (int, error)
 }
 
 func (r *withdrawalRepository) GetAll(ctx context.Context, limit, offset int) ([]*domain.Withdrawal, error) {
-	query := "SELECT id, user_id, amount_requested, status, admin_note, created_at FROM withdrawals ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+	// Join the user's USDT address so admins can see the payout destination
+	// alongside the requested/net amounts (M18).
+	query := `
+		SELECT w.id, w.user_id, w.amount_requested, w.tds_amount, w.net_amount,
+		       w.status, w.payment_ref, w.admin_note, w.created_at,
+		       COALESCE(u.usdt_address, '')
+		FROM withdrawals w
+		LEFT JOIN users u ON u.id = w.user_id
+		ORDER BY w.created_at DESC LIMIT $1 OFFSET $2
+	`
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, err
@@ -113,7 +158,7 @@ func (r *withdrawalRepository) GetAll(ctx context.Context, limit, offset int) ([
 	var wds []*domain.Withdrawal
 	for rows.Next() {
 		w := &domain.Withdrawal{}
-		err := rows.Scan(&w.ID, &w.UserID, &w.AmountRequested, &w.Status, &w.AdminNote, &w.CreatedAt)
+		err := rows.Scan(&w.ID, &w.UserID, &w.AmountRequested, &w.TDSAmount, &w.NetAmount, &w.Status, &w.PaymentRef, &w.AdminNote, &w.CreatedAt, &w.UsdtAddress)
 		if err != nil {
 			return nil, err
 		}

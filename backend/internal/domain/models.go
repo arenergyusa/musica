@@ -80,6 +80,7 @@ type Withdrawal struct {
 	ProcessedAt     *time.Time `json:"processed_at,omitempty" db:"processed_at"`
 	AdminNote       string     `json:"admin_note,omitempty" db:"admin_note"`
 	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	UsdtAddress     string     `json:"usdt_address,omitempty" db:"usdt_address"`
 }
 
 type PlatformSettings struct {

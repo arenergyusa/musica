@@ -50,9 +50,12 @@ import {
 export default function AdminWithdrawalsPage() {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const PAGE_SIZE = 20;
+  const [hasMore, setHasMore] = useState(true);
   
   // Modals state
   const [approveModalOpen, setApproveModalOpen] = useState(false);
@@ -65,32 +68,46 @@ export default function AdminWithdrawalsPage() {
     fetchWithdrawals();
   }, []);
 
-  const fetchWithdrawals = async () => {
-    setIsLoading(true);
+  const fetchWithdrawals = async (offset = 0, append = false) => {
+    if (!append) setIsLoading(true);
+    else setIsLoadingMore(true);
     try {
-      const res = await api.get("/admin/withdrawals");
+      const res = await api.get(`/admin/withdrawals`, {
+        params: { limit: PAGE_SIZE, offset },
+      });
       if (res.data.data) {
         const mapped = res.data.data.map((w: Withdrawal) => ({
           id: w.id,
           user: w.user_id,
-          amount: w.amount,
-          requested: new Date(w.created_at || '').toLocaleString(),
+          amount: w.amount_requested ?? w.amount ?? 0,
+          requested: w.created_at ? new Date(w.created_at).toLocaleString() : "N/A",
           status: w.status,
           usdt_address: (w as any).usdt_address || (w as any).payment_ref || "N/A",
           tx_hash: (w as any).tx_hash || "",
           reason: w.admin_note
         }));
-        setWithdrawals(mapped);
+        setWithdrawals(prev => (append ? [...prev, ...mapped] : mapped));
+        setHasMore(mapped.length === PAGE_SIZE);
+      } else {
+        setHasMore(false);
       }
     } catch (err) {
       console.error("Failed to load withdrawals", err);
-      toast.error("Failed to fetch payout requests");
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   };
 
+  const handleLoadMore = () => {
+    fetchWithdrawals(withdrawals.length, true);
+  };
+
   const handleAction = async (actionType: "approve" | "reject") => {
+    if (!adminNote.trim()) {
+      toast.error(`An admin note is required to ${actionType} a payout`);
+      return;
+    }
     setIsSubmitting(true);
     try {
       const targetIds = activeTx ? [activeTx.id] : selectedIds;
@@ -115,7 +132,6 @@ export default function AdminWithdrawalsPage() {
       fetchWithdrawals();
     } catch (error) {
       console.error(`Failed to ${actionType} withdrawal`, error);
-      toast.error(`Action failed. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -146,6 +162,12 @@ export default function AdminWithdrawalsPage() {
     }
   };
 
+  // Batch total: sum of the requested amounts for the selected rows
+  const selectedTotal = selectedIds.reduce((sum, id) => {
+    const w = withdrawals.find(x => x.id === id);
+    return sum + (w?.amount ?? 0);
+  }, 0);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
@@ -162,7 +184,7 @@ export default function AdminWithdrawalsPage() {
         </div>
 
         <Button 
-          onClick={fetchWithdrawals} 
+          onClick={() => fetchWithdrawals()} 
           variant="outline" 
           size="sm" 
           className="bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700 text-xs font-bold rounded-xl h-9 self-start sm:self-auto"
@@ -314,6 +336,20 @@ export default function AdminWithdrawalsPage() {
               )}
             </TableBody>
           </Table>
+          {hasMore && (
+            <div className="p-3 border-t border-slate-100 dark:border-slate-800 flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className="text-xs font-bold rounded-lg h-8"
+              >
+                {isLoadingMore && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                {isLoadingMore ? "Loading..." : "Load More"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -330,11 +366,11 @@ export default function AdminWithdrawalsPage() {
             <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-1 font-mono">
               <div className="flex justify-between text-slate-500">
                 <span>Total Payout Amount:</span>
-                <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(activeTx ? activeTx.amount : 0)}</span>
+                <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(activeTx ? activeTx.amount : selectedTotal)}</span>
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Admin Note (Optional)</Label>
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Admin Note (Required)</Label>
               <Input
                 placeholder="Optional notes or transaction hash..."
                 value={adminNote}
@@ -365,7 +401,7 @@ export default function AdminWithdrawalsPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Rejection Reason</Label>
+              <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Rejection Reason (Required)</Label>
               <Input
                 placeholder="Reason for rejection (e.g. Invalid USDT address)..."
                 value={adminNote}

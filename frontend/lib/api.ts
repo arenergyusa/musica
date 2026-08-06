@@ -20,52 +20,52 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-// Request Interceptor to attach JWT token
+// Request Interceptor: the JWT is carried in an httpOnly, Secure cookie set by
+// the backend (M29). We do NOT touch localStorage, so a stored-token XSS
+// escalation vector is removed.
 api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    // We only access localStorage in the browser
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error: AxiosError) => {
-    return Promise.reject(error);
-  }
+  (config: InternalAxiosRequestConfig) => config,
+  (error: AxiosError) => Promise.reject(error)
 );
 
-// Response Interceptor for global error handling
+// Auth endpoints where a 401 is an expected, user-facing validation error
+// (bad credentials, expired OTP, etc.). These are handled by the form itself,
+// so the interceptor must stay silent and NOT redirect (M26).
+const AUTH_401_ENDPOINTS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/auth/verify',
+  '/auth/reset-password',
+  '/auth/resend-otp',
+  '/user/profile', // AuthProvider auth-state probe on mount — silent
+];
+
+const isSilent401 = (url?: string) =>
+  !!url && AUTH_401_ENDPOINTS.some((prefix) => url.includes(prefix));
+
+// Response Interceptor for global error handling. Toasting lives here as the
+// single source of truth; 401 handling only hard-redirects for protected
+// (non-auth) API calls (M26, M29).
 api.interceptors.response.use(
-  (response: AxiosResponse) => {
-    return response;
-  },
+  (response: AxiosResponse) => response,
   (error: AxiosError<{ message?: string }>) => {
     if (error.response) {
       const status = error.response.status;
       const message = error.response.data?.message || 'Something went wrong';
 
       if (status === 401) {
-        const isAuthRoute = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register');
-        
-        if (isAuthRoute) {
-          // If it's a 401 on login, just show the error message (e.g., "invalid credentials")
-          toast.error(message || 'Invalid email or password');
-        } else {
-          // Handle unauthorized (e.g. token expired) for protected routes
-          toast.error('Session expired. Please login again.');
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('token');
-            document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            window.location.href = '/login';
-          }
+        if (isSilent401(error.config?.url)) {
+          return Promise.reject(error);
+        }
+        toast.error('Session expired. Please login again.');
+        if (typeof window !== 'undefined') {
+          document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax;";
+          window.location.href = '/login?session_expired=true';
         }
       } else if (status >= 500) {
         toast.error('Internal Server Error. Please try again later.');
       } else {
-        // Show the specific error message from the backend
         toast.error(message);
       }
     } else if (error.request) {

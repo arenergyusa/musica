@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -10,11 +10,16 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server/main.go
 
 # Production stage
-FROM alpine:latest
+FROM alpine:3.21
+
+RUN addgroup -S app && adduser -S -G app app
 
 WORKDIR /app
 COPY --from=builder /app/main .
 COPY migrations ./migrations
+RUN chown -R app:app /app
+
+USER app
 
 EXPOSE 8080
 

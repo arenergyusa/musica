@@ -15,6 +15,7 @@ type UserRepository interface {
 	GetByPhone(ctx context.Context, phone string) (*domain.User, error)
 	GetByInviteCode(ctx context.Context, code string) (*domain.User, error)
 	Update(ctx context.Context, user *domain.User) error
+	Delete(ctx context.Context, id uuid.UUID) error
 	GetTotalCount(ctx context.Context) (int, error)
 	GetAll(ctx context.Context, limit, offset int) ([]*domain.User, error)
 	// SearchUsers filters by optional name/email search and status
@@ -36,6 +37,9 @@ type InvestmentRepository interface {
 	ConfirmDepositAtomic(ctx context.Context, id, userID uuid.UUID, txHash string) (int64, error)
 	// Track cap
 	UpdateCapTracker(ctx context.Context, investmentID uuid.UUID, rewardAmount float64) error
+	// UpdateInvestmentCap rewrites the cap limit and working flag (used to
+	// upgrade a sponsorship's multiplier once WORKING status is provable).
+	UpdateInvestmentCap(ctx context.Context, id uuid.UUID, capLimit float64, isWorking bool) (int64, error)
 	GetActiveCount(ctx context.Context) (int, error)
 	GetTotalActiveInvested(ctx context.Context) (float64, error)
 	GetPendingCount(ctx context.Context) (int, error)
@@ -57,6 +61,11 @@ type WalletRepository interface {
 	GetDailyIncomeBySource(ctx context.Context, source string, days int) ([]map[string]interface{}, error)
 	GetLifetimeIncomeBySource(ctx context.Context, userID uuid.UUID, source string) (float64, error)
 	HasDailyRewardBeenProcessed(ctx context.Context, investmentID uuid.UUID, dateStr string) (bool, error)
+	// CreditLevelIncomeWithLog credits level income idempotently: it records the
+	// payout in level_income_log (unique per beneficiary+source+level+date) in
+	// the same transaction as the wallet credit, returning ErrAlreadyProcessed
+	// when the payout was already applied.
+	CreditLevelIncomeWithLog(ctx context.Context, beneficiaryID uuid.UUID, sourceUserID uuid.UUID, sourceInvID uuid.UUID, level int, amount float64, desc string) error
 }
 
 // MLMRepository handles invite tree and volume logic
@@ -81,6 +90,9 @@ type WithdrawalRepository interface {
 	GetPending(ctx context.Context) ([]*domain.Withdrawal, error)
 	UpdateRequestStatus(ctx context.Context, id uuid.UUID, status string, adminNote string) error
 	UpdateRequestStatusWithRef(ctx context.Context, id uuid.UUID, status string, paymentRef string, adminNote string) error
+	// GetProcessing returns withdrawals stuck in the ambiguous-broadcast state
+	// (PROCESSING with a payment_ref) that still need on-chain reconciliation.
+	GetProcessing(ctx context.Context) ([]*domain.Withdrawal, error)
 	GetPendingCount(ctx context.Context) (int, error)
 	GetAll(ctx context.Context, limit, offset int) ([]*domain.Withdrawal, error)
 }

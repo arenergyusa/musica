@@ -7,16 +7,18 @@ import (
 )
 
 type Config struct {
-	ServerPort    string
-	DBURL         string
-	RedisURL      string
-	JWTSecret     string
-	Environment   string
-	SMTPHost      string
-	SMTPPort      int
-	SMTPUser      string
-	SMTPPass      string
-	EncryptionKey string
+	ServerPort        string
+	DBURL             string
+	RedisURL          string
+	JWTSecret         string
+	Environment       string
+	SMTPHost          string
+	SMTPPort          int
+	SMTPUser          string
+	SMTPPass          string
+	EncryptionKey     string
+	CORSAllowedOrigins string
+	MigrationsPath    string
 }
 
 func getEnvOrDefault(key, defaultVal string) string {
@@ -36,6 +38,14 @@ func LoadConfig() (config Config, err error) {
 	}
 
 	config.RedisURL = os.Getenv("REDIS_URL")
+	if config.RedisURL == "" {
+		return config, fmt.Errorf("REDIS_URL is required")
+	}
+
+	config.CORSAllowedOrigins = getEnvOrDefault("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+
+	// Absolute path preferred so migrations are not dependent on the CWD (L4).
+	config.MigrationsPath = getEnvOrDefault("MIGRATIONS_PATH", "migrations")
 
 	config.JWTSecret = os.Getenv("JWT_SECRET")
 	if config.JWTSecret == "" {

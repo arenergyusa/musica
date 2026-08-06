@@ -58,11 +58,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.error('Logout API failed:', error);
     });
 
-    // Immediately clear client session
+    // Immediately clear client session. The JWT itself lives in an httpOnly
+    // cookie; clearing it here is best-effort (M29), the backend logout
+    // call above also blacklists the token.
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      // Clear cookie (fallback)
-      document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax;";
     }
     set({ user: null, isAuthenticated: false, isLoading: false });
     // Force reload or redirect to trigger middleware

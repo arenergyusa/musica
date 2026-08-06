@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Wallet, ArrowRight, Eye, EyeOff, DollarSign } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, nextSettlementDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -13,7 +13,26 @@ interface RewardWalletProps {
   totalEarned: number;
   totalWithdrawn: number;
   salaryIncome?: number;
-  nextWithdrawalDate?: Date;
+}
+
+function useSettlementCountdown() {
+  const [timeLeft, setTimeLeft] = useState({ h: 0, m: 0, s: 0 });
+
+  useEffect(() => {
+    function calc() {
+      const target = nextSettlementDate(new Date());
+      const diff = Math.max(0, target.getTime() - Date.now());
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setTimeLeft({ h, m, s });
+    }
+    calc();
+    const timer = setInterval(calc, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return timeLeft;
 }
 
 export function RewardWalletCard({
@@ -21,9 +40,10 @@ export function RewardWalletCard({
   totalEarned,
   totalWithdrawn,
   salaryIncome = 0,
-  nextWithdrawalDate = new Date(new Date().setHours(23, 59, 59, 999))
 }: RewardWalletProps) {
   const [showBalance, setShowBalance] = useState(true);
+  const { h, m, s } = useSettlementCountdown();
+  const pad = (n: number) => String(n).padStart(2, "0");
 
   return (
     <Card className="overflow-hidden bg-white dark:bg-slate-900 text-foreground border border-slate-200/80 dark:border-slate-800 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 relative">
@@ -40,7 +60,7 @@ export function RewardWalletCard({
             <div className="flex items-center flex-wrap sm:flex-nowrap gap-3">
               <div className="text-3xl sm:text-4xl font-extrabold tracking-tight flex items-center whitespace-nowrap text-slate-900 dark:text-white font-mono">
                 <DollarSign className="h-7 w-7 text-blue-600 dark:text-blue-400 shrink-0" />
-                <span>{showBalance ? balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "••••••"}</span>
+                <span>{showBalance ? formatCurrency(balance) : "••••••"}</span>
               </div>
               <Button
                 variant="ghost"
@@ -80,8 +100,8 @@ export function RewardWalletCard({
           </div>
           <div className="bg-slate-50/80 dark:bg-slate-800/50 p-3.5 rounded-lg border border-slate-100 dark:border-slate-800">
             <p className="text-slate-500 dark:text-slate-400 text-[11px] font-semibold uppercase tracking-wider mb-1">Next Settlement</p>
-            <p className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400 font-mono">
-              {nextWithdrawalDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            <p className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">
+              {pad(h)}:{pad(m)}:{pad(s)}
             </p>
           </div>
         </div>

@@ -14,9 +14,10 @@ export default function NotFound() {
         <p className="text-muted-foreground text-lg">
           Oops! It seems the page you are looking for doesn't exist, has been moved, or you don't have access to it.
         </p>
-        <Link href="/dashboard" passHref>
+        {/* /dashboard is auth-gated; always land on the public home page instead */}
+        <Link href="/" passHref>
           <Button size="lg" className="mt-4">
-            Return to Dashboard
+            Return to Home
           </Button>
         </Link>
       </div>

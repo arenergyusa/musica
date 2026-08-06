@@ -35,9 +35,15 @@ export default function ProfilePage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">{user.name}</h1>
-                <Badge className="bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900 text-[11px] font-bold">
-                  Active Account
-                </Badge>
+                {(user as any).status === "BLOCKED" ? (
+                  <Badge className="bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900 text-[11px] font-bold">
+                    Blocked
+                  </Badge>
+                ) : (
+                  <Badge className="bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900 text-[11px] font-bold">
+                    Active Account
+                  </Badge>
+                )}
               </div>
             </div>
           </div>

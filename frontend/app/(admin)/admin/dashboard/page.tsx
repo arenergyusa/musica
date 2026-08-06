@@ -380,7 +380,7 @@ export default function AdminDashboardPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right pr-6 text-slate-400 text-xs font-mono">
-                        {new Date(wx.created_at || "").toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
+                        {wx.created_at ? new Date(wx.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short' }) : "N/A"}
                       </TableCell>
                     </TableRow>
                   ))

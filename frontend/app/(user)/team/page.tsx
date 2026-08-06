@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
   Users, Copy, CheckCircle2, UserPlus, TrendingUp, ShieldCheck,
-  Zap, QrCode, Download, Share2, Network
+  QrCode, Download, Share2, Network
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -262,43 +262,6 @@ export default function TeamPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Working Status + Level Unlock Progress */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Account Status */}
-        <Card className={`rounded-2xl shadow-sm ${stats.status === "WORKING" ? "bg-gradient-to-br from-emerald-500/10 to-white dark:to-slate-900 border-emerald-500/20" : stats.status === "ACTIVE" ? "bg-gradient-to-br from-blue-500/10 to-white dark:to-slate-900 border-blue-200/70 dark:border-slate-800" : "bg-gradient-to-br from-amber-500/10 to-white dark:to-slate-900 border-amber-200/70 dark:border-slate-800"}`}>
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-full ${stats.status === "WORKING" ? "bg-emerald-500/15" : stats.status === "ACTIVE" ? "bg-blue-500/15" : "bg-amber-500/15"}`}>
-                <Zap className={`h-5 w-5 ${stats.status === "WORKING" ? "text-emerald-500" : stats.status === "ACTIVE" ? "text-blue-500" : "text-amber-500"}`} />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Account Status</p>
-                <p className={`font-bold text-base ${stats.status === "WORKING" ? "text-emerald-600 dark:text-emerald-400" : stats.status === "ACTIVE" ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"}`}>
-                  {stats.status === "WORKING" ? "⚡ Working" : stats.status === "ACTIVE" ? "Active" : "Inactive"}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Level Unlock Progress */}
-        <Card className="rounded-2xl shadow-sm bg-gradient-to-br from-blue-500/10 to-white dark:to-slate-900 border-blue-200/70 dark:border-slate-800">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400">
-                <Network className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Levels Unlocked</p>
-                <p className="font-bold text-base text-slate-900 dark:text-white">
-                  {levelsUnlocked === 0 ? "No levels yet" : `L1–L${levelsUnlocked} Active`}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

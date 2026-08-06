@@ -4,17 +4,14 @@ import { useEffect } from "react";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { fetchUser, isAuthenticated, isLoading } = useAuthStore();
+  const { fetchUser } = useAuthStore();
 
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (token) {
-      fetchUser();
-    } else {
-      // If there's no token, we are not loading the user anymore
-      useAuthStore.setState({ isLoading: false });
-    }
-  }, [fetchUser]); // Run only once on mount (fetchUser is stable)
+    // The JWT lives in an httpOnly cookie (M29), which JS cannot read. We probe
+    // /user/profile instead: the 401 from that probe is silenced by the api
+    // interceptor, so public pages don't get redirected or spammed with toasts.
+    fetchUser();
+  }, [fetchUser]);
 
   return <>{children}</>;
 }

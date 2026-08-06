@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: `Register | ${APP.NAME}`,
-  description: "Create your free Musica account to stream official Haryanvi music videos & studio tracks.",
+  description: "Create your free Musica account to start earning daily rewards, level income, and monthly salary.",
 };
 
 const benefits = [

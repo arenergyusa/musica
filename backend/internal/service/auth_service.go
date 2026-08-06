@@ -33,11 +33,14 @@ func hashOTP(otp, secret string) string {
 type AuthService interface {
 	Register(ctx context.Context, req *domain.RegisterRequest) (*domain.User, error)
 	VerifyRegisterOTP(ctx context.Context, email, otp string) error
-	Login(ctx context.Context, email, password string) (*domain.User, string, error)
-	GenerateToken(userID uuid.UUID, role string) (string, error)
+	Login(ctx context.Context, email, password string, rememberMe bool) (*domain.User, string, error)
+	GenerateToken(userID uuid.UUID, role string, ttl time.Duration) (string, error)
 	ForgotPassword(ctx context.Context, email string) error
 	VerifyForgotPasswordOTP(ctx context.Context, email, otp string) error
 	ResetPassword(ctx context.Context, req *domain.ResetPasswordRequest) error
+	// Logout blacklists the presented JWT (by its jti claim) until it would
+	// naturally expire, so a stolen token cannot keep working after logout (H2).
+	Logout(ctx context.Context, tokenString string) error
 }
 
 type authService struct {
@@ -80,7 +83,7 @@ func (s *authService) isOtpLocked(ctx context.Context, email, purpose string) bo
 		return false
 	}
 	val, err := s.redis.Get(ctx, otpAttemptsKey(email, purpose)).Int()
-	return err == nil && val > otpMaxAttempts
+	return err == nil && val >= otpMaxAttempts
 }
 
 // registerFailedAttempt records a failed verification and returns true when the
@@ -96,7 +99,7 @@ func (s *authService) registerFailedAttempt(ctx context.Context, email, purpose 
 	if val == 1 {
 		s.redis.Expire(ctx, otpAttemptsKey(email, purpose), 10*time.Minute)
 	}
-	return val > otpMaxAttempts
+	return val >= otpMaxAttempts
 }
 
 // clearAttempts resets the failure counter after a successful verification.
@@ -169,6 +172,12 @@ func (s *authService) Register(ctx context.Context, req *domain.RegisterRequest)
 
 		if upline != nil {
 			if err := s.mlmRepo.InsertNode(ctx, user.ID, upline.ID); err != nil {
+				// Roll back the user so we never leave an orphaned account with
+				// no invite-tree node (H6). Best-effort: if the delete fails the
+				// PENDING_VERIFICATION reconciliation branch will reuse the row.
+				if delErr := s.userRepo.Delete(ctx, user.ID); delErr != nil {
+					log.Printf("Register: failed to rollback user %s after tree insert error: %v (original: %v)", user.ID, delErr, err)
+				}
 				return nil, err
 			}
 		}
@@ -195,7 +204,11 @@ func (s *authService) Register(ctx context.Context, req *domain.RegisterRequest)
 		if uplineChanged {
 			existingEmail.InvitedBy = newUplineID
 			if upline != nil {
-				_ = s.mlmRepo.InsertNode(ctx, existingEmail.ID, upline.ID)
+				// Never silently drop the tree insert: a broken upline link means
+				// the user would earn no downline income (H6).
+				if err := s.mlmRepo.InsertNode(ctx, existingEmail.ID, upline.ID); err != nil {
+					return nil, err
+				}
 			}
 		}
 
@@ -219,6 +232,9 @@ func (s *authService) Register(ctx context.Context, req *domain.RegisterRequest)
 	if err := s.otpRepo.SaveOTP(ctx, otp); err != nil {
 		return nil, err
 	}
+	// A freshly issued OTP resets the failure counter so a locked-out but
+	// legitimate user can recover by requesting a new code (M15).
+	s.clearAttempts(ctx, user.Email, "REGISTER")
 
 	// Send Email
 	body := emailpkg.RenderOTPEmail(
@@ -270,7 +286,7 @@ func (s *authService) VerifyRegisterOTP(ctx context.Context, email, otp string) 
 	return nil
 }
 
-func (s *authService) Login(ctx context.Context, email, password string) (*domain.User, string, error) {
+func (s *authService) Login(ctx context.Context, email, password string, rememberMe bool) (*domain.User, string, error) {
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil || user == nil {
 		return nil, "", errors.New("invalid credentials")
@@ -287,7 +303,14 @@ func (s *authService) Login(ctx context.Context, email, password string) (*domai
 		return nil, "", errors.New("email not verified")
 	}
 
-	token, err := s.GenerateToken(user.ID, user.Role)
+	// "Remember me" is honoured at the token level, not just the cookie level,
+	// so the JWT actually outlives the session the user asked for (M21).
+	ttl := time.Hour * 24
+	if rememberMe {
+		ttl = time.Hour * 24 * 30
+	}
+
+	token, err := s.GenerateToken(user.ID, user.Role, ttl)
 	if err != nil {
 		return nil, "", err
 	}
@@ -295,15 +318,59 @@ func (s *authService) Login(ctx context.Context, email, password string) (*domai
 	return user, token, nil
 }
 
-func (s *authService) GenerateToken(userID uuid.UUID, role string) (string, error) {
+func (s *authService) GenerateToken(userID uuid.UUID, role string, ttl time.Duration) (string, error) {
+	now := time.Now()
 	claims := jwt.MapClaims{
 		"user_id": userID.String(),
-		"exp":     time.Now().Add(time.Hour * 24).Unix(),
+		"jti":     uuid.New().String(),
+		"iat":     now.Unix(),
+		"nbf":     now.Unix(), // reject tokens before issuance (L3)
+		"exp":     now.Add(ttl).Unix(),
 		"role":    role,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.jwtSecret))
+}
+
+// Logout blacklists the presented token's jti for the remainder of its natural
+// lifetime so the stateless JWT stops working even though it is still
+// cryptographically valid (H2).
+func (s *authService) Logout(ctx context.Context, tokenString string) error {
+	if s.redis == nil || tokenString == "" {
+		return nil
+	}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(s.jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return errors.New("invalid token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return errors.New("invalid token claims")
+	}
+
+	jti, ok := claims["jti"].(string)
+	if !ok || jti == "" {
+		return nil
+	}
+	expFloat, ok := claims["exp"].(float64)
+	if !ok {
+		return nil
+	}
+
+	ttl := time.Unix(int64(expFloat), 0).Sub(time.Now())
+	if ttl <= 0 {
+		return nil
+	}
+
+	return s.redis.Set(ctx, "token:blacklist:"+jti, "1", ttl).Err()
 }
 
 func (s *authService) ForgotPassword(ctx context.Context, email string) error {
@@ -326,6 +393,8 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 	if err := s.otpRepo.SaveOTP(ctx, otp); err != nil {
 		return err
 	}
+	// Reset the failure counter whenever a fresh code is issued (M15).
+	s.clearAttempts(ctx, user.Email, "FORGOT_PASSWORD")
 
 	body := emailpkg.RenderOTPEmail(
 		"Reset your password",

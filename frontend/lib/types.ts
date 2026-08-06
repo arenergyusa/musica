@@ -139,8 +139,8 @@ export interface PlatformSettings {
   non_working_cap_multiplier: number;
   working_cap_multiplier: number;
   level1_to_5_business: number;
-  level6_to_10_business: number;
-  level11_to_15_business: number;
+  level1_to_10_business: number;
+  level1_to_15_business: number;
   invite_reward_l1_pct: number;
   invite_reward_l2_pct: number;
   invite_reward_l3_pct: number;

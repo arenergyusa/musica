@@ -12,18 +12,23 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV API_URL_INTERNAL=$API_URL_INTERNAL
 RUN npm run build
 
-# Production stage
-FROM node:20-alpine
+# Production stage — runs Next.js in standalone mode (L20),
+# so builds are lean (no full node_modules) and run as an unprivileged user.
+FROM node:22-alpine
+
+RUN addgroup -S app && adduser -S -G app app
 
 WORKDIR /app
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/next.config.ts ./next.config.ts
-
-EXPOSE 3000
 ENV NODE_ENV=production
 ENV API_URL_INTERNAL=http://backend:8080
+ENV PORT=3000
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+RUN chown -R app:app /app
 
-CMD ["npm", "start"]
+USER app
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]

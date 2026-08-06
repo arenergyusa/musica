@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
@@ -19,14 +20,49 @@ func NewUserRepository(db *pgxpool.Pool) UserRepository {
 }
 
 func (r *userRepository) Create(ctx context.Context, user *domain.User) error {
-	leg := "LEFT"
-	if user.InvitedBy != nil {
-		var count int
-		_ = r.db.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE invited_by = $1", *user.InvitedBy).Scan(&count)
-		if count%2 == 1 {
-			leg = "RIGHT"
-		}
+	if user.InvitedBy == nil {
+		return r.insertUser(ctx, user, "LEFT")
 	}
+
+	// L2: leg auto-assignment must be atomic. The previous COUNT-then-pick was
+	// racy when two users registered under the same upline concurrently, which
+	// could put both in the same leg. We serialize assignment per inviter with a
+	// transaction-scoped advisory lock keyed off the upline's UUID.
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	lockKey := uuidToInt64(*user.InvitedBy)
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", lockKey); err != nil {
+		return err
+	}
+
+	var count int
+	if err := tx.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE invited_by = $1", *user.InvitedBy).Scan(&count); err != nil {
+		return err
+	}
+
+	leg := "LEFT"
+	if count%2 == 1 {
+		leg = "RIGHT"
+	}
+
+	if err := insertUserTx(ctx, tx, user, leg); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// uuidToInt64 derives a stable 64-bit advisory-lock key from a UUID.
+func uuidToInt64(id uuid.UUID) int64 {
+	var b [8]byte
+	copy(b[:], id[:8])
+	return int64(binary.BigEndian.Uint64(b[:]))
+}
+
+func (r *userRepository) insertUser(ctx context.Context, user *domain.User, leg string) error {
 	user.Leg = leg
 
 	query := `
@@ -34,9 +70,29 @@ func (r *userRepository) Create(ctx context.Context, user *domain.User) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, updated_at
 	`
-	err := r.db.QueryRow(ctx, query,
+	return r.db.QueryRow(ctx, query,
 		user.Name, user.Email, user.Phone, user.PasswordHash, user.InviteCode, user.InvitedBy, user.Leg, user.Role, user.Status,
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
+}
+
+func insertUserTx(ctx context.Context, tx pgx.Tx, user *domain.User, leg string) error {
+	user.Leg = leg
+
+	query := `
+		INSERT INTO users (name, email, phone, password_hash, invite_code, invited_by, leg, role, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING id, created_at, updated_at
+	`
+	return tx.QueryRow(ctx, query,
+		user.Name, user.Email, user.Phone, user.PasswordHash, user.InviteCode, user.InvitedBy, user.Leg, user.Role, user.Status,
+	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
+}
+
+// Delete removes a user row. Invite-tree rows cascade via ON DELETE CASCADE.
+// Used to roll back a registration whose invite-tree node could not be created
+// so the two are never left inconsistent (H6).
+func (r *userRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
 	return err
 }
 

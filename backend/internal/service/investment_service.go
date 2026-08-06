@@ -64,6 +64,9 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 	if user == nil {
 		return nil, errors.New("user not found")
 	}
+	if user.Status == "BLOCKED" {
+		return nil, errors.New("account is blocked")
+	}
 
 	// Validate amount at the API boundary as well as in the client.
 	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount < 100 || req.Amount > 10000 || math.Mod(req.Amount, 100) != 0 {

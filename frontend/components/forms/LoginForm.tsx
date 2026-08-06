@@ -68,14 +68,12 @@ export function LoginForm() {
       const response = await api.post("/auth/login", {
         email: data.email,
         password: data.password,
+        remember_me: data.rememberMe,
       });
 
-      const { token, user } = response.data.data;
-      localStorage.setItem("token", token);
-
-      const maxAge = data.rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60;
-      const secureFlag = process.env.NODE_ENV === "production" ? "; Secure" : "";
-      document.cookie = `token=${token}; path=/; max-age=${maxAge}; SameSite=Lax${secureFlag}`;
+      // The JWT lives in an httpOnly, Secure cookie set by the backend
+      // (M29); do not mirror it into localStorage or a JS-readable cookie.
+      const { user } = response.data.data;
 
       toast.success("Login successful!", {
         description: `Welcome back, ${user.name ? user.name.split(' ')[0] : 'user'}!`,

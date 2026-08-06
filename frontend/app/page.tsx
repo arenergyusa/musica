@@ -9,19 +9,19 @@ import { FaqSection } from "@/components/sections/FaqSection";
 import { CtaBanner } from "@/components/sections/CtaBanner";
 
 export const metadata: Metadata = {
-  title: "Musica — Official Haryanvi Music Streaming & Video Platform",
-  description: "Official Musica streaming hub. Discover trending Haryanvi music videos, audio releases, and studio tracks.",
+  title: "Musica — Community Rewards & Income Platform",
+  description: "Official Musica platform. Earn daily rewards, level income, and monthly salary through sponsorships and team building.",
   keywords: [
     "Musica",
-    "Musica Streaming",
-    "Musica Haryanvi",
-    "Musica Songs",
-    "Musica Music Videos",
-    "Haryanvi Music Videos",
+    "Musica Rewards",
+    "Musica Income",
+    "Musica Sponsorships",
+    "Community Rewards",
+    "Level Income",
   ],
   openGraph: {
-    title: "Musica — Official Haryanvi Music Videos & Audio Hub",
-    description: "Watch latest Haryanvi music videos & official song releases on Musica.",
+    title: "Musica — Community Rewards & Income Platform",
+    description: "Earn daily rewards, level income, and monthly salary by building your Musica team.",
     url: "https://the-musica.com",
     siteName: "Musica",
     locale: "en_IN",
@@ -29,8 +29,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Musica — Haryanvi Music Streaming Hub",
-    description: "Stream trending Haryanvi music videos & official song releases on Musica.",
+    title: "Musica — Community Rewards",
+    description: "Earn daily rewards, level income, and monthly salary with Musica.",
   },
   alternates: {
     canonical: "https://the-musica.com",
@@ -42,9 +42,9 @@ const jsonLd = [
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Musica",
-    "alternateName": ["Musica Streaming", "Musica Haryanvi", "The Musica", "Musica Music"],
+    "alternateName": ["Musica Rewards", "Musica Income", "The Musica", "Musica Community"],
     "url": "https://the-musica.com",
-    "description": "Official Haryanvi Music Video Streaming Platform.",
+    "description": "Musica is a community rewards and income platform.",
     "publisher": {
       "@type": "Organization",
       "name": "Musica",
@@ -56,7 +56,7 @@ const jsonLd = [
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Musica",
-    "alternateName": "Musica Streaming",
+    "alternateName": "Musica Community Rewards",
     "url": "https://the-musica.com",
     "identifier": {
       "@type": "PropertyValue",

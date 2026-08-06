@@ -141,7 +141,9 @@ export default function AdminUsersPage() {
   const handleToggleStatus = async (userId: string, currentStatus: string) => {
     const nextStatus = currentStatus === "BLOCKED" ? "ACTIVE" : "BLOCKED";
     try {
-      await api.put(`/admin/users/${userId}/status`, { status: nextStatus });
+      // Backend exposes /admin/users/:id/block and /admin/users/:id/unblock
+      const endpoint = nextStatus === "BLOCKED" ? `/admin/users/${userId}/block` : `/admin/users/${userId}/unblock`;
+      await api.put(endpoint);
       toast.success(`User status updated to ${nextStatus}`);
       fetchUsers();
       if (selectedUser?.id === userId && userSummary?.user) {
@@ -152,7 +154,6 @@ export default function AdminUsersPage() {
       }
     } catch (error) {
       console.error("Failed to update status", error);
-      toast.error("Failed to update user status");
     }
   };
 

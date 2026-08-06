@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"log"
 	"net/http"
+	"strings"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/arenergyusa/musica/backend/internal/service"
@@ -55,15 +57,20 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	user, token, err := h.authService.Login(c.Request.Context(), req.Email, req.Password)
+	user, token, err := h.authService.Login(c.Request.Context(), req.Email, req.Password, req.RememberMe)
 	if err != nil {
 		response.Error(c, http.StatusUnauthorized, "Login failed", err)
 		return
 	}
 
+	maxAge := 3600 * 24
+	if req.RememberMe {
+		maxAge = 3600 * 24 * 30
+	}
+
 	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("token", token, 3600*24*30, "/", "", secure, true)
+	c.SetCookie("token", token, maxAge, "/", "", secure, true)
 
 	response.Success(c, http.StatusOK, "Login successful", gin.H{
 		"token": token,
@@ -126,6 +133,18 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
+	// Extract the token so it can be blacklisted server-side (H2).
+	tokenString := c.GetHeader("Authorization")
+	if strings.HasPrefix(tokenString, "Bearer ") {
+		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+	} else {
+		tokenString, _ = c.Cookie("token")
+	}
+	if err := h.authService.Logout(c.Request.Context(), tokenString); err != nil {
+		// Even if the token could not be blacklisted, the cookie is cleared.
+		log.Printf("Logout: failed to blacklist token: %v", err)
+	}
+
 	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 	c.SetSameSite(http.SameSiteLaxMode)
 	// Clear the cookie by setting max age to -1

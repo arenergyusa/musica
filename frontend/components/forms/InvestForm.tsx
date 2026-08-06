@@ -80,7 +80,8 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
         const createRes = await api.post("/investment/create", {
           amount: data.amount,
           payment_method: "USDT_BEP20",
-          payment_ref: depositAddress,
+          // payment_ref is intentionally NOT the deposit address; the actual
+          // transaction hash is submitted at confirm-deposit below (L8).
         });
         pendingInvestmentId = createRes.data?.data?.id;
         if (!pendingInvestmentId) throw new Error("Investment ID missing from server response");

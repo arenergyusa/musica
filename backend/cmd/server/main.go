@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/arenergyusa/musica/backend/internal/api/handler"
@@ -32,8 +37,8 @@ func main() {
 		log.Fatalf("Crypto initialization error: %v", err)
 	}
 
-	// Run Migrations
-	if err := database.RunMigrations(cfg.DBURL, "migrations"); err != nil {
+	// Run Migrations (path configurable so it is not CWD-dependent, L4)
+	if err := database.RunMigrations(cfg.DBURL, cfg.MigrationsPath); err != nil {
 		log.Fatalf("Migration error: %v", err)
 	}
 
@@ -95,16 +100,28 @@ func main() {
 	salaryH := handler.NewSalaryHandler(salaryRepo)
 
 	// Initialize and Start Cron Jobs
-	jobRunner := cron.NewJobRunner(dbPool, invRepo, mlmRepo, walletRepo, settingsRepo)
+	jobRunner := cron.NewJobRunner(dbPool, invRepo, mlmRepo, walletRepo, settingsRepo, salaryRepo, wdSvc)
 	jobRunner.Start()
-	defer jobRunner.Stop()
 
 	router := gin.Default()
 	// KYC scans are intentionally not served as public static files.
 
+	// CORS allowlist driven by env so it is not hardcoded per domain (L6).
+	// Comma-separated: CORS_ALLOWED_ORIGINS=https://the-musica.com,https://www.the-musica.com
+	var allowedOrigins []string
+	for _, o := range strings.Split(cfg.CORSAllowedOrigins, ",") {
+		o = strings.TrimSpace(o)
+		if o != "" {
+			allowedOrigins = append(allowedOrigins, o)
+		}
+	}
+	if len(allowedOrigins) == 0 {
+		allowedOrigins = []string{"http://localhost:3000"}
+	}
+
 	// CORS Middleware
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "https://the-musica.com", "https://www.the-musica.com"},
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -113,8 +130,10 @@ func main() {
 	}))
 
 
-	// Configure trusted proxies for ingress/nginx IP resolution
-	_ = router.SetTrustedProxies([]string{"127.0.0.1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"})
+	// Configure trusted proxies for ingress/nginx IP resolution. Only trust the
+	// loopback interface and the Docker bridge so attackers cannot spoof
+	// X-Forwarded-For through the proxy headers (H3).
+	_ = router.SetTrustedProxies([]string{"127.0.0.1", "172.16.0.0/12"})
 
 	// Global Middlewares
 	router.Use(middleware.RateLimiter(redisClient))
@@ -136,6 +155,7 @@ func main() {
 			response.Success(c, 200, "Settings retrieved", settings)
 		})
 		auth := api.Group("/auth")
+		auth.Use(middleware.AuthRateLimiter(redisClient))
 		{
 			auth.POST("/register", authH.Register)
 			auth.POST("/register/verify", authH.VerifyRegister)
@@ -148,7 +168,7 @@ func main() {
 		}
 
 		user := api.Group("/user")
-		user.Use(middleware.AuthMiddleware())
+		user.Use(middleware.AuthMiddleware(dbPool, redisClient))
 		{
 			user.GET("/profile", userH.GetProfile)
 			user.PUT("/profile", userH.UpdateProfile)
@@ -159,7 +179,7 @@ func main() {
 		}
 
 		sponsorship := api.Group("/sponsorship")
-		sponsorship.Use(middleware.AuthMiddleware())
+		sponsorship.Use(middleware.AuthMiddleware(dbPool, redisClient))
 		{
 			sponsorship.GET("/plans", invH.GetPlans)
 			sponsorship.POST("/create", invH.CreateInvestment)
@@ -167,7 +187,7 @@ func main() {
 		}
 
 		investment := api.Group("/investment")
-		investment.Use(middleware.AuthMiddleware())
+		investment.Use(middleware.AuthMiddleware(dbPool, redisClient))
 		{
 			investment.GET("/plans", invH.GetPlans)
 			investment.POST("/create", invH.CreateInvestment)
@@ -176,14 +196,14 @@ func main() {
 		}
 
 		wallet := api.Group("/wallet")
-		wallet.Use(middleware.AuthMiddleware())
+		wallet.Use(middleware.AuthMiddleware(dbPool, redisClient))
 		{
 			wallet.GET("/balance", walletH.GetBalance)
 			wallet.GET("/transactions", walletH.GetTransactions)
 		}
 
 		invites := api.Group("/invites")
-		invites.Use(middleware.AuthMiddleware())
+		invites.Use(middleware.AuthMiddleware(dbPool, redisClient))
 		{
 			invites.GET("/direct", teamH.GetDirectReferrals)
 			invites.GET("/tree", teamH.GetTree)
@@ -192,7 +212,7 @@ func main() {
 		}
 
 		team := api.Group("/team")
-		team.Use(middleware.AuthMiddleware())
+		team.Use(middleware.AuthMiddleware(dbPool, redisClient))
 		{
 			team.GET("/direct", teamH.GetDirectReferrals)
 			team.GET("/tree", teamH.GetTree)
@@ -201,14 +221,14 @@ func main() {
 		}
 
 		withdrawal := api.Group("/withdrawal")
-		withdrawal.Use(middleware.AuthMiddleware())
+		withdrawal.Use(middleware.AuthMiddleware(dbPool, redisClient))
 		{
 			withdrawal.POST("/request", wdH.RequestWithdrawal)
 			withdrawal.GET("/history", wdH.GetHistory)
 		}
 
 		salary := api.Group("/salary")
-		salary.Use(middleware.AuthMiddleware())
+		salary.Use(middleware.AuthMiddleware(dbPool, redisClient))
 		salary.POST("/divide-downlines", salaryH.DivideDownlines)
 		{
 			salary.GET("/progress", salaryH.GetUserSalaryProgress)
@@ -216,7 +236,7 @@ func main() {
 		}
 
 		admin := api.Group("/admin")
-		admin.Use(middleware.AuthMiddleware(), middleware.AdminMiddleware())
+		admin.Use(middleware.AuthMiddleware(dbPool, redisClient), middleware.AdminMiddleware())
 		{
 			admin.GET("/dashboard", adminH.GetDashboard)
 			admin.GET("/analytics", adminH.GetAnalytics)
@@ -243,7 +263,36 @@ func main() {
 	}
 
 	log.Printf("Server starting on port %s", cfg.ServerPort)
-	if err := router.Run(":" + cfg.ServerPort); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+
+	// Graceful shutdown (H14): on SIGTERM/SIGINT we drain in-flight HTTP
+	// requests and let cron payouts finish, rather than dying mid-transaction.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	srv := &http.Server{
+		Addr:              ":" + cfg.ServerPort,
+		Handler:           router,
+		ReadHeaderTimeout: 15 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      45 * time.Second,
 	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Println("Shutdown signal received; draining in-flight work...")
+
+	// Stop the cron scheduler, waiting for any running credit/payout job to land.
+	jobRunner.Stop()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("HTTP server shutdown error: %v", err)
+	}
+	log.Println("Server shut down cleanly.")
 }

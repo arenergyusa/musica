@@ -6,7 +6,9 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"math"
 	"math/big"
@@ -14,13 +16,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/sha3"
 )
@@ -31,14 +34,27 @@ type USDTService interface {
 	VerifyDeposit(ctx context.Context, userID uuid.UUID, txHash string, expectedAmount float64) error
 	ProcessAutoWithdrawal(ctx context.Context, withdrawalID, userID uuid.UUID, recipientAddress string, amountUSD float64) (string, error)
 	IsTransactionMined(ctx context.Context, txHash string) (bool, error)
+	// IsTransactionKnown reports whether the chain (pending or mined) knows about
+	// the given transaction hash. Returns false only when the tx is not present
+	// anywhere on the node — the signal used before a safe refund.
+	IsTransactionKnown(ctx context.Context, txHash string) (bool, error)
 	GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error)
 }
 
 const transferTopic = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
-// payoutMu serializes all automatic payouts so that BSC nonces are allocated
-// sequentially and two concurrent withdrawals can never use the same nonce.
-var payoutMu sync.Mutex
+// depositAddressLockKey serializes deposit-address derivation index allocation
+// so two concurrent requests can never compute the same next index (H7).
+const depositAddressLockKey int64 = 739123450
+
+// payoutLockKey derives a stable Postgres advisory lock id from the sender
+// address and chain ID so concurrent payouts that share a master wallet are
+// serialized even across multiple backend replicas.
+func payoutLockKey(fromAddress string, chainID *big.Int) int64 {
+	h := fnv.New64a()
+	h.Write([]byte(strings.ToLower(fromAddress) + ":" + chainID.String()))
+	return int64(h.Sum64())
+}
 
 // txHashForRawTx computes the on-chain transaction hash for a signed raw
 // transaction (EIP-155 legacy: hash = keccak256(RLP(signed tx))).
@@ -181,7 +197,7 @@ func hexToPrivateKey(hexKey string) (*ecdsa.PrivateKey, error) {
 
 // GetOrCreateDepositAddress returns an existing derived BEP20 address or derives a new one on demand.
 func (s *usdtService) GetOrCreateDepositAddress(ctx context.Context, userID uuid.UUID) (*domain.UserDepositAddress, error) {
-	// Check existing address
+	// Fast path: check existing address
 	var addr domain.UserDepositAddress
 	query := `SELECT id, user_id, address, derivation_index, created_at FROM user_deposit_addresses WHERE user_id = $1`
 	err := s.db.QueryRow(ctx, query, userID).Scan(&addr.ID, &addr.UserID, &addr.Address, &addr.DerivationIndex, &addr.CreatedAt)
@@ -189,15 +205,37 @@ func (s *usdtService) GetOrCreateDepositAddress(ctx context.Context, userID uuid
 		return &addr, nil
 	}
 
-	// Calculate next index
-	var nextIndex int
-	idxQuery := `SELECT COALESCE(MAX(derivation_index), 0) + 1 FROM user_deposit_addresses`
-	if err := s.db.QueryRow(ctx, idxQuery).Scan(&nextIndex); err != nil {
-		nextIndex = 1
-	}
-
 	if !s.masterKeyPresent {
 		return nil, fmt.Errorf("MASTER_PRIVATE_KEY not configured in environment; cannot generate deposit address")
+	}
+
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Serialize index allocation with a transaction-scoped advisory lock so two
+	// concurrent requests can never derive the same index and trip the UNIQUE
+	// constraint (H7). The lock is released on commit.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, depositAddressLockKey); err != nil {
+		return nil, err
+	}
+
+	// Re-check inside the lock: another request may have created it meanwhile.
+	var existing domain.UserDepositAddress
+	err = tx.QueryRow(ctx, query, userID).Scan(&existing.ID, &existing.UserID, &existing.Address, &existing.DerivationIndex, &existing.CreatedAt)
+	if err == nil {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		return &existing, nil
+	}
+
+	// Calculate next index
+	var nextIndex int
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(derivation_index), 0) + 1 FROM user_deposit_addresses`).Scan(&nextIndex); err != nil || nextIndex < 1 {
+		nextIndex = 1
 	}
 
 	masterHex := strings.TrimPrefix(os.Getenv("MASTER_PRIVATE_KEY"), "0x")
@@ -218,10 +256,25 @@ func (s *usdtService) GetOrCreateDepositAddress(ctx context.Context, userID uuid
 		RETURNING id, user_id, address, derivation_index, created_at
 	`
 	var newAddr domain.UserDepositAddress
-	err = s.db.QueryRow(ctx, insertQuery, userID, derivedAddress, nextIndex).Scan(
+	err = tx.QueryRow(ctx, insertQuery, userID, derivedAddress, nextIndex).Scan(
 		&newAddr.ID, &newAddr.UserID, &newAddr.Address, &newAddr.DerivationIndex, &newAddr.CreatedAt,
 	)
 	if err != nil {
+		// L1: even with the advisory lock, treat a UNIQUE-violation on insert as
+		// a benign collision and return whatever address already exists for the
+		// user rather than surfacing an opaque error.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			var existing domain.UserDepositAddress
+			if err2 := s.db.QueryRow(ctx, query, userID).Scan(&existing.ID, &existing.UserID, &existing.Address, &existing.DerivationIndex, &existing.CreatedAt); err2 == nil {
+				_ = tx.Rollback(ctx)
+				return &existing, nil
+			}
+		}
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -256,20 +309,37 @@ func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, u
 	}
 	fromAddress := gethcrypto.PubkeyToAddress(privKey.PublicKey).Hex()
 
-	// Serialize the nonce-fetch -> sign -> broadcast sequence so concurrent
-	// withdrawals cannot read the same nonce and overwrite each other on-chain.
-	payoutMu.Lock()
-	defer payoutMu.Unlock()
+	// Resolve the chain ID up front so the distributed lock can be keyed by the
+	// sender address and chain ID.
+	chainIDHex, err := callBSC(ctx, rpcURL, "eth_chainId", []interface{}{})
+	if err != nil {
+		return "", err
+	}
+	chainID, ok := new(big.Int).SetString(strings.TrimPrefix(chainIDHex, "0x"), 16)
+	if !ok {
+		return "", fmt.Errorf("invalid BSC chain ID")
+	}
+
+	// Serialize the nonce-fetch -> sign -> broadcast sequence with a distributed
+	// Postgres advisory lock keyed by sender address + chain ID, so replicas
+	// sharing the same master wallet can never allocate the same nonce. The lock
+	// is held on a dedicated connection for the whole sequence.
+	lockKey := payoutLockKey(fromAddress, chainID)
+	conn, err := s.db.Acquire(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to acquire db connection for payout lock: %w", err)
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock($1)`, lockKey); err != nil {
+		return "", fmt.Errorf("failed to acquire payout lock: %w", err)
+	}
+	defer func() { _, _ = conn.Exec(context.Background(), `SELECT pg_advisory_unlock($1)`, lockKey) }()
 
 	nonceHex, err := callBSC(ctx, rpcURL, "eth_getTransactionCount", []interface{}{fromAddress, "pending"})
 	if err != nil {
 		return "", err
 	}
 	gasPriceHex, err := callBSC(ctx, rpcURL, "eth_gasPrice", []interface{}{})
-	if err != nil {
-		return "", err
-	}
-	chainIDHex, err := callBSC(ctx, rpcURL, "eth_chainId", []interface{}{})
 	if err != nil {
 		return "", err
 	}
@@ -280,10 +350,6 @@ func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, u
 	gasPrice, ok := new(big.Int).SetString(strings.TrimPrefix(gasPriceHex, "0x"), 16)
 	if !ok {
 		return "", fmt.Errorf("invalid BSC gas price")
-	}
-	chainID, ok := new(big.Int).SetString(strings.TrimPrefix(chainIDHex, "0x"), 16)
-	if !ok {
-		return "", fmt.Errorf("invalid BSC chain ID")
 	}
 
 	decimals := 18
@@ -360,6 +426,24 @@ func (s *usdtService) IsTransactionMined(ctx context.Context, txHash string) (bo
 	return receipt.Status == "0x1", nil
 }
 
+// IsTransactionKnown reports whether the node knows about the tx at all.
+// Unlike IsTransactionMined, a tx stuck in the mempool (or mined but receipt
+// not yet available) still returns true, so it must never be auto-refunded.
+func (s *usdtService) IsTransactionKnown(ctx context.Context, txHash string) (bool, error) {
+	rpcURL := os.Getenv("BSC_RPC_URL")
+	if rpcURL == "" {
+		return false, fmt.Errorf("BSC_RPC_URL not configured")
+	}
+	var result string
+	if err := callBSCJSON(ctx, rpcURL, "eth_getTransactionByHash", []interface{}{txHash}, &result); err != nil {
+		if strings.Contains(err.Error(), "transaction not mined yet") {
+			return false, nil
+		}
+		return false, err
+	}
+	return strings.TrimSpace(result) != "" && strings.TrimSpace(result) != "null", nil
+}
+
 // GetMasterWalletBalance reads the native BNB and BEP-20 USDT balances from BSC.
 // It deliberately returns only the public address and balances, never the private key.
 func (s *usdtService) GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error) {
@@ -412,13 +496,25 @@ func (s *usdtService) getWalletBalance(ctx context.Context, address string) (*Ma
 	}
 
 	bnb, _ := new(big.Float).Quo(new(big.Float).SetInt(nativeWei), big.NewFloat(1e18)).Float64()
-	usdt, _ := new(big.Float).Quo(new(big.Float).SetInt(usdtUnits), big.NewFloat(1e18)).Float64()
+	// USDT decimals come from USDT_DECIMALS (default 18) so 6-decimal USDT
+	// deployments report the correct balance instead of being off by 10^12 (H8).
+	usdtDecimals := 18
+	if v := os.Getenv("USDT_DECIMALS"); v != "" {
+		if d, err := strconv.Atoi(v); err == nil && d >= 0 && d <= 18 {
+			usdtDecimals = d
+		}
+	}
+	usdt, _ := new(big.Float).Quo(new(big.Float).SetInt(usdtUnits), big.NewFloat(math.Pow10(usdtDecimals))).Float64()
 	return &MasterWalletBalance{
 		Address: address,
 		BNB:     bnb,
 		USDT:    usdt,
 	}, nil
 }
+
+// bscHTTPClient carries a hard timeout so a slow RPC node can never hang a
+// payout or balance request indefinitely (M6).
+var bscHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 func callBSC(ctx context.Context, url, method string, params []interface{}) (string, error) {
 	payload, err := json.Marshal(map[string]interface{}{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
@@ -430,7 +526,7 @@ func callBSC(ctx context.Context, url, method string, params []interface{}) (str
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := bscHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("BSC RPC request failed: %w", err)
 	}
@@ -467,7 +563,7 @@ func callBSCJSON(ctx context.Context, url, method string, params []interface{}, 
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := bscHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}

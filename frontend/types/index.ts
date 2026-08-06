@@ -4,7 +4,7 @@
 // User & Auth
 // ============================================================
 export type KycStatus = "PENDING" | "APPROVED" | "REJECTED";
-export type UserRole = "USER" | "ADMIN";
+export type UserRole = "USER" | "ADMIN" | "SUPER_ADMIN";
 
 export interface User {
   id: string;

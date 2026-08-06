@@ -27,21 +27,24 @@ export default function AdminSettingsPage() {
     try {
       const res = await api.get("/admin/salary/tiers");
       if (Array.isArray(res.data.data)) {
+        const toFinite = (val: any, fallback: number) => {
+          const n = Number(val);
+          return Number.isFinite(n) ? n : fallback;
+        };
         const byTier: Record<number, any> = {};
         for (const t of res.data.data) {
           byTier[t.tier] = {
-            min_volume_usd: Number(t.min_volume_usd) || 0,
-            monthly_salary_usd: Number(t.monthly_salary_usd) || 0,
-            max_strong_leg_pct: Number(t.max_strong_leg_pct) || 60,
-            min_weaker_leg_pct: Number(t.min_weaker_leg_pct) || 40,
-            monthly_increment_pct: Number(t.monthly_increment_pct) || 25,
+            min_volume_usd: toFinite(t.min_volume_usd, 0),
+            monthly_salary_usd: toFinite(t.monthly_salary_usd, 0),
+            max_strong_leg_pct: toFinite(t.max_strong_leg_pct, 60),
+            min_weaker_leg_pct: toFinite(t.min_weaker_leg_pct, 40),
+            monthly_increment_pct: toFinite(t.monthly_increment_pct, 25),
           };
         }
         setSalaryTiers(byTier);
       }
     } catch (error) {
       console.error("Failed to load salary tiers:", error);
-      toast.error("Failed to load salary tiers");
     }
   };
 
@@ -54,7 +57,6 @@ export default function AdminSettingsPage() {
       }
     } catch (error) {
       console.error("Failed to load platform settings:", error);
-      toast.error("Failed to load platform settings");
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +101,6 @@ export default function AdminSettingsPage() {
       toast.success("Platform settings updated successfully!");
     } catch (error) {
       console.error("Failed to save settings:", error);
-      toast.error("Failed to update settings. Please check values.");
     } finally {
       setIsSaving(false);
     }
@@ -253,8 +254,8 @@ export default function AdminSettingsPage() {
               <Input 
                 type="number" 
                 step="100" 
-                value={settings.level6_to_10_business}
-                onChange={(e) => handleChange('level6_to_10_business', parseFloat(e.target.value) || 0)}
+                value={settings.level1_to_10_business}
+                onChange={(e) => handleChange('level1_to_10_business', parseFloat(e.target.value) || 0)}
                 className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
               />
             </div>
@@ -264,8 +265,8 @@ export default function AdminSettingsPage() {
               <Input 
                 type="number" 
                 step="100" 
-                value={settings.level11_to_15_business}
-                onChange={(e) => handleChange('level11_to_15_business', parseFloat(e.target.value) || 0)}
+                value={settings.level1_to_15_business}
+                onChange={(e) => handleChange('level1_to_15_business', parseFloat(e.target.value) || 0)}
                 className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
               />
             </div>
@@ -452,7 +453,8 @@ export default function AdminSettingsPage() {
                         key={`vol-${tierNo}-${tier.min_volume_usd}`}
                         className="h-8 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                         onBlur={(e) => {
-                          const newVol = parseFloat(e.target.value) || tier.min_volume_usd;
+                          const parsed = Number(e.target.value);
+                          const newVol = Number.isFinite(parsed) ? parsed : tier.min_volume_usd;
                           if (newVol !== tier.min_volume_usd) updateTier({ min_volume_usd: newVol });
                         }}
                       />
@@ -466,7 +468,8 @@ export default function AdminSettingsPage() {
                         key={`sal-${tierNo}-${tier.monthly_salary_usd}`}
                         className="h-8 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
                         onBlur={(e) => {
-                          const newSal = parseFloat(e.target.value) || tier.monthly_salary_usd;
+                          const parsed = Number(e.target.value);
+                          const newSal = Number.isFinite(parsed) ? parsed : tier.monthly_salary_usd;
                           if (newSal !== tier.monthly_salary_usd) updateTier({ monthly_salary_usd: newSal });
                         }}
                       />

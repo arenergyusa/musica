@@ -12,12 +12,12 @@ export default function RegisterLoading() {
         </div>
         <div className="flex flex-col items-center space-y-3">
           <div className="relative w-16 h-16 flex items-center justify-center">
-            <div className="absolute inset-0 bg-blue-600/20 rounded-full animate-ping opacity-75" />
+            <div className="absolute inset-0 bg-blue-600/20 rounded-full animate-ping motion-reduce:animate-none opacity-75" />
             <div className="relative bg-blue-600 p-3.5 rounded-xl text-white shadow-md">
-              <Music className="h-7 w-7 animate-pulse" />
+              <Music className="h-7 w-7 animate-pulse motion-reduce:animate-none" />
             </div>
           </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 animate-pulse font-medium">Loading registration...</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 animate-pulse motion-reduce:animate-none font-medium">Loading registration...</p>
         </div>
       </div>
     </div>

@@ -21,19 +21,26 @@ export function AutoLogout() {
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  // Mirror showWarning into a ref so the timer callbacks never close over a
+  // stale value (L12): without this, "Stay Logged In" left the timer
+  // permanently disarmed because resetTimer saw the pre-setShowWarning value.
+  const showWarningRef = useRef(showWarning);
+  useEffect(() => {
+    showWarningRef.current = showWarning;
+  }, [showWarning]);
 
   const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
 
-  const resetTimer = () => {
-    if (showWarning) return; // Don't reset if warning is showing
-    
+  const resetTimer = useCallback(() => {
+    if (showWarningRef.current) return; // Don't reset if warning is showing
+
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    
+
     timeoutRef.current = setTimeout(() => {
       setShowWarning(true);
       setCountdown(60);
     }, INACTIVITY_LIMIT);
-  };
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -47,7 +54,7 @@ export function AutoLogout() {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
-  }, [isAuthenticated, showWarning]);
+  }, [isAuthenticated, resetTimer]);
 
   useEffect(() => {
     if (showWarning) {

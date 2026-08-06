@@ -91,7 +91,25 @@ func (r *salaryRepository) UpdateSalaryTier(ctx context.Context, tier *domain.Sa
 	return err
 }
 
+// ErrDownlineLegLocked is returned by SetDownlineLeg when the downline belongs
+// to the sponsor but already carries active business (an ACTIVE sponsorship or a
+// salary qualification), so its leg can no longer be rearranged.
+var ErrDownlineLegLocked = errors.New("leg assignment locked: downline already has active business")
+
 func (r *salaryRepository) SetDownlineLeg(ctx context.Context, sponsorID uuid.UUID, downlineID uuid.UUID, leg string) error {
+	// Distinguish a missing/mismatched downline (no lock exists) from a genuine
+	// active-business lock before claiming one.
+	var belongs bool
+	if err := r.db.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND invited_by = $2)`,
+		downlineID, sponsorID,
+	).Scan(&belongs); err != nil {
+		return err
+	}
+	if !belongs {
+		return errors.New("downline not found under this sponsor")
+	}
+
 	// Legs are locked once the downline has an ACTIVE sponsorship or a salary
 	// qualification — otherwise a sponsor could keep re-arranging legs to game
 	// the 60:40 leg ratio after business has accumulated.
@@ -113,7 +131,7 @@ func (r *salaryRepository) SetDownlineLeg(ctx context.Context, sponsorID uuid.UU
 		return err
 	}
 	if res.RowsAffected() == 0 {
-		return errors.New("leg assignment locked: downline already has active business")
+		return ErrDownlineLegLocked
 	}
 	return nil
 }
@@ -143,10 +161,11 @@ func (r *salaryRepository) GetBinaryLegVolumes(ctx context.Context, userID uuid.
 	if err != nil {
 		return 0, 0, err
 	}
-    // Apply 60:40 split: left leg (junior team) gets 60% of its volume, right leg (big team) gets 40%.
-    adjustedLeft := leftVol * 0.6
-    adjustedRight := rightVol * 0.4
-    return adjustedLeft, adjustedRight, nil
+	// Return RAW leg volumes. The 60:40 / max-strong-leg rule is NOT applied
+	// here — it is enforced per-tier in GetSalaryProgress using the qualified
+	// tier's min_weaker_leg_pct / max_strong_leg_pct (M14). Hardcoding 0.6/0.4
+	// here double-applied the split and left the config dead.
+	return leftVol, rightVol, nil
 }
 
 func (r *salaryRepository) GetSalaryQualification(ctx context.Context, userID uuid.UUID) (*domain.SalaryQualification, error) {
@@ -215,7 +234,15 @@ func (r *salaryRepository) GetSalaryProgress(ctx context.Context, userID uuid.UU
 	var currentTierObj *domain.SalaryTier
 
 	for _, t := range tiers {
-		weakerReq := t.MinVolumeUSD * (t.MinWeakerLegPct / 100.0)
+		// Leg-balance rule driven by the tier config (M14): the weaker leg must
+		// hold at least min_weaker_leg_pct of the target volume. When that value
+		// is unset, it falls back to the complement of max_strong_leg_pct (e.g.
+		// 60% strong → 40% weaker) so the configured 60/40 is honoured.
+		weakerPct := t.MinWeakerLegPct
+		if weakerPct <= 0 {
+			weakerPct = 100.0 - t.MaxStrongLegPct
+		}
+		weakerReq := t.MinVolumeUSD * (weakerPct / 100.0)
 		if totalVol >= t.MinVolumeUSD && weakerLegVol >= weakerReq {
 			currentTier = t.Tier
 			currentSalary = t.MonthlySalaryUSD
@@ -252,14 +279,17 @@ func (r *salaryRepository) GetSalaryProgress(ctx context.Context, userID uuid.UU
 		monthlyIncTarget = currentTierObj.MinVolumeUSD * (currentTierObj.MonthlyIncrementPct / 100.0)
 	}
 
-	// Measure new ACTIVE downline business since the start of the current cycle
-	// (the last payout), so the same volume is never counted twice.
-	qual, _ := r.GetSalaryQualification(ctx, userID)
-	since := time.Now().AddDate(0, 0, -30)
-	if qual != nil {
-		since = qual.CycleStartDate
-	}
+	// The payout cycle is the current calendar month, matching the cycle_month
+	// key used by salary_payout_logs. Measure new ACTIVE downline business from
+	// the first day of the month so cycle start, cycle end, remaining days and
+	// the increment volume all refer to the same boundaries.
+	now := time.Now().UTC()
+	cycleStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	cycleEnd := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
 
+	// Measure new downline business activated within the cycle, including
+	// sponsorships that were active this cycle and have since CLOSED — closing
+	// must not erase business that was already earned (H9).
 	var cycleNewVol float64
 	incQuery := `
 		WITH my_downline AS (
@@ -270,21 +300,23 @@ func (r *salaryRepository) GetSalaryProgress(ctx context.Context, userID uuid.UU
 		SELECT COALESCE(SUM(amount), 0)
 		FROM sponsorships
 		WHERE user_id IN (SELECT user_id FROM my_downline)
-		  AND status = 'ACTIVE'
-		  AND created_at >= $2
+		  AND status IN ('ACTIVE', 'CLOSED')
+		  AND COALESCE(activated_at, created_at) >= $2
 	`
-	_ = r.db.QueryRow(ctx, incQuery, userID, since).Scan(&cycleNewVol)
+	if err := r.db.QueryRow(ctx, incQuery, userID, cycleStart).Scan(&cycleNewVol); err != nil {
+		return nil, err
+	}
 
 	monthlyIncRemaining := math.Max(0, monthlyIncTarget-cycleNewVol)
 
-	// Days remaining in the 30 day cycle
-	cycleEnd := since.AddDate(0, 0, 30)
-	daysRemaining := int(math.Ceil(cycleEnd.Sub(time.Now()).Hours() / 24))
+	// Days remaining in the current calendar month (cycle_month boundary)
+	daysInMonth := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	daysRemaining := int(math.Ceil(cycleEnd.Sub(now).Hours() / 24))
 	if daysRemaining < 0 {
 		daysRemaining = 0
 	}
-	if daysRemaining > 30 {
-		daysRemaining = 30
+	if daysRemaining > daysInMonth {
+		daysRemaining = daysInMonth
 	}
 
 	status := "IN_PROGRESS"
@@ -433,21 +465,26 @@ func (r *salaryRepository) ProcessMonthlySalaryPayouts(ctx context.Context) (int
 			continue
 		}
 
-		// Upsert Salary Qualification
-		_, _ = tx.Exec(ctx, `
+		// Upsert Salary Qualification. A failure here would silently leave the
+		// user looking like a first-time earner next cycle (25% increment bypass),
+		// so the whole payout transaction rolls back (H10).
+		if _, err := tx.Exec(ctx, `
 			INSERT INTO salary_qualifications (user_id, tier, left_leg_volume, right_leg_volume, total_volume, cycle_start_date, cycle_new_volume, status, last_payout_at)
-			VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6, 'PAYOUT_ACTIVE', CURRENT_TIMESTAMP)
+			VALUES ($1, $2, $3, $4, $5, date_trunc('month', CURRENT_TIMESTAMP), $6, 'PAYOUT_ACTIVE', CURRENT_TIMESTAMP)
 			ON CONFLICT (user_id) DO UPDATE SET
 				tier = EXCLUDED.tier,
 				left_leg_volume = EXCLUDED.left_leg_volume,
 				right_leg_volume = EXCLUDED.right_leg_volume,
 				total_volume = EXCLUDED.total_volume,
-				cycle_start_date = CURRENT_TIMESTAMP,
+				cycle_start_date = date_trunc('month', CURRENT_TIMESTAMP),
 				cycle_new_volume = 0.00,
 				status = 'PAYOUT_ACTIVE',
 				last_payout_at = CURRENT_TIMESTAMP,
 				updated_at = CURRENT_TIMESTAMP
-		`, uid, progress.CurrentTier, progress.LeftLegVolume, progress.RightLegVolume, progress.TotalVolume, progress.MonthlyIncrementAchieved)
+		`, uid, progress.CurrentTier, progress.LeftLegVolume, progress.RightLegVolume, progress.TotalVolume, progress.MonthlyIncrementAchieved); err != nil {
+			_ = tx.Rollback(ctx)
+			continue
+		}
 
 		if err := tx.Commit(ctx); err == nil {
 			payoutCount++

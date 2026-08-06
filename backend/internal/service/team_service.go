@@ -33,6 +33,27 @@ func (s *teamService) GetTeamBreakdown(ctx context.Context, userID uuid.UUID, le
 		filtered = append(filtered, member)
 	}
 	breakdown.Members = filtered
+
+	// Recompute the level summaries from the filtered member set so the counts
+	// and volumes match what is actually shown (M8).
+	breakdown.Levels = make([]*domain.TeamLevelSummary, 15)
+	for i := 0; i < 15; i++ {
+		breakdown.Levels[i] = &domain.TeamLevelSummary{Level: i + 1}
+	}
+	for _, member := range breakdown.Members {
+		summary := breakdown.Levels[member.Level-1]
+		summary.TotalMembers++
+		summary.TotalInvestment += member.TotalInvestment
+		summary.LifetimeIncome += member.LifetimeIncome
+		switch member.Status {
+		case "INACTIVE":
+			summary.InactiveCount++
+		case "ACTIVE":
+			summary.NonWorkingCount++
+		case "WORKING":
+			summary.WorkingCount++
+		}
+	}
 	return breakdown, nil
 }
 
@@ -57,7 +78,14 @@ func (s *teamService) GetDirectReferrals(ctx context.Context, userID uuid.UUID) 
 }
 
 func (s *teamService) GetTeamStats(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error) {
-	volume, err := s.mlmRepo.GetDownlineTotalInvestment(ctx, userID)
+	// active_volume counts only currently-ACTIVE downline sponsorship value;
+	// team_value is the lifetime team business (including CLOSED/capped), so the
+	// two metrics no longer disagree (M9).
+	activeVolume, err := s.mlmRepo.GetDownlineVolume(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	teamValue, err := s.mlmRepo.GetDownlineTotalInvestment(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +104,9 @@ func (s *teamService) GetTeamStats(ctx context.Context, userID uuid.UUID) (map[s
 
 	status := UserStatusInactive
 	if settings != nil {
-		status, _ = GetUserStatus(ctx, s.invRepo, s.mlmRepo, userID, settings)
+		if st, err := GetUserStatus(ctx, s.invRepo, s.mlmRepo, userID, settings); err == nil {
+			status = st
+		}
 	}
 
 	hasActiveDirect, err := s.mlmRepo.HasActiveDirectReferral(ctx, userID)
@@ -90,8 +120,8 @@ func (s *teamService) GetTeamStats(ctx context.Context, userID uuid.UUID) (map[s
 	if err != nil { return nil, err }
 
 	return map[string]interface{}{
-		"active_volume": volume,
-		"team_value": volume,
+		"active_volume": activeVolume,
+		"team_value": teamValue,
 		"invite_income": inviteIncome,
 		"level_income": levelIncome,
 		"levels_unlocked": levels,

@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: `Login | ${APP.NAME}`,
-  description: "Log in to your Musica account to stream official Haryanvi music videos and studio tracks.",
+  description: "Log in to your Musica account to access your rewards, team network, and income dashboard.",
 };
 
 const benefits = [

@@ -114,8 +114,8 @@ func (s *adminService) ActivateInvestment(ctx context.Context, invID uuid.UUID) 
 		return errors.New("investment is not pending approval")
 	}
 
-	s.payReferralIncome(ctx, targetInv)
-	return nil
+	s.recomputeWorkingCap(ctx, targetInv)
+	return s.payReferralIncome(ctx, targetInv)
 }
 
 func (s *adminService) ConfirmDeposit(ctx context.Context, userID, invID uuid.UUID, txHash string) error {
@@ -128,18 +128,54 @@ func (s *adminService) ConfirmDeposit(ctx context.Context, userID, invID uuid.UU
 	if err != nil { return err }
 	if rows != 1 { return errors.New("investment was already confirmed") }
 	inv.Status = "ACTIVE"
-	s.payReferralIncome(ctx, inv)
-	return nil
+	s.recomputeWorkingCap(ctx, inv)
+	return s.payReferralIncome(ctx, inv)
+}
+
+// recomputeWorkingCap re-evaluates the sponsorship owner's WORKING status now
+// that the sponsorship is ACTIVE. At creation the owner's own PENDING
+// sponsorship was invisible to HasActiveInvestment, so a user who already
+// qualified as WORKING via their downline would have been locked into the
+// non-working (lower) cap multiplier forever (M7). Once proven, the cap is
+// upgraded to the working multiplier.
+func (s *adminService) recomputeWorkingCap(ctx context.Context, inv *domain.Sponsorship) {
+	if inv == nil {
+		return
+	}
+	settings, err := s.settingsRepo.GetSettings(ctx)
+	if err != nil {
+		return
+	}
+	status, err := GetUserStatus(ctx, s.invRepo, s.mlmRepo, inv.UserID, settings)
+	if err != nil {
+		return
+	}
+	if status != UserStatusWorking {
+		return
+	}
+	workingCap := inv.Amount * GetIncomeCap(true, settings)
+	if workingCap <= inv.CapLimit {
+		return
+	}
+	if _, err := s.invRepo.UpdateInvestmentCap(ctx, inv.ID, workingCap, true); err != nil {
+		log.Printf("ADMIN: failed to upgrade cap for inv %s: %v", inv.ID, err)
+	}
+	inv.CapLimit = workingCap
+	inv.WorkingCapAtCreation = true
 }
 
 // payReferralIncome distributes one-time invite bonuses when a sponsorship is activated.
-func (s *adminService) payReferralIncome(ctx context.Context, inv *domain.Sponsorship) {
-	settings, _ := s.settingsRepo.GetSettings(ctx)
-	refPcts := map[int]float64{
-		1: 4.0,
-		2: 1.0,
-		3: 1.0,
+// It fails closed (H5): if platform settings cannot be loaded, no bonus is paid and the
+// error is returned to the caller instead of silently falling back to hardcoded rates.
+func (s *adminService) payReferralIncome(ctx context.Context, inv *domain.Sponsorship) error {
+	settings, err := s.settingsRepo.GetSettings(ctx)
+	if err != nil {
+		return errors.New("failed to load platform settings for invite reward")
 	}
+
+	// Fall back to platform defaults only when a percentage is unset (0), never
+	// when the settings read itself failed.
+	refPcts := map[int]float64{1: 4.0, 2: 1.0, 3: 1.0}
 	if settings != nil {
 		if settings.InviteRewardL1Pct > 0 {
 			refPcts[1] = settings.InviteRewardL1Pct
@@ -169,7 +205,7 @@ func (s *adminService) payReferralIncome(ctx context.Context, inv *domain.Sponso
 			continue
 		}
 
-		rewardAmt := inv.Amount * (pct / 100.0)
+		rewardAmt := math.Round(inv.Amount*(pct/100.0)*100) / 100
 		if rewardAmt <= 0 {
 			continue
 		}
@@ -305,6 +341,8 @@ func (s *adminService) payReferralIncome(ctx context.Context, inv *domain.Sponso
 			continue
 		}
 	}
+
+	return nil
 }
 
 // applyIncomeToCap adds income to upline's oldest active investment for cap tracking.
@@ -466,7 +504,9 @@ func (s *adminService) GetUserSummary(ctx context.Context, userID uuid.UUID) (ma
 	settings, _ := s.settingsRepo.GetSettings(ctx)
 	status := UserStatusInactive
 	if settings != nil {
-		status, _ = GetUserStatus(ctx, s.invRepo, s.mlmRepo, userID, settings)
+		if st, err := GetUserStatus(ctx, s.invRepo, s.mlmRepo, userID, settings); err == nil {
+			status = st
+		}
 	}
 
 	// Scrub sensitive data
