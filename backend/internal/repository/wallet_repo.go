@@ -33,7 +33,7 @@ func (r *walletRepository) GetBalance(ctx context.Context, userID uuid.UUID) (*d
 	return &w, nil
 }
 
-func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, amount float64, txType string, source string, refID string, desc string) error {
+func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, amount float64, txType string, source string, refID string, rewardDate string, desc string) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -44,15 +44,20 @@ func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, a
 	// investment+date was already processed (concurrent cron run, restart, etc.)
 	// the insert conflicts, no row is returned and the whole transaction aborts
 	// before the wallet or transactions tables are touched.
+	//
+	// rewardDate is the reward day in IST (e.g. "2006-01-02"), the same value
+	// used by HasDailyRewardBeenProcessed and the description. It must NOT use
+	// the DB's UTC CURRENT_DATE, otherwise the gate and the check can disagree
+	// around midnight and double credits (or skipped credits) slip through.
 	if source == "DAILY_REWARD" && refID != "" {
 		logQuery := `
 			INSERT INTO daily_reward_log (investment_id, user_id, amount, date, processed_at)
-			VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIMESTAMP)
+			VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
 			ON CONFLICT (investment_id, date) DO NOTHING
 			RETURNING id
 		`
 		var logID uuid.UUID
-		if err := tx.QueryRow(ctx, logQuery, refID, userID, amount).Scan(&logID); err != nil {
+		if err := tx.QueryRow(ctx, logQuery, refID, userID, amount, rewardDate).Scan(&logID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrAlreadyProcessed
 			}
@@ -118,7 +123,7 @@ func creditWalletTx(ctx context.Context, tx pgx.Tx, userID uuid.UUID, amount flo
 // idempotent: a retry of the same cron run (restart, concurrent replica)
 // returns ErrAlreadyProcessed instead of double-crediting the wallet or
 // double-consuming the upline's cap (C5).
-func (r *walletRepository) CreditLevelIncomeWithLog(ctx context.Context, beneficiaryID uuid.UUID, sourceUserID uuid.UUID, sourceInvID uuid.UUID, level int, amount float64, desc string) error {
+func (r *walletRepository) CreditLevelIncomeWithLog(ctx context.Context, beneficiaryID uuid.UUID, sourceUserID uuid.UUID, sourceInvID uuid.UUID, level int, amount float64, date string, desc string) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -127,12 +132,12 @@ func (r *walletRepository) CreditLevelIncomeWithLog(ctx context.Context, benefic
 
 	logQuery := `
 		INSERT INTO level_income_log (beneficiary_user_id, source_user_id, source_sponsorship_id, level, amount, date)
-		VALUES ($1, $2, $3, $4, $5, CURRENT_DATE)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (beneficiary_user_id, source_sponsorship_id, level, date) DO NOTHING
 		RETURNING id
 	`
 	var logID uuid.UUID
-	if err := tx.QueryRow(ctx, logQuery, beneficiaryID, sourceUserID, sourceInvID, level, amount).Scan(&logID); err != nil {
+	if err := tx.QueryRow(ctx, logQuery, beneficiaryID, sourceUserID, sourceInvID, level, amount, date).Scan(&logID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrAlreadyProcessed
 		}

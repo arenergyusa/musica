@@ -22,6 +22,13 @@ import (
 // and any additional backend replicas.
 const dailyRewardLockKey int64 = 738572190
 
+// istLoc is the fixed India Standard Time zone used to derive the daily reward
+// day. The reward day MUST be computed and stored consistently (in IST) in the
+// pre-check, the daily_reward_log/level_income_log inserts and the description,
+// otherwise the idempotency gate and the credit can disagree across the
+// midnight boundary and double-credit (or skip) a day.
+var istLoc = time.FixedZone("IST", 5*60*60+30*60)
+
 // getLevelIncomePct returns the percentage for the given level from PlatformSettings.
 func getLevelIncomePct(level int, s *domain.PlatformSettings) float64 {
 	if s == nil {
@@ -189,7 +196,7 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 	// (today, days-in-month, first day of month) in IST and compare the
 	// investment's creation time in the same zone to avoid mixing local and UTC
 	// boundaries in the full-month calculation.
-	loc := time.FixedZone("IST", 5*60*60+30*60)
+	loc := istLoc
 	now := time.Now().In(loc)
 	today := now.Format("2006-01-02")
 	daysInCurrentMonth := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, loc).Day()
@@ -235,7 +242,7 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 		roiDesc := fmt.Sprintf("Daily promotional reward for %s", today)
 		err = j.walletRepo.CreditReward(
 			ctx, freshInv.UserID, roiAmount,
-			"CREDIT", "DAILY_REWARD", freshInv.ID.String(), roiDesc,
+			"CREDIT", "DAILY_REWARD", freshInv.ID.String(), today, roiDesc,
 		)
 		if err != nil {
 			if errors.Is(err, repository.ErrAlreadyProcessed) {
@@ -254,7 +261,7 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 		roiProcessed++
 
 		// --- Step 2: Distribute Level Income to upline chain ---
-		levelCount := j.distributeLevelIncome(ctx, freshInv.UserID, freshInv.ID, roiAmount, settings)
+		levelCount := j.distributeLevelIncome(ctx, freshInv.UserID, freshInv.ID, roiAmount, settings, today)
 		levelIncomeDistributed += levelCount
 	}
 
@@ -270,6 +277,7 @@ func (j *JobRunner) distributeLevelIncome(
 	sourceInvID uuid.UUID,
 	roiAmount float64,
 	settings *domain.PlatformSettings,
+	today string,
 ) int {
 	if settings == nil {
 		return 0
@@ -282,7 +290,6 @@ func (j *JobRunner) distributeLevelIncome(
 		return 0
 	}
 
-	today := time.Now().Format("2006-01-02")
 	payoutCount := 0
 
 	for depthIdx, uplineUserID := range uplineChain {
@@ -345,7 +352,7 @@ func (j *JobRunner) distributeLevelIncome(
 		// index gates this so a duplicate run never double-credits (C5); on
 		// ErrAlreadyProcessed we skip BOTH the credit and the cap consumption.
 		err = j.walletRepo.CreditLevelIncomeWithLog(
-			ctx, uplineUserID, downlineUserID, sourceInvID, levelNum, levelIncomeAmt, desc,
+			ctx, uplineUserID, downlineUserID, sourceInvID, levelNum, levelIncomeAmt, today, desc,
 		)
 		if err != nil {
 			if errors.Is(err, repository.ErrAlreadyProcessed) {

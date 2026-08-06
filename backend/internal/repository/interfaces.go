@@ -52,7 +52,7 @@ type InvestmentRepository interface {
 // WalletRepository handles wallet balances and transaction logs atomically
 type WalletRepository interface {
 	GetBalance(ctx context.Context, userID uuid.UUID) (*domain.RewardWallet, error)
-	CreditReward(ctx context.Context, userID uuid.UUID, amount float64, txType string, source string, refID string, desc string) error
+	CreditReward(ctx context.Context, userID uuid.UUID, amount float64, txType string, source string, refID string, rewardDate string, desc string) error
 	DebitWithdrawal(ctx context.Context, userID uuid.UUID, amount float64, refID string, desc string) error
 	GetTransactions(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*domain.Transaction, error)
 	GetIncomeChartData(ctx context.Context, userID uuid.UUID, days int) ([]map[string]interface{}, error)
@@ -65,7 +65,7 @@ type WalletRepository interface {
 	// payout in level_income_log (unique per beneficiary+source+level+date) in
 	// the same transaction as the wallet credit, returning ErrAlreadyProcessed
 	// when the payout was already applied.
-	CreditLevelIncomeWithLog(ctx context.Context, beneficiaryID uuid.UUID, sourceUserID uuid.UUID, sourceInvID uuid.UUID, level int, amount float64, desc string) error
+	CreditLevelIncomeWithLog(ctx context.Context, beneficiaryID uuid.UUID, sourceUserID uuid.UUID, sourceInvID uuid.UUID, level int, amount float64, date string, desc string) error
 }
 
 // MLMRepository handles invite tree and volume logic
