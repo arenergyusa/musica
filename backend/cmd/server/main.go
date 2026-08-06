@@ -135,13 +135,16 @@ func main() {
 	// X-Forwarded-For through the proxy headers (H3).
 	_ = router.SetTrustedProxies([]string{"127.0.0.1", "172.16.0.0/12"})
 
-	// Global Middlewares
-	router.Use(middleware.RateLimiter(redisClient))
-
-	// Health Check
+	// Health Check: registered BEFORE the global rate limiter so container
+	// health checks (which poll /health every 30s) can never be throttled to
+	// 429. Rate limiting a health endpoint only marks healthy containers as
+	// unhealthy and causes unnecessary restarts.
 	router.GET("/health", func(c *gin.Context) {
 		response.Success(c, 200, "Server is running", nil)
 	})
+
+	// Global Middlewares
+	router.Use(middleware.RateLimiter(redisClient))
 
 	api := router.Group("/api/v1")
 	{
