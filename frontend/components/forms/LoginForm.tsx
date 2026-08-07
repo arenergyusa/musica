@@ -91,10 +91,7 @@ export function LoginForm() {
       if (axios.isAxiosError(error) && typeof error.response?.data?.message === 'string') {
         message = error.response.data.message;
       }
-      form.setError("root", {
-        type: "manual",
-        message: message,
-      });
+      toast.error(message);
       console.error("Login error:", error);
     } finally {
       setIsLoading(false);
@@ -106,12 +103,7 @@ export function LoginForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
 
-          {form.formState.errors.root && (
-            <motion.div variants={itemVariants} className="p-3 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 font-semibold text-xs rounded-lg border border-red-200 dark:border-red-900 text-center">
-              {form.formState.errors.root.message}
-            </motion.div>
-          )}
-
+          {/* Errors surface only as toast alerts */}
           {/* Email / Username Field */}
           <motion.div variants={itemVariants}>
             <FormField
