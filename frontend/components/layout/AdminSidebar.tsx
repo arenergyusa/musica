@@ -146,7 +146,7 @@ export function AdminSidebar() {
           </Button>
         </Link>
         <Button 
-          onClick={logout} 
+          onClick={() => logout()} 
           variant="ghost" 
           className="w-full justify-start text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 text-xs font-semibold rounded-xl h-9"
         >

@@ -22,7 +22,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   fetchUser: () => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (redirectTo?: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -52,22 +52,27 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
   
-  logout: async () => {
-    // Best-effort background API call
-    api.post('/auth/logout').catch((error) => {
+  logout: async (redirectTo = '/login') => {
+    try {
+      // Await the server call so its Set-Cookie (HttpOnly token clear + Redis
+      // blacklist) lands BEFORE we navigate away. Navigating immediately aborts
+      // the in-flight request and leaves the HttpOnly cookie alive — JS cannot
+      // delete an HttpOnly cookie, so the middleware then bounces /login back
+      // to the dashboard and the user can never log out.
+      await api.post('/auth/logout', {}, { timeout: 5000 });
+    } catch (error) {
       console.error('Logout API failed:', error);
-    });
+    }
 
-    // Immediately clear client session. The JWT itself lives in an httpOnly
-    // cookie; clearing it here is best-effort (M29), the backend logout
-    // call above also blacklists the token.
+    // Best-effort client-side clear; the authoritative clear is the server's
+    // Set-Cookie above. HttpOnly cookies cannot be removed from JS (M29).
     if (typeof window !== 'undefined') {
       document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax;";
     }
     set({ user: null, isAuthenticated: false, isLoading: false });
     // Force reload or redirect to trigger middleware
     if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+      window.location.href = redirectTo;
     }
   }
 }));

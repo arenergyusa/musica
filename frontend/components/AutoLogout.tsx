@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +13,6 @@ import {
 import { useAuthStore } from "@/lib/store/useAuthStore";
 
 export function AutoLogout() {
-  const router = useRouter();
   const { logout, isAuthenticated } = useAuthStore();
   const [showWarning, setShowWarning] = useState(false);
   const [countdown, setCountdown] = useState(60);
@@ -72,9 +70,12 @@ export function AutoLogout() {
 
   const handleLogout = useCallback(() => {
     setShowWarning(false);
-    logout();
-    router.push("/login?session_expired=true");
-  }, [logout, router]);
+    // logout() awaits the server-side cookie clear + blacklist before the full
+    // navigation, then redirects to /login?session_expired=true (the HttpOnly
+    // token cookie cannot be cleared from JS, so the server call must land
+    // first or middleware bounces the user straight back to the dashboard).
+    logout("/login?session_expired=true");
+  }, [logout]);
 
   useEffect(() => {
     if (showWarning && countdown === 0) {
@@ -83,14 +84,30 @@ export function AutoLogout() {
   }, [showWarning, countdown, handleLogout]);
 
   const handleStayLoggedIn = () => {
+    // Flip the ref synchronously BEFORE resetTimer runs. The effect that syncs
+    // the ref only runs after the next render, so a bare setShowWarning(false)
+    // leaves resetTimer reading the stale "warning showing" value and it early-
+    // returns without re-arming the inactivity timer — the user would then
+    // never be auto-logged-out again.
+    showWarningRef.current = false;
     setShowWarning(false);
     resetTimer();
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setShowWarning(open);
+    // Dismissing the dialog (Escape / backdrop / X) must also re-arm the
+    // inactivity timer, otherwise auto-logout is permanently disarmed.
+    if (!open) {
+      showWarningRef.current = false;
+      if (isAuthenticated) resetTimer();
+    }
   };
 
   if (!isAuthenticated) return null;
 
   return (
-    <AlertDialog open={showWarning} onOpenChange={setShowWarning}>
+    <AlertDialog open={showWarning} onOpenChange={handleOpenChange}>
       <AlertDialogContent className="border-warning/50 bg-card/95 backdrop-blur-xl">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-warning flex items-center gap-2">

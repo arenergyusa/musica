@@ -131,7 +131,7 @@ export function Sidebar() {
         )}
 
         <Button
-          onClick={logout}
+          onClick={() => logout()}
           variant="ghost"
           className="w-full justify-start text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg h-9 transition-colors"
         >

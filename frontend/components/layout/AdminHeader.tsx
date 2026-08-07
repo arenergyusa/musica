@@ -121,7 +121,7 @@ export function AdminHeader() {
                 Switch to User View
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout} className="text-rose-600 focus:text-rose-600 cursor-pointer text-xs font-medium">
+              <DropdownMenuItem onClick={() => logout()} className="text-rose-600 focus:text-rose-600 cursor-pointer text-xs font-medium">
                 <LogOut className="mr-2 h-3.5 w-3.5" />
                 Sign Out
               </DropdownMenuItem>

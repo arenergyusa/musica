@@ -38,6 +38,7 @@ const AUTH_401_ENDPOINTS = [
   '/auth/verify',
   '/auth/reset-password',
   '/auth/resend-otp',
+  '/auth/logout', // logout with an already-expired session — stay silent
   '/user/profile', // AuthProvider auth-state probe on mount — silent
 ];
 
