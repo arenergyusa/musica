@@ -36,6 +36,10 @@ export function WithdrawForm({ availableBalance, minWithdrawal: minProp, feePct:
   const [isLoading, setIsLoading] = useState(false);
   const [minWithdrawal, setMinWithdrawal] = useState<number>(minProp ?? 10);
   const [feePct, setFeePct] = useState<number>(feeProp ?? 10);
+  // The amount input is bound to a local string (not react-hook-form's
+  // field.value) because setValue does not reliably re-render the Base UI
+  // Field.Control input, leaving the box empty after clicking MAX.
+  const [rawAmount, setRawAmount] = useState("");
   const { user, fetchUser } = useAuthStore();
 
   useEffect(() => {
@@ -77,6 +81,7 @@ export function WithdrawForm({ availableBalance, minWithdrawal: minProp, feePct:
   const handleMaxAmount = () => {
     if (availableBalance > 0) {
       const maxWithCents = Math.round(availableBalance * 100) / 100;
+      setRawAmount(String(maxWithCents));
       form.setValue("amount", maxWithCents, { shouldValidate: true });
     }
   };
@@ -114,6 +119,7 @@ export function WithdrawForm({ availableBalance, minWithdrawal: minProp, feePct:
       });
 
       form.reset();
+      setRawAmount("");
       if (onSuccess) onSuccess();
       if (fetchUser) await fetchUser();
     } catch (error: unknown) {
@@ -173,11 +179,20 @@ export function WithdrawForm({ availableBalance, minWithdrawal: minProp, feePct:
                 <FormControl>
                   <Input
                     type="number"
+                    inputMode="decimal"
                     placeholder="10"
                     className="pl-7 pr-16 text-xs h-10 rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-2 focus-visible:ring-blue-600"
                     disabled={isLoading || !hasUsdtAddress}
                     {...field}
-                    onChange={(e) => field.onChange(e.target.valueAsNumber || undefined)}
+                    value={rawAmount}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setRawAmount(raw);
+                      const parsedAmount = raw === "" ? undefined : Number(raw);
+                      form.setValue("amount", parsedAmount as number, {
+                        shouldValidate: true,
+                      });
+                    }}
                   />
                 </FormControl>
                 <Button
