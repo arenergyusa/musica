@@ -221,6 +221,7 @@ type SalaryProgressResponse struct {
 	MonthlyIncrementTarget  float64      `json:"monthly_increment_target"`
 	MonthlyIncrementAchieved float64     `json:"monthly_increment_achieved"`
 	MonthlyIncrementRemaining float64    `json:"monthly_increment_remaining"`
-	DaysRemainingInCycle    int          `json:"days_remaining_in_cycle"`
-	Status                  string       `json:"status"`
+	DaysRemainingInCycle    int       `json:"days_remaining_in_cycle"`
+	Status                  string    `json:"status"`
+	HasReceivedSalary       bool      `json:"has_received_salary"`
 }

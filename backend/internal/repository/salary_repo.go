@@ -327,6 +327,17 @@ func (r *salaryRepository) GetSalaryProgress(ctx context.Context, userID uuid.UU
 		status = "TARGET_ACHIEVED"
 	}
 
+	// True once this user has received at least one salary payout. Before that,
+	// the 25% monthly growth tracker has nothing to measure, so the frontend
+	// hides it until the first salary actually lands.
+	var hasReceivedSalary bool
+	if err := r.db.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM salary_payout_logs WHERE user_id = $1)`,
+		userID,
+	).Scan(&hasReceivedSalary); err != nil {
+		hasReceivedSalary = false
+	}
+
 	return &domain.SalaryProgressResponse{
 		CurrentTier:               currentTier,
 		CurrentSalaryUSD:          currentSalary,
@@ -346,6 +357,7 @@ func (r *salaryRepository) GetSalaryProgress(ctx context.Context, userID uuid.UU
 		MonthlyIncrementRemaining: monthlyIncRemaining,
 		DaysRemainingInCycle:      daysRemaining,
 		Status:                    status,
+		HasReceivedSalary:         hasReceivedSalary,
 	}, nil
 }
 

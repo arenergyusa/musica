@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { TrendingUp, Award, AlertCircle, CheckCircle2, Clock, Scale, ArrowUpRight, Sparkles } from "lucide-react";
+import { TrendingUp, Award, AlertCircle, CheckCircle2, Clock, Scale, ArrowUpRight } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { motion } from "framer-motion";
@@ -32,6 +32,7 @@ export interface SalaryProgress {
   monthly_increment_remaining: number;
   days_remaining_in_cycle: number;
   status: string;
+  has_received_salary: boolean;
 }
 
 // ─── Animated circular progress ring ─────────────────────────────────────────
@@ -148,10 +149,6 @@ export function SalaryProgressCard() {
               <h3 className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight leading-snug">
                 Salary Program
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
-                <Sparkles className="h-3 w-3 text-purple-400" />
-                Binary leg volume with 25% monthly growth target
-              </p>
             </div>
           </div>
 
@@ -293,6 +290,7 @@ export function SalaryProgressCard() {
         </div>
 
         {/* ═══ 25% MONTHLY INCREMENT TRACKER ═══ */}
+        {data.has_received_salary && (
         <div className="space-y-2.5 rounded-xl bg-gradient-to-r from-purple-50/60 to-fuchsia-50/40 dark:from-purple-950/25 dark:to-fuchsia-950/15 p-4 border border-purple-100/80 dark:border-purple-800/30">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
@@ -321,6 +319,7 @@ export function SalaryProgressCard() {
             </span>
           </div>
         </div>
+        )}
 
       </div>
     </motion.div>
