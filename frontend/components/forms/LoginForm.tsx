@@ -87,7 +87,7 @@ export function LoginForm() {
         window.location.assign("/dashboard");
       }
     } catch (error: unknown) {
-      let message = "Invalid email or password";
+      let message = "Invalid email/username or password";
       if (axios.isAxiosError(error) && typeof error.response?.data?.message === 'string') {
         message = error.response.data.message;
       }
@@ -112,22 +112,22 @@ export function LoginForm() {
             </motion.div>
           )}
 
-          {/* Email Field with Mail Trust Badge */}
+          {/* Email / Username Field */}
           <motion.div variants={itemVariants}>
             <FormField
               control={form.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-xs font-bold text-slate-800 dark:text-slate-200">Email Address</FormLabel>
+                  <FormLabel className="text-xs font-bold text-slate-800 dark:text-slate-200">Email or Username</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                         <Mail className="h-4 w-4" />
                       </div>
                       <Input
-                        placeholder="Enter your email address"
-                        type="email"
+                        placeholder="Enter your email or username"
+                        type="text"
                         disabled={isLoading}
                         className="pl-9 h-11 text-xs rounded-lg border-slate-200 dark:border-slate-800 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:border-blue-600 transition-all"
                         {...field}

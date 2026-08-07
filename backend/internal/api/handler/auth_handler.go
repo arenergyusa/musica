@@ -75,11 +75,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Login successful", gin.H{
 		"token": token,
 		"user": gin.H{
-			"id":     user.ID,
-			"name":   user.Name,
-			"email":  user.Email,
-			"role":   user.Role,
-			"status": user.Status,
+			"id":       user.ID,
+			"name":     user.Name,
+			"email":    user.Email,
+			"username": user.Username,
+			"role":     user.Role,
+			"status":   user.Status,
 		},
 	})
 }
@@ -152,4 +153,3 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	response.Success(c, http.StatusOK, "Logged out successfully", nil)
 }
-

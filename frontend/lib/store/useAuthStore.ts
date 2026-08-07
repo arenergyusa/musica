@@ -9,6 +9,7 @@ export interface User {
   name: string;
   email: string;
   phone: string;
+  username?: string;
   role: UserRole;
   referralCode?: string;
   invite_code?: string;

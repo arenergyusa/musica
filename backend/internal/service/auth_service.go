@@ -41,6 +41,9 @@ type AuthService interface {
 	// Logout blacklists the presented JWT (by its jti claim) until it would
 	// naturally expire, so a stolen token cannot keep working after logout (H2).
 	Logout(ctx context.Context, tokenString string) error
+	// SendUsernameEmails backfills the username announcement email to existing
+	// ACTIVE users who have not received it yet (M30).
+	SendUsernameEmails(ctx context.Context)
 }
 
 type authService struct {
@@ -131,17 +134,6 @@ func (s *authService) Register(ctx context.Context, req *domain.RegisterRequest)
 		return nil, errors.New("email address is already registered")
 	}
 
-	// Check if phone number exists and belongs to a different active user
-	existingPhone, err := s.userRepo.GetByPhone(ctx, req.Phone)
-	if err != nil {
-		return nil, err
-	}
-	if existingPhone != nil && existingPhone.Status != "PENDING_VERIFICATION" {
-		if existingEmail == nil || existingPhone.ID != existingEmail.ID {
-			return nil, errors.New("mobile number is already registered")
-		}
-	}
-
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -150,12 +142,20 @@ func (s *authService) Register(ctx context.Context, req *domain.RegisterRequest)
 
 	var user *domain.User
 	if existingEmail == nil {
+		// Generate a unique system username (prefix "MU" + 8 digits) that is
+		// emailed to the user after their account is verified (M30).
+		username, err := s.userRepo.GenerateUniqueUsername(ctx)
+		if err != nil {
+			return nil, err
+		}
+
 		// Generate new unique invite code only for new user registration
 		newInviteCode := uuid.New().String()[:8]
 		user = &domain.User{
 			Name:         req.Name,
 			Email:        req.Email,
 			Phone:        req.Phone,
+			Username:     username,
 			PasswordHash: string(hash),
 			InviteCode:   newInviteCode,
 			Role:         "user",
@@ -191,7 +191,7 @@ func (s *authService) Register(ctx context.Context, req *domain.RegisterRequest)
 		if upline != nil {
 			newUplineID = &upline.ID
 		}
-		
+
 		uplineChanged := false
 		if existingEmail.InvitedBy == nil && newUplineID != nil {
 			uplineChanged = true
@@ -283,11 +283,65 @@ func (s *authService) VerifyRegisterOTP(ctx context.Context, email, otp string) 
 		return err
 	}
 
+	s.sendUsernameEmail(user)
+
 	return nil
 }
 
-func (s *authService) Login(ctx context.Context, email, password string, rememberMe bool) (*domain.User, string, error) {
-	user, err := s.userRepo.GetByEmail(ctx, email)
+// sendUsernameEmail delivers the account username to the user. It is called
+// right after OTP verification (new accounts) and once per user by the startup
+// backfill; MarkUsernameEmailSent makes it idempotent.
+func (s *authService) sendUsernameEmail(user *domain.User) {
+	if user == nil || user.Email == "" || user.Username == "" {
+		return
+	}
+	body := emailpkg.RenderUsernameEmail(user.Name, user.Username)
+	go func(email, subject, body string) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Recovered from panic in SendEmail: %v", r)
+			}
+		}()
+		if err := s.emailSender.SendEmail(email, subject, body); err != nil {
+			log.Printf("ERROR: Failed to send username email to %s: %v", email, err)
+			return
+		}
+		// Idempotency marker: only set after a successful send so a transient
+		// SMTP failure leaves the user pending for the next backfill run.
+		u, err := s.userRepo.GetByID(context.Background(), user.ID)
+		if err != nil || u == nil {
+			return
+		}
+		if err := s.userRepo.MarkUsernameEmailSent(context.Background(), user.ID); err != nil {
+			log.Printf("WARN: failed to mark username email sent for %s: %v", user.Email, err)
+		}
+	}(user.Email, "Musica - Your Account Username", body)
+}
+
+// SendUsernameEmails is the startup backfill: it emails every ACTIVE user who
+// already has a username but has not yet been told about it. Runs asynchronously
+// so startup is not blocked, and paces sends to avoid SMTP bursts.
+func (s *authService) SendUsernameEmails(ctx context.Context) {
+	users, err := s.userRepo.GetUsersMissingUsernameEmail(ctx)
+	if err != nil {
+		log.Printf("SendUsernameEmails: failed to load pending users: %v", err)
+		return
+	}
+	if len(users) == 0 {
+		return
+	}
+	log.Printf("SendUsernameEmails: delivering usernames to %d existing user(s)", len(users))
+	for _, u := range users {
+		if ctx.Err() != nil {
+			return
+		}
+		s.sendUsernameEmail(u)
+		time.Sleep(300 * time.Millisecond)
+	}
+}
+
+func (s *authService) Login(ctx context.Context, identifier, password string, rememberMe bool) (*domain.User, string, error) {
+	user, err := s.userRepo.GetByIdentifier(ctx, identifier)
 	if err != nil || user == nil {
 		return nil, "", errors.New("invalid credentials")
 	}

@@ -22,6 +22,14 @@ type UserRepository interface {
 	SearchUsers(ctx context.Context, limit, offset int, search, status string) ([]*domain.User, error)
 	// GetDailySignups returns daily new user counts for the last N days
 	GetDailySignups(ctx context.Context, days int) ([]map[string]interface{}, error)
+	// GetByIdentifier resolves a user by email OR generated username (login).
+	GetByIdentifier(ctx context.Context, identifier string) (*domain.User, error)
+	// GenerateUniqueUsername returns a fresh "MUxxxxxxx" username that is free.
+	GenerateUniqueUsername(ctx context.Context) (string, error)
+	// GetUsersMissingUsernameEmail lists ACTIVE users still owed their username email.
+	GetUsersMissingUsernameEmail(ctx context.Context) ([]*domain.User, error)
+	// MarkUsernameEmailSent records that the username email was delivered.
+	MarkUsernameEmailSent(ctx context.Context, id uuid.UUID) error
 }
 
 // InvestmentRepository handles sponsorship and plan data

@@ -103,6 +103,19 @@ func main() {
 	jobRunner := cron.NewJobRunner(dbPool, invRepo, mlmRepo, walletRepo, settingsRepo, salaryRepo, wdSvc)
 	jobRunner.Start()
 
+	// Backfill: email existing ACTIVE users their generated username asynchronously
+	// so startup is never blocked on SMTP delivery (M30).
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Recovered from panic in SendUsernameEmails: %v", r)
+			}
+		}()
+		bfCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+		defer cancel()
+		authSvc.SendUsernameEmails(bfCtx)
+	}()
+
 	router := gin.Default()
 	// KYC scans are intentionally not served as public static files.
 
@@ -128,7 +141,6 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-
 
 	// Configure trusted proxies for ingress/nginx IP resolution. Only trust the
 	// loopback interface and the Docker bridge so attackers cannot spoof
@@ -210,8 +222,8 @@ func main() {
 		{
 			invites.GET("/direct", teamH.GetDirectReferrals)
 			invites.GET("/tree", teamH.GetTree)
-		invites.GET("/stats", teamH.GetTeamStats)
-		invites.GET("/breakdown", teamH.GetTeamBreakdown)
+			invites.GET("/stats", teamH.GetTeamStats)
+			invites.GET("/breakdown", teamH.GetTeamBreakdown)
 		}
 
 		team := api.Group("/team")
@@ -219,8 +231,8 @@ func main() {
 		{
 			team.GET("/direct", teamH.GetDirectReferrals)
 			team.GET("/tree", teamH.GetTree)
-		team.GET("/stats", teamH.GetTeamStats)
-		team.GET("/breakdown", teamH.GetTeamBreakdown)
+			team.GET("/stats", teamH.GetTeamStats)
+			team.GET("/breakdown", teamH.GetTeamBreakdown)
 		}
 
 		withdrawal := api.Group("/withdrawal")

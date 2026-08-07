@@ -9,7 +9,9 @@ type RegisterRequest struct {
 }
 
 type LoginRequest struct {
-	Email      string `json:"email" binding:"required,email"`
+	// Email accepts either the account email or the generated username; the
+	// service resolves it by either column (M30).
+	Email      string `json:"email" binding:"required"`
 	Password   string `json:"password" binding:"required"`
 	RememberMe bool   `json:"remember_me"`
 }

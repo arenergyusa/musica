@@ -51,14 +51,9 @@ func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, req *
 	if req.Name != "" {
 		user.Name = req.Name
 	}
-	if req.Phone != "" && req.Phone != user.Phone {
-		existingPhone, err := s.userRepo.GetByPhone(ctx, req.Phone)
-		if err != nil {
-			return nil, err
-		}
-		if existingPhone != nil && existingPhone.ID != userID {
-			return nil, errors.New("this mobile number is already registered with another account")
-		}
+	// The same phone number may be used by multiple accounts (M30); there is no
+	// longer a uniqueness check here.
+	if req.Phone != "" {
 		user.Phone = req.Phone
 	}
 	if req.UsdtAddress != "" {

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
 
@@ -66,12 +67,12 @@ func (r *userRepository) insertUser(ctx context.Context, user *domain.User, leg 
 	user.Leg = leg
 
 	query := `
-		INSERT INTO users (name, email, phone, password_hash, invite_code, invited_by, leg, role, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (name, email, phone, username, password_hash, invite_code, invited_by, leg, role, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id, created_at, updated_at
 	`
 	return r.db.QueryRow(ctx, query,
-		user.Name, user.Email, user.Phone, user.PasswordHash, user.InviteCode, user.InvitedBy, user.Leg, user.Role, user.Status,
+		user.Name, user.Email, user.Phone, user.Username, user.PasswordHash, user.InviteCode, user.InvitedBy, user.Leg, user.Role, user.Status,
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 }
 
@@ -79,12 +80,12 @@ func insertUserTx(ctx context.Context, tx pgx.Tx, user *domain.User, leg string)
 	user.Leg = leg
 
 	query := `
-		INSERT INTO users (name, email, phone, password_hash, invite_code, invited_by, leg, role, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (name, email, phone, username, password_hash, invite_code, invited_by, leg, role, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id, created_at, updated_at
 	`
 	return tx.QueryRow(ctx, query,
-		user.Name, user.Email, user.Phone, user.PasswordHash, user.InviteCode, user.InvitedBy, user.Leg, user.Role, user.Status,
+		user.Name, user.Email, user.Phone, user.Username, user.PasswordHash, user.InviteCode, user.InvitedBy, user.Leg, user.Role, user.Status,
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 }
 
@@ -98,12 +99,12 @@ func (r *userRepository) Delete(ctx context.Context, id uuid.UUID) error {
 
 func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, invite_code, invited_by, COALESCE(usdt_address, ''), COALESCE(leg, 'LEFT'), status, COALESCE(role, 'user'), created_at, updated_at
+		SELECT id, name, email, phone, username, password_hash, invite_code, invited_by, COALESCE(usdt_address, ''), COALESCE(leg, 'LEFT'), status, COALESCE(role, 'user'), created_at, updated_at
 		FROM users WHERE id = $1
 	`
 	var u domain.User
 	err := r.db.QueryRow(ctx, query, id).Scan(
-		&u.ID, &u.Name, &u.Email, &u.Phone, &u.PasswordHash, &u.InviteCode, &u.InvitedBy,
+		&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.PasswordHash, &u.InviteCode, &u.InvitedBy,
 		&u.UsdtAddress, &u.Leg, &u.Status, &u.Role, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
@@ -117,12 +118,12 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Use
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, invite_code, invited_by, COALESCE(usdt_address, ''), COALESCE(leg, 'LEFT'), status, COALESCE(role, 'user'), created_at, updated_at
+		SELECT id, name, email, phone, username, password_hash, invite_code, invited_by, COALESCE(usdt_address, ''), COALESCE(leg, 'LEFT'), status, COALESCE(role, 'user'), created_at, updated_at
 		FROM users WHERE email = $1
 	`
 	var u domain.User
 	err := r.db.QueryRow(ctx, query, email).Scan(
-		&u.ID, &u.Name, &u.Email, &u.Phone, &u.PasswordHash, &u.InviteCode, &u.InvitedBy,
+		&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.PasswordHash, &u.InviteCode, &u.InvitedBy,
 		&u.UsdtAddress, &u.Leg, &u.Status, &u.Role, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
@@ -136,12 +137,12 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.
 
 func (r *userRepository) GetByPhone(ctx context.Context, phone string) (*domain.User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, invite_code, invited_by, COALESCE(usdt_address, ''), COALESCE(leg, 'LEFT'), status, COALESCE(role, 'user'), created_at, updated_at
+		SELECT id, name, email, phone, username, password_hash, invite_code, invited_by, COALESCE(usdt_address, ''), COALESCE(leg, 'LEFT'), status, COALESCE(role, 'user'), created_at, updated_at
 		FROM users WHERE phone = $1
 	`
 	var u domain.User
 	err := r.db.QueryRow(ctx, query, phone).Scan(
-		&u.ID, &u.Name, &u.Email, &u.Phone, &u.PasswordHash, &u.InviteCode, &u.InvitedBy,
+		&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.PasswordHash, &u.InviteCode, &u.InvitedBy,
 		&u.UsdtAddress, &u.Leg, &u.Status, &u.Role, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
@@ -155,12 +156,12 @@ func (r *userRepository) GetByPhone(ctx context.Context, phone string) (*domain.
 
 func (r *userRepository) GetByInviteCode(ctx context.Context, code string) (*domain.User, error) {
 	query := `
-		SELECT id, name, email, phone, password_hash, invite_code, invited_by, COALESCE(usdt_address, ''), COALESCE(leg, 'LEFT'), status, COALESCE(role, 'user'), created_at, updated_at
+		SELECT id, name, email, phone, username, password_hash, invite_code, invited_by, COALESCE(usdt_address, ''), COALESCE(leg, 'LEFT'), status, COALESCE(role, 'user'), created_at, updated_at
 		FROM users WHERE invite_code = $1
 	`
 	var u domain.User
 	err := r.db.QueryRow(ctx, query, code).Scan(
-		&u.ID, &u.Name, &u.Email, &u.Phone, &u.PasswordHash, &u.InviteCode, &u.InvitedBy,
+		&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.PasswordHash, &u.InviteCode, &u.InvitedBy,
 		&u.UsdtAddress, &u.Leg, &u.Status, &u.Role, &u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
@@ -192,7 +193,7 @@ func (r *userRepository) GetTotalCount(ctx context.Context) (int, error) {
 }
 
 func (r *userRepository) GetAll(ctx context.Context, limit, offset int) ([]*domain.User, error) {
-	query := "SELECT id, name, email, phone, invite_code, invited_by, COALESCE(usdt_address, ''), status, created_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+	query := "SELECT id, name, email, phone, username, invite_code, invited_by, COALESCE(usdt_address, ''), status, created_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2"
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, err
@@ -202,7 +203,7 @@ func (r *userRepository) GetAll(ctx context.Context, limit, offset int) ([]*doma
 	var users []*domain.User
 	for rows.Next() {
 		var u domain.User
-		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.InviteCode, &u.InvitedBy, &u.UsdtAddress, &u.Status, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.InviteCode, &u.InvitedBy, &u.UsdtAddress, &u.Status, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, &u)
@@ -213,7 +214,7 @@ func (r *userRepository) GetAll(ctx context.Context, limit, offset int) ([]*doma
 // SearchUsers searches users by name/email and optionally filters by status.
 func (r *userRepository) SearchUsers(ctx context.Context, limit, offset int, search, status string) ([]*domain.User, error) {
 	query := `
-		SELECT id, name, email, phone, invite_code, invited_by, COALESCE(usdt_address, ''), status, created_at
+		SELECT id, name, email, phone, username, invite_code, invited_by, COALESCE(usdt_address, ''), status, created_at
 		FROM users
 		WHERE 
 			($1 = '' OR name ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%')
@@ -230,7 +231,7 @@ func (r *userRepository) SearchUsers(ctx context.Context, limit, offset int, sea
 	var users []*domain.User
 	for rows.Next() {
 		u := &domain.User{}
-		err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.InviteCode, &u.InvitedBy, &u.UsdtAddress, &u.Status, &u.CreatedAt)
+		err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.InviteCode, &u.InvitedBy, &u.UsdtAddress, &u.Status, &u.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -298,4 +299,88 @@ func (r *userRepository) GetRegistrationStats(ctx context.Context, days int) ([]
 		data = append(data, map[string]interface{}{"date": date, "count": count})
 	}
 	return data, rows.Err()
+}
+
+// GetByIdentifier resolves a user by either their email address or their
+// generated username, so login accepts both. Both columns are unique, so the
+// OR lookup can never return more than one row.
+func (r *userRepository) GetByIdentifier(ctx context.Context, identifier string) (*domain.User, error) {
+	query := `
+		SELECT id, name, email, phone, username, password_hash, invite_code, invited_by, COALESCE(usdt_address, ''), COALESCE(leg, 'LEFT'), status, COALESCE(role, 'user'), created_at, updated_at
+		FROM users WHERE email = $1 OR username = $1
+		ORDER BY created_at ASC
+		LIMIT 1
+	`
+	var u domain.User
+	err := r.db.QueryRow(ctx, query, identifier).Scan(
+		&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.PasswordHash, &u.InviteCode, &u.InvitedBy,
+		&u.UsdtAddress, &u.Leg, &u.Status, &u.Role, &u.CreatedAt, &u.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &u, nil
+}
+
+// GenerateUniqueUsername returns a free username of the form "MU" followed by
+// 8 random digits. The partial unique index is the source of truth for
+// uniqueness; a pre-check just avoids wasting an INSERT attempt on a collision.
+func (r *userRepository) GenerateUniqueUsername(ctx context.Context) (string, error) {
+	const charset = "0123456789"
+	buf := make([]byte, 8)
+	for i := 0; i < 20; i++ {
+		if _, err := rand.Read(buf); err != nil {
+			return "", err
+		}
+		for j := range buf {
+			buf[j] = charset[int(buf[j])%len(charset)]
+		}
+		candidate := "MU" + string(buf)
+		var exists bool
+		if err := r.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE username = $1)`, candidate).Scan(&exists); err != nil {
+			return "", err
+		}
+		if !exists {
+			return candidate, nil
+		}
+	}
+	return "", errors.New("could not generate a unique username")
+}
+
+// GetUsersMissingUsernameEmail lists ACTIVE users who have a username but have
+// not yet received the email announcing it (used by the startup backfill).
+func (r *userRepository) GetUsersMissingUsernameEmail(ctx context.Context) ([]*domain.User, error) {
+	query := `
+		SELECT id, name, email, phone, username
+		FROM users
+		WHERE status = 'ACTIVE'
+		  AND username IS NOT NULL AND username <> ''
+		  AND username_email_sent_at IS NULL
+		ORDER BY created_at ASC
+	`
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*domain.User
+	for rows.Next() {
+		u := &domain.User{}
+		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+// MarkUsernameEmailSent records that the username email was delivered for a user
+// so the backfill never sends duplicates.
+func (r *userRepository) MarkUsernameEmailSent(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET username_email_sent_at = CURRENT_TIMESTAMP WHERE id = $1`, id)
+	return err
 }

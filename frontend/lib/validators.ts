@@ -30,8 +30,10 @@ export const registerSchema = z
     path: ["confirmPassword"],
   });
 
+// Identifier accepts either the account email or the generated username
+// (e.g. "MU12345678"), so no email-format validation is applied here.
 export const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().min(3, "Enter your email or username"),
   password: z.string().min(1, "Password is required"),
   rememberMe: z.boolean(),
 });
