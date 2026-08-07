@@ -313,17 +313,18 @@ func (r *walletRepository) GetIncomeChartData(ctx context.Context, userID uuid.U
 	return data, nil
 }
 
-// GetTotalPaid returns total platform income paid to users. Only genuine income
-// sources count — withdrawal refunds (CREDIT + source WITHDRAWAL) and any other
-// non-income credits are excluded so the admin "total paid" figure is not
-// inflated (H11).
+	// GetTotalPaid returns total platform income paid to users. Only genuine income
+	// sources count — withdrawal refunds (CREDIT + source WITHDRAWAL) and any other
+	// non-income credits are excluded so the admin "total paid" figure is not
+	// inflated (H11). INVITE_REWARD is the legacy name for the same invite bonus
+	// payouts, so it counts towards total paid as well.
 func (r *walletRepository) GetTotalPaid(ctx context.Context) (float64, error) {
 	var total float64
 	err := r.db.QueryRow(ctx, `
 		SELECT COALESCE(SUM(amount), 0)
 		FROM transactions
 		WHERE type = 'CREDIT'
-		  AND source IN ('DAILY_REWARD', 'LEVEL_INCOME', 'INVITE', 'SALARY_INCOME')
+		  AND source IN ('DAILY_REWARD', 'LEVEL_INCOME', 'INVITE', 'INVITE_REWARD', 'SALARY_INCOME')
 	`).Scan(&total)
 	return total, err
 }
@@ -375,7 +376,7 @@ func (r *walletRepository) GetLifetimeIncomeBySource(ctx context.Context, userID
 		WHERE user_id = $1
 		  AND type = 'CREDIT'
 		  AND source = $2
-		  AND description ~ '^L[1-3] invite bonus'`
+		  AND description ~ '^Level [1-3] invite bonus'`
 	} else {
 		query = `
 		SELECT COALESCE(SUM(amount), 0)

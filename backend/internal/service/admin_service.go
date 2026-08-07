@@ -309,7 +309,7 @@ func (s *adminService) payReferralIncome(ctx context.Context, inv *domain.Sponso
 		}
 
 		// 2. Credit wallet and create transaction in tx
-		desc := fmt.Sprintf("L%d invite bonus — community reward (%.1f%% of ₹%.0f)", level, pct, inv.Amount)
+		desc := fmt.Sprintf("Level %d invite bonus of ₹%.0f", level, inv.Amount)
 		cmdTag, err := tx.Exec(ctx, `UPDATE reward_wallet SET balance = balance + $1, total_credited = total_credited + $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`, boundedReward, *uplineID)
 		if err != nil || cmdTag.RowsAffected() != 1 {
 			tx.Rollback(ctx)

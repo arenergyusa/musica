@@ -239,7 +239,7 @@ func (j *JobRunner) distributeDailyRewardAndLevelIncome() {
 			continue
 		}
 
-		roiDesc := fmt.Sprintf("Daily promotional reward for %s", today)
+		roiDesc := fmt.Sprintf("Daily income for %s", today)
 		err = j.walletRepo.CreditReward(
 			ctx, freshInv.UserID, roiAmount,
 			"CREDIT", "DAILY_REWARD", freshInv.ID.String(), today, roiDesc,
@@ -346,7 +346,7 @@ func (j *JobRunner) distributeLevelIncome(
 			continue
 		}
 
-		desc := fmt.Sprintf("Level %d income from network activity (%s)", levelNum, today)
+		desc := fmt.Sprintf("Level %d income for %s", levelNum, today)
 
 		// Credit bounded reward to upline's wallet. The level_income_log unique
 		// index gates this so a duplicate run never double-credits (C5); on
