@@ -17,6 +17,25 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// clearTokenCookie expires the HttpOnly token cookie when the session is
+// rejected. JS cannot delete an HttpOnly cookie — only a server Set-Cookie can
+// — so without this, a blacklisted-but-unexpired token keeps the Next.js
+// middleware bouncing /login back to the dashboard while the backend 401s every
+// API call, leaving the browser stuck in a login<->dashboard redirect loop.
+func clearTokenCookie(c *gin.Context) {
+	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("token", "", -1, "/", "", secure, true)
+}
+
+// reject responds with an error, clears any token cookie so the client can
+// escape a redirect loop, and aborts the request.
+func reject(c *gin.Context, status int, msg string) {
+	clearTokenCookie(c)
+	response.Error(c, status, msg, nil)
+	c.Abort()
+}
+
 // AuthMiddleware verifies the JWT and then re-checks the user against the DB on
 // every request so that:
 //   - blocked users are rejected immediately even while their token is still
@@ -45,8 +64,7 @@ func AuthMiddleware(db *pgxpool.Pool, rdb *redis.Client) gin.HandlerFunc {
 		}
 
 		if tokenString == "" {
-			response.Error(c, http.StatusUnauthorized, "Authorization token is missing", nil)
-			c.Abort()
+			reject(c, http.StatusUnauthorized, "Authorization token is missing")
 			return
 		}
 
@@ -66,15 +84,13 @@ func AuthMiddleware(db *pgxpool.Pool, rdb *redis.Client) gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			response.Error(c, http.StatusUnauthorized, "Invalid or expired token", nil)
-			c.Abort()
+			reject(c, http.StatusUnauthorized, "Invalid or expired token")
 			return
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			response.Error(c, http.StatusUnauthorized, "Invalid token claims", nil)
-			c.Abort()
+			reject(c, http.StatusUnauthorized, "Invalid token claims")
 			return
 		}
 
@@ -87,8 +103,7 @@ func AuthMiddleware(db *pgxpool.Pool, rdb *redis.Client) gin.HandlerFunc {
 				exists, _ := rdb.Exists(ctx, "token:blacklist:"+jti).Result()
 				cancel()
 				if exists == 1 {
-					response.Error(c, http.StatusUnauthorized, "Session has been logged out", nil)
-					c.Abort()
+					reject(c, http.StatusUnauthorized, "Session has been logged out")
 					return
 				}
 			}
@@ -97,14 +112,12 @@ func AuthMiddleware(db *pgxpool.Pool, rdb *redis.Client) gin.HandlerFunc {
 		// Load the user and re-derive role/status from the DB (H1/H4).
 		userIDStr, ok := claims["user_id"].(string)
 		if !ok {
-			response.Error(c, http.StatusUnauthorized, "Invalid token claims", nil)
-			c.Abort()
+			reject(c, http.StatusUnauthorized, "Invalid token claims")
 			return
 		}
 		userID, err := uuid.Parse(userIDStr)
 		if err != nil {
-			response.Error(c, http.StatusUnauthorized, "Invalid token claims", nil)
-			c.Abort()
+			reject(c, http.StatusUnauthorized, "Invalid token claims")
 			return
 		}
 
@@ -114,16 +127,15 @@ func AuthMiddleware(db *pgxpool.Pool, rdb *redis.Client) gin.HandlerFunc {
 		).Scan(&role, &status)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				response.Error(c, http.StatusUnauthorized, "Account no longer exists", nil)
+				reject(c, http.StatusUnauthorized, "Account no longer exists")
 			} else {
 				response.Error(c, http.StatusInternalServerError, "Authentication is temporarily unavailable", nil)
+				c.Abort()
 			}
-			c.Abort()
 			return
 		}
 		if status == "BLOCKED" {
-			response.Error(c, http.StatusForbidden, "Account is blocked", nil)
-			c.Abort()
+			reject(c, http.StatusForbidden, "Account is blocked")
 			return
 		}
 
