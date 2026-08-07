@@ -32,7 +32,7 @@ func (r *withdrawalRepository) CreateRequest(ctx context.Context, req *domain.Wi
 
 func (r *withdrawalRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Withdrawal, error) {
 	query := `
-		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, payment_ref, scheduled_date, processed_at, admin_note
+		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, COALESCE(payment_ref, ''), scheduled_date, processed_at, COALESCE(admin_note, '')
 		FROM withdrawals
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -48,7 +48,7 @@ func (r *withdrawalRepository) GetByUserID(ctx context.Context, userID uuid.UUID
 
 func (r *withdrawalRepository) GetPending(ctx context.Context) ([]*domain.Withdrawal, error) {
 	query := `
-		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, payment_ref, scheduled_date, processed_at, admin_note
+		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, COALESCE(payment_ref, ''), scheduled_date, processed_at, COALESCE(admin_note, '')
 		FROM withdrawals
 		WHERE status = 'PENDING'
 		ORDER BY created_at ASC
@@ -107,7 +107,7 @@ func (r *withdrawalRepository) UpdateRequestStatusWithRef(ctx context.Context, i
 
 func (r *withdrawalRepository) GetProcessing(ctx context.Context) ([]*domain.Withdrawal, error) {
 	query := `
-		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, payment_ref, scheduled_date, processed_at, admin_note, created_at
+		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, COALESCE(payment_ref, ''), scheduled_date, processed_at, COALESCE(admin_note, ''), created_at
 		FROM withdrawals
 		WHERE status = 'PROCESSING' AND payment_ref IS NOT NULL AND payment_ref != ''
 		ORDER BY created_at ASC
@@ -143,7 +143,7 @@ func (r *withdrawalRepository) GetAll(ctx context.Context, limit, offset int) ([
 	// alongside the requested/net amounts (M18).
 	query := `
 		SELECT w.id, w.user_id, w.amount_requested, w.tds_amount, w.net_amount,
-		       w.status, w.payment_ref, w.admin_note, w.created_at,
+		       w.status, COALESCE(w.payment_ref, ''), COALESCE(w.admin_note, ''), w.created_at,
 		       COALESCE(u.usdt_address, '')
 		FROM withdrawals w
 		LEFT JOIN users u ON u.id = w.user_id
