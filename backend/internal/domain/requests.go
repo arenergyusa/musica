@@ -25,7 +25,10 @@ type ConfirmDepositRequest struct {
 }
 
 type WithdrawRequest struct {
-	Amount float64 `json:"amount" binding:"required,min=10"`
+	// The minimum is enforced dynamically against platform_settings
+	// (withdrawal_min_amount) in the service so users get a clean, current
+	// message instead of this stale hardcoded tag leaking as a raw error.
+	Amount float64 `json:"amount" binding:"required"`
 }
 
 type UpdateProfileRequest struct {

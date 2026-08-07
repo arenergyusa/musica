@@ -28,6 +28,11 @@ func (r *walletRepository) GetBalance(ctx context.Context, userID uuid.UUID) (*d
 	var w domain.RewardWallet
 	err := r.db.QueryRow(ctx, query, userID).Scan(&w.ID, &w.UserID, &w.Balance, &w.TotalCredited, &w.TotalWithdrawn, &w.SalaryIncome)
 	if err != nil {
+		// A user with no reward_wallet row has a zero balance — don't fail the
+		// wallet/balance endpoint with a 500 just because the row is absent.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &domain.RewardWallet{UserID: userID}, nil
+		}
 		return nil, err
 	}
 	return &w, nil

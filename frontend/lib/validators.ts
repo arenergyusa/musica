@@ -72,11 +72,12 @@ export const investSchema = z.object({
 // ============================================================
 // Withdrawal Schema
 // ============================================================
-export const withdrawSchema = z.object({
-  amount: z
-    .number({ error: "Enter a valid amount" })
-    .min(10, "Minimum withdrawal amount is $10"),
-});
+export const withdrawSchema = (min: number = 10) =>
+  z.object({
+    amount: z
+      .number({ error: "Enter a valid amount" })
+      .min(min, `Minimum withdrawal amount is $${min}`),
+  });
 
 // ============================================================
 // Profile & USDT Address Schemas
@@ -119,7 +120,7 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type InvestInput = z.infer<typeof investSchema>;
-export type WithdrawInput = z.infer<typeof withdrawSchema>;
+export type WithdrawInput = z.infer<ReturnType<typeof withdrawSchema>>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type UsdtAddressInput = z.infer<typeof usdtAddressSchema>;
 export type RejectReasonInput = z.infer<typeof rejectWithReasonSchema>;

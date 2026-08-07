@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
@@ -27,31 +27,42 @@ import { useAuthStore } from "@/lib/store/useAuthStore";
 
 interface WithdrawFormProps {
   availableBalance: number;
+  minWithdrawal?: number;
+  feePct?: number;
   onSuccess?: () => void;
 }
 
-export function WithdrawForm({ availableBalance, onSuccess }: WithdrawFormProps) {
+export function WithdrawForm({ availableBalance, minWithdrawal: minProp, feePct: feeProp, onSuccess }: WithdrawFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [minWithdrawal, setMinWithdrawal] = useState<number>(10);
-  const [feePct, setFeePct] = useState<number>(10);
+  const [minWithdrawal, setMinWithdrawal] = useState<number>(minProp ?? 10);
+  const [feePct, setFeePct] = useState<number>(feeProp ?? 10);
   const { user, fetchUser } = useAuthStore();
 
   useEffect(() => {
     fetchUser();
-    api.get("/settings")
-      .then((res) => {
-        if (res.data?.data?.withdrawal_min_amount) {
-          setMinWithdrawal(res.data.data.withdrawal_min_amount);
-        }
-        if (typeof res.data?.data?.withdrawal_fee_pct === "number") {
-          setFeePct(res.data.data.withdrawal_fee_pct);
-        }
-      })
-      .catch((err) => console.error(err));
-  }, [fetchUser]);
+    // Settings are normally loaded by the page and passed in as props; this
+    // fallback keeps the form self-sufficient when embedded elsewhere.
+    if (minProp === undefined || feeProp === undefined) {
+      api.get("/settings")
+        .then((res) => {
+          if (res.data?.data?.withdrawal_min_amount) {
+            setMinWithdrawal(res.data.data.withdrawal_min_amount);
+          }
+          if (typeof res.data?.data?.withdrawal_fee_pct === "number") {
+            setFeePct(res.data.data.withdrawal_fee_pct);
+          }
+        })
+        .catch((err) => console.error(err));
+    }
+  }, [fetchUser, minProp, feeProp]);
+
+  const resolver = useMemo(
+    () => zodResolver(withdrawSchema(minWithdrawal)),
+    [minWithdrawal]
+  );
 
   const form = useForm<WithdrawInput>({
-    resolver: zodResolver(withdrawSchema),
+    resolver,
     defaultValues: {
       amount: undefined,
     },

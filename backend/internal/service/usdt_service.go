@@ -384,10 +384,17 @@ func (s *usdtService) ProcessAutoWithdrawal(ctx context.Context, withdrawalID, u
 	}
 	txHash, err := callBSC(ctx, rpcURL, "eth_sendRawTransaction", []interface{}{"0x" + hex.EncodeToString(rawTx)})
 	if err != nil {
-		// The transaction may still have been accepted and mined even though the
-		// RPC response was lost (timeout / connection reset). Return the locally
-		// computed hash so the caller can verify on-chain before deciding to refund.
-		return txHashForRawTx(rawTx), fmt.Errorf("failed to broadcast payout transaction: %w", err)
+		// A JSON-RPC error (e.g. "insufficient funds for gas", "nonce too low")
+		// means the node REJECTED the transaction — it was never broadcast, so
+		// the caller can refund the user immediately instead of leaving them
+		// stuck in PROCESSING. Only a transport-level failure (request failed /
+		// timeout) is ambiguous: the tx may have been accepted even though the
+		// RPC response was lost, so return the locally computed hash and let
+		// on-chain reconciliation decide.
+		if strings.Contains(err.Error(), "BSC RPC request failed") {
+			return txHashForRawTx(rawTx), fmt.Errorf("failed to broadcast payout transaction: %w", err)
+		}
+		return "", fmt.Errorf("payout transaction was rejected by the BSC node: %w", err)
 	}
 
 	// Audit log for withdrawal payout execution

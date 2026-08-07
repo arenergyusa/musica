@@ -27,7 +27,7 @@ func (h *WithdrawalHandler) RequestWithdrawal(c *gin.Context) {
 
 	var req domain.WithdrawRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "Invalid request payload", err)
+		response.Error(c, http.StatusBadRequest, "Invalid withdrawal amount", nil)
 		return
 	}
 
