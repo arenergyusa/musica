@@ -32,7 +32,7 @@ func (r *withdrawalRepository) CreateRequest(ctx context.Context, req *domain.Wi
 
 func (r *withdrawalRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Withdrawal, error) {
 	query := `
-		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, COALESCE(payment_ref, ''), scheduled_date, processed_at, COALESCE(admin_note, '')
+		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, COALESCE(payment_ref, ''), scheduled_date, processed_at, COALESCE(admin_note, ''), created_at
 		FROM withdrawals
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -48,7 +48,7 @@ func (r *withdrawalRepository) GetByUserID(ctx context.Context, userID uuid.UUID
 
 func (r *withdrawalRepository) GetPending(ctx context.Context) ([]*domain.Withdrawal, error) {
 	query := `
-		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, COALESCE(payment_ref, ''), scheduled_date, processed_at, COALESCE(admin_note, '')
+		SELECT id, user_id, amount_requested, tds_amount, net_amount, status, COALESCE(payment_ref, ''), scheduled_date, processed_at, COALESCE(admin_note, ''), created_at
 		FROM withdrawals
 		WHERE status = 'PENDING'
 		ORDER BY created_at ASC
@@ -66,7 +66,7 @@ func scanWithdrawals(rows pgx.Rows) ([]*domain.Withdrawal, error) {
 	var wds []*domain.Withdrawal
 	for rows.Next() {
 		w := &domain.Withdrawal{}
-		if err := rows.Scan(&w.ID, &w.UserID, &w.AmountRequested, &w.TDSAmount, &w.NetAmount, &w.Status, &w.PaymentRef, &w.ScheduledDate, &w.ProcessedAt, &w.AdminNote); err != nil {
+		if err := rows.Scan(&w.ID, &w.UserID, &w.AmountRequested, &w.TDSAmount, &w.NetAmount, &w.Status, &w.PaymentRef, &w.ScheduledDate, &w.ProcessedAt, &w.AdminNote, &w.CreatedAt); err != nil {
 			return nil, err
 		}
 		wds = append(wds, w)
