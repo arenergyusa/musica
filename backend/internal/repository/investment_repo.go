@@ -178,6 +178,11 @@ func (r *investmentRepository) ConfirmDepositAtomic(ctx context.Context, id, use
 	return tag.RowsAffected(), nil
 }
 
+// UpdateCapTracker consumes `rewardAmount` from an investment's income cap and
+// keeps the tracker and sponsorship total in sync. It delegates to
+// ConsumeCapInTx so a missing tracker row (legacy investment) is seeded rather
+// than erroring out, and the total is bounded at cap_limit with the investment
+// flipped to CLOSED once the cap is reached.
 func (r *investmentRepository) UpdateCapTracker(ctx context.Context, investmentID uuid.UUID, rewardAmount float64) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -185,36 +190,8 @@ func (r *investmentRepository) UpdateCapTracker(ctx context.Context, investmentI
 	}
 	defer tx.Rollback(ctx)
 
-	query := `
-		UPDATE income_cap_tracker 
-		SET total_reward_earned = total_reward_earned + $1, updated_at = CURRENT_TIMESTAMP
-		WHERE sponsorship_id = $2
-		RETURNING total_reward_earned, cap_limit
-	`
-	var total, cap float64
-	err = tx.QueryRow(ctx, query, rewardAmount, investmentID).Scan(&total, &cap)
-	if err != nil {
+	if err := ConsumeCapInTx(ctx, tx, investmentID, rewardAmount); err != nil {
 		return err
-	}
-
-	// Sync sponsorship total_reward_earned
-	_, err = tx.Exec(ctx, `UPDATE sponsorships SET total_reward_earned = $1 WHERE id = $2`, total, investmentID)
-	if err != nil {
-		return err
-	}
-
-	if total >= cap {
-		// Mark as capped
-		_, err = tx.Exec(ctx, `UPDATE income_cap_tracker SET is_capped = TRUE, capped_at = CURRENT_TIMESTAMP WHERE sponsorship_id = $1`, investmentID)
-		if err != nil {
-			return err
-		}
-		
-		// Mark sponsorship as closed
-		_, err = tx.Exec(ctx, `UPDATE sponsorships SET status = 'CLOSED', closed_at = CURRENT_TIMESTAMP WHERE id = $1`, investmentID)
-		if err != nil {
-			return err
-		}
 	}
 
 	return tx.Commit(ctx)

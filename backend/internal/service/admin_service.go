@@ -278,7 +278,10 @@ func (s *adminService) payReferralIncome(ctx context.Context, inv *domain.Sponso
 			continue
 		}
 
-		// 1. Reserve cap capacity by updating sponsorships / cap tracker in tx
+		// 1. Reserve cap capacity in tx. ConsumeCapInTx keeps BOTH the tracker
+		//    and sponsorship totals in sync, bounds at cap_limit, sets
+		//    is_capped/capped_at and CLOSES the investment at the cap (previously
+		//    only sponsorships was updated here, desyncing the tracker).
 		remainingToDeduct := boundedReward
 		txFailed := false
 		for _, activeInv := range activeInvs {
@@ -293,24 +296,9 @@ func (s *adminService) payReferralIncome(ctx context.Context, inv *domain.Sponso
 			if deduct > available {
 				deduct = available
 			}
-			newTotal := activeInv.TotalRewardEarned + deduct
-			if newTotal >= activeInv.CapLimit {
-				_, err = tx.Exec(ctx, `UPDATE sponsorships SET total_reward_earned = cap_limit, status = 'CLOSED', closed_at = CURRENT_TIMESTAMP WHERE id = $1`, activeInv.ID)
-				if err != nil {
-					txFailed = true
-					break
-				}
-				_, err = tx.Exec(ctx, `UPDATE income_cap_tracker SET is_capped = TRUE, capped_at = CURRENT_TIMESTAMP WHERE sponsorship_id = $1`, activeInv.ID)
-				if err != nil {
-					txFailed = true
-					break
-				}
-			} else {
-				_, err = tx.Exec(ctx, `UPDATE sponsorships SET total_reward_earned = total_reward_earned + $1 WHERE id = $2`, deduct, activeInv.ID)
-				if err != nil {
-					txFailed = true
-					break
-				}
+			if err := repository.ConsumeCapInTx(ctx, tx, activeInv.ID, deduct); err != nil {
+				txFailed = true
+				break
 			}
 			remainingToDeduct -= deduct
 		}

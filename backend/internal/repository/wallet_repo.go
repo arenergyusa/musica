@@ -73,12 +73,12 @@ func (r *walletRepository) CreditReward(ctx context.Context, userID uuid.UUID, a
 	// wallet credit so a crash can never leave a credited reward without cap
 	// accounting (previously the cron updated income_cap_tracker in a separate
 	// transaction, which could desync). The daily_reward_log gate above already
-	// guarantees this credit runs exactly once, and applyCapInTx locks the
+	// guarantees this credit runs exactly once, and ConsumeCapInTx locks the
 	// sponsorship row so concurrent cap updates serialize.
 	if source == "DAILY_REWARD" && refID != "" {
 		invID, uuidErr := uuid.Parse(refID)
 		if uuidErr == nil {
-			if err := applyCapInTx(ctx, tx, invID, amount); err != nil {
+			if err := ConsumeCapInTx(ctx, tx, invID, amount); err != nil {
 				return err
 			}
 		}
@@ -151,26 +151,26 @@ func (r *walletRepository) CreditLevelIncomeWithLog(ctx context.Context, benefic
 	return tx.Commit(ctx)
 }
 
-// applyCapInTx consumes `amount` from an investment's income cap inside an
-// already-open transaction. It locks both the income_cap_tracker and the
-// sponsorship row so concurrent cap updates serialize, then keeps
-// income_cap_tracker.total_reward_earned and sponsorships.total_reward_earned
-// in sync (bounded at cap_limit) and flips the investment to CLOSED once the
-// cap is reached. Missing tracker rows are treated as no-ops so pre-existing
-// data cannot block a credit.
-func applyCapInTx(ctx context.Context, tx pgx.Tx, investmentID uuid.UUID, amount float64) error {
+// ConsumeCapInTx adds `amount` to an investment's income cap inside an
+// already-open transaction. It locks the sponsorship row so concurrent cap
+// updates serialize, then keeps income_cap_tracker.total_reward_earned and
+// sponsorships.total_reward_earned in sync (bounded at cap_limit) and flips
+// the investment to CLOSED once the cap is reached.
+//
+// The tracker row may be missing for legacy investments that predate cap
+// tracking (e.g. d0527ca0): in that case it is seeded from the sponsorship so
+// cap accounting always runs. Previously ErrNoRows was treated as a silent
+// no-op, which let such investments earn past their cap forever.
+func ConsumeCapInTx(ctx context.Context, tx pgx.Tx, investmentID uuid.UUID, amount float64) error {
 	var total, cap float64
 	err := tx.QueryRow(ctx, `
-		SELECT ic.total_reward_earned, ic.cap_limit
-		FROM income_cap_tracker ic
-		JOIN sponsorships s ON s.id = ic.sponsorship_id
-		WHERE ic.sponsorship_id = $1
-		FOR UPDATE OF ic, s
+		SELECT COALESCE(ic.total_reward_earned, s.total_reward_earned), s.cap_limit
+		FROM sponsorships s
+		LEFT JOIN income_cap_tracker ic ON ic.sponsorship_id = s.id
+		WHERE s.id = $1
+		FOR UPDATE OF s
 	`, investmentID).Scan(&total, &cap)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
 		return err
 	}
 
@@ -180,14 +180,17 @@ func applyCapInTx(ctx context.Context, tx pgx.Tx, investmentID uuid.UUID, amount
 	}
 	capped := newTotal >= cap && cap > 0
 
+	// Upsert the tracker so a missing row is created (seeded from the
+	// sponsorship) rather than silently skipped.
 	if _, err := tx.Exec(ctx, `
-		UPDATE income_cap_tracker
-		SET total_reward_earned = $1,
-		    is_capped = $2,
-		    capped_at = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE capped_at END,
+		INSERT INTO income_cap_tracker (sponsorship_id, cap_limit, total_reward_earned, is_capped, capped_at)
+		VALUES ($1, $2, $3, $4, CASE WHEN $4 THEN CURRENT_TIMESTAMP ELSE NULL END)
+		ON CONFLICT (sponsorship_id) DO UPDATE
+		SET total_reward_earned = $3,
+		    is_capped = $4,
+		    capped_at = CASE WHEN $4 THEN CURRENT_TIMESTAMP ELSE income_cap_tracker.capped_at END,
 		    updated_at = CURRENT_TIMESTAMP
-		WHERE sponsorship_id = $3
-	`, newTotal, capped, investmentID); err != nil {
+	`, investmentID, cap, newTotal, capped); err != nil {
 		return err
 	}
 
