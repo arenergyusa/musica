@@ -66,9 +66,6 @@ export const investSchema = z.object({
     }),
   paymentMethod: z.string().optional(),
   paymentRef: z.string().optional(),
-  confirmedPayment: z.boolean().refine((v) => v === true, {
-    message: "Confirm that you have completed the USDT transfer",
-  }),
 });
 
 // ============================================================

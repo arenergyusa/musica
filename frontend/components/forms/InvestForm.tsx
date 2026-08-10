@@ -5,8 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { toast } from "sonner";
-import { Loader2, Copy, Wallet, Minus, Plus } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import { Loader2, Wallet, Minus, Plus } from "lucide-react";
 import {
   useAppKit,
   useAppKitAccount,
@@ -20,9 +19,7 @@ import { formatCurrency, shortenAddress } from "@/lib/utils";
 import { USDT } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Form } from "@/components/ui/form";
 import { Slider } from "@/components/ui/slider";
 
 const MIN_AMOUNT = 100;
@@ -41,9 +38,7 @@ interface InvestFormProps {
 
 export function InvestForm({ amount, onSuccess }: InvestFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [isFetchingAddress, setIsFetchingAddress] = useState(true);
   const [depositAddress, setDepositAddress] = useState<string>("");
-  const [txHash, setTxHash] = useState("");
   const [investmentId, setInvestmentId] = useState<string | null>(null);
 
   const { open } = useAppKit();
@@ -60,9 +55,8 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
       })
       .catch((err) => {
         console.error("Failed to get deposit address", err);
-        toast.error("Failed to generate deposit address. Please try again.");
-      })
-      .finally(() => setIsFetchingAddress(false));
+        toast.error("Failed to load deposit address. Please try again.");
+      });
   }, []);
 
   const form = useForm<InvestInput>({
@@ -70,8 +64,6 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
     defaultValues: {
       amount: amount ?? 0,
       paymentMethod: "USDT_BEP20",
-      paymentRef: "",
-      confirmedPayment: false,
     },
   });
   const selectedAmount = form.watch("amount");
@@ -80,11 +72,6 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
   const adjustAmount = (delta: number) => {
     const nextAmount = Math.min(MAX_AMOUNT, Math.max(0, currentAmt + delta));
     form.setValue("amount", nextAmount, { shouldDirty: true, shouldValidate: true });
-  };
-
-  const handleCopy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard`);
   };
 
   // Signs and broadcasts the USDT (BEP-20) transfer from the connected wallet
@@ -105,16 +92,13 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
 
     toast.info("Confirm the USDT transfer in your wallet...");
     const tx = await contract.transfer(depositAddress, units);
-    setTxHash(tx.hash);
     toast.info("USDT transfer submitted. Waiting for on-chain confirmation...");
     await tx.wait();
     return tx.hash;
   }
 
   async function onSubmit(data: InvestInput) {
-    // Wallet is the primary path. If it isn't connected and no manual hash has
-    // been pasted, open the wallet modal so the user can sign and auto-verify.
-    if (!isConnected && !txHash.trim()) {
+    if (!isConnected) {
       await open();
       return;
     }
@@ -126,21 +110,16 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
         const createRes = await api.post("/investment/create", {
           amount: data.amount,
           payment_method: "USDT_BEP20",
-          // payment_ref is intentionally NOT the deposit address; the actual
-          // transaction hash is submitted at confirm-deposit below (L8).
         });
         pendingInvestmentId = createRes.data?.data?.id;
         if (!pendingInvestmentId) throw new Error("Investment ID missing from server response");
         setInvestmentId(pendingInvestmentId);
       }
 
-      let confirmHash = txHash.trim();
-      if (isConnected) {
-        confirmHash = await sendUsdtPayment(data.amount);
-      }
+      const confirmHash = await sendUsdtPayment(data.amount);
       await api.post(`/investment/${pendingInvestmentId}/confirm-deposit`, { tx_hash: confirmHash });
 
-      toast.success("Investment request submitted!", {
+      toast.success("Investment activated!", {
         description: "Your USDT deposit has been verified and your investment is now active.",
       });
 
@@ -160,8 +139,6 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
       setIsLoading(false);
     }
   }
-
-  const connectButtonLabel = !isConnected ? "Connect Wallet & Pay" : "Send & Activate";
 
   return (
     <Form {...form}>
@@ -258,89 +235,18 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
           )}
         </div>
 
-        {/* USDT BEP20 Deposit Box */}
-        {isFetchingAddress ? (
-          <div className="p-8 text-center text-xs text-slate-400 font-medium flex items-center justify-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-            Generating your quick deposit address...
-          </div>
-        ) : (
-          <div className="bg-slate-50 dark:bg-slate-900/70 rounded-xl p-5 border border-slate-200 dark:border-slate-800 space-y-4">
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <div className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm shrink-0">
-                {depositAddress && <QRCodeSVG value={depositAddress} size={110} />}
-              </div>
-              <div className="space-y-2 flex-1 w-full">
-                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Your Unique USDT (BEP-20) Deposit Address:</p>
-                <div className="flex items-center gap-2">
-                  <Input
-                    readOnly
-                    value={depositAddress}
-                    className="font-mono text-xs bg-white dark:bg-slate-950 h-10 border-slate-200 dark:border-slate-800"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => handleCopy(depositAddress, "Deposit Address")}
-                    className="h-10 px-3 shrink-0"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-[11px] text-slate-400">
-                  Network: <strong className="text-slate-600 dark:text-slate-300">Binance Smart Chain (BEP-20)</strong>. Deposits sent via other networks may be lost.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Manual fallback: transaction hash */}
-        <div className="space-y-2">
-          <label htmlFor="deposit-tx-hash" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-            BSC transaction hash <span className="text-slate-400 font-medium">(manual, optional when wallet is connected)</span>
-          </label>
-          <Input
-            id="deposit-tx-hash"
-            value={txHash}
-            onChange={(event) => setTxHash(event.target.value)}
-            placeholder="0x..."
-            className="font-mono text-xs"
-          />
-          <p className="text-[11px] text-slate-400">After sending USDT, paste the hash from your wallet. We verify the mined Transfer event automatically.</p>
-        </div>
-
-        {/* Confirmation Checkbox */}
-        <FormField
-          control={form.control}
-          name="confirmedPayment"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border border-slate-200/80 dark:border-slate-800 p-4 bg-white dark:bg-slate-900 shadow-sm">
-              <FormControl>
-                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel className="text-xs font-bold text-slate-900 dark:text-white">
-                  I have sent exactly {selectedAmount === undefined ? "$0.00" : formatCurrency(selectedAmount)} USDT to the address above.
-                </FormLabel>
-                <FormMessage />
-              </div>
-            </FormItem>
-          )}
-        />
-
         <Button
           type="submit"
-          disabled={isLoading || isFetchingAddress}
+          disabled={isLoading}
           className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl shadow-md transition-all"
         >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Verifying Deposit...
+              Signing & Verifying Deposit...
             </>
           ) : (
-            `${connectButtonLabel} ${selectedAmount === undefined ? "$0.00" : formatCurrency(selectedAmount)}`
+            `${isConnected ? "Pay" : "Connect Wallet & Pay"} ${selectedAmount === undefined ? "$0.00" : formatCurrency(selectedAmount)}`
           )}
         </Button>
 
