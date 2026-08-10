@@ -41,9 +41,9 @@ func (r *investmentRepository) GetPlans(ctx context.Context) ([]*domain.Sponsors
 		{
 			ID:           uuid.MustParse("6f9d2a2d-9c4d-5d11-b8a0-40f6a0f8a001"),
 			Name:         "Dynamic Music Sponsorship Pool",
-			MinAmount:    100,
+			MinAmount:    1,
 			DailyRatePct: 0.3333,
-			Description:  "USDT BEP-20 investment in multiples of $100 USD",
+			Description:  "USDT BEP-20 investment",
 			IsActive:     true,
 		},
 	}

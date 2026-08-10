@@ -22,9 +22,9 @@ import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Slider } from "@/components/ui/slider";
 
-const MIN_AMOUNT = 100;
+const MIN_AMOUNT = 1;
 const MAX_AMOUNT = 10000;
-const STEP_AMOUNT = 100;
+const STEP_AMOUNT = 1;
 
 const ERC20_TRANSFER_ABI = [
   "function transfer(address to, uint256 amount) returns (bool)",
