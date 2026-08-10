@@ -12,7 +12,7 @@ import {
   useAppKitProvider,
   useDisconnect,
 } from "@reown/appkit/react";
-import { BrowserProvider, Contract, formatUnits, parseUnits, type Eip1193Provider } from "ethers";
+import { BrowserProvider, Contract, JsonRpcProvider, formatUnits, parseUnits, type Eip1193Provider } from "ethers";
 
 import { investSchema, type InvestInput } from "@/lib/validators";
 import { formatCurrency, shortenAddress } from "@/lib/utils";
@@ -89,11 +89,27 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
 
     const signer = await ethersProvider.getSigner();
     const signerAddress = await signer.getAddress();
-    const contract = new Contract(USDT.CONTRACT_ADDRESS, ERC20_TRANSFER_ABI, signer);
     const units = parseUnits(amount.toFixed(2), USDT.DECIMALS);
 
+    // Balance and gas queries run against a reliable public BSC RPC rather than
+    // the wallet provider, which can reject eth_call with "missing revert data".
+    let readProvider: JsonRpcProvider | null = null;
+    for (const url of USDT.RPC_URLS) {
+      try {
+        const candidate = new JsonRpcProvider(url, USDT.NETWORK_ID, { staticNetwork: true });
+        await candidate.getBlockNumber();
+        readProvider = candidate;
+        break;
+      } catch {
+        // try next public RPC
+      }
+    }
+    if (!readProvider) throw new Error("Unable to reach the BSC network. Please try again.");
+
+    const readContract = new Contract(USDT.CONTRACT_ADDRESS, ERC20_TRANSFER_ABI, readProvider);
+
     // Ensure the wallet actually holds enough USDT before opening the sign flow.
-    const balanceUnits = await contract.balanceOf(signerAddress);
+    const balanceUnits = await readContract.balanceOf(signerAddress);
     const balance = formatUnits(balanceUnits, USDT.DECIMALS);
     if (balanceUnits < units) {
       throw new Error(
@@ -105,9 +121,9 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
     // cover it with BNB (BEP-20 tx fees are paid in BNB), otherwise the sign
     // prompt would just fail on broadcast.
     const [estimatedGas, feeData, bnbBalance] = await Promise.all([
-      contract.transfer.estimateGas(depositAddress, units),
-      ethersProvider.getFeeData(),
-      ethersProvider.getBalance(signerAddress),
+      readContract.transfer.estimateGas(depositAddress, units, { from: signerAddress }),
+      readProvider.getFeeData(),
+      readProvider.getBalance(signerAddress),
     ]);
     const gasPrice = feeData.gasPrice ?? BigInt(0);
     const gasCost = estimatedGas * gasPrice;
@@ -118,7 +134,8 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
     }
 
     toast.info("Confirm the USDT transfer in your wallet...");
-    const tx = await contract.transfer(depositAddress, units);
+    const signerContract = new Contract(USDT.CONTRACT_ADDRESS, ERC20_TRANSFER_ABI, signer);
+    const tx = await signerContract.transfer(depositAddress, units);
     toast.info("USDT transfer submitted. Waiting for on-chain confirmation...");
     await tx.wait();
     return tx.hash;
