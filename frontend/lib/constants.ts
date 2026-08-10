@@ -119,8 +119,9 @@ export const USDT = {
   RPC_URLS: [
     "https://bsc-dataseed.binance.org",
     "https://bsc-dataseed1.binance.org",
-    "https://bsc-dataseed2.binance.org",
     "https://rpc.ankr.com/bsc",
+    "https://bsc.publicnode.com",
+    "https://1rpc.io/bnb",
   ],
 } as const;
 
