@@ -27,6 +27,7 @@ import (
 
 type USDTService interface {
 	GetDepositAddress(ctx context.Context) (string, error)
+	CheckDepositReadiness(ctx context.Context, walletAddress string, amountUSD float64) (*DepositCheck, error)
 	VerifyDeposit(ctx context.Context, userID uuid.UUID, txHash string, expectedAmount float64) error
 	ProcessAutoWithdrawal(ctx context.Context, withdrawalID, userID uuid.UUID, recipientAddress string, amountUSD float64) (string, error)
 	IsTransactionMined(ctx context.Context, txHash string) (bool, error)
@@ -142,6 +143,19 @@ type MasterWalletBalance struct {
 	Address string  `json:"address"`
 	BNB     float64 `json:"bnb"`
 	USDT    float64 `json:"usdt"`
+}
+
+// DepositCheck is the response to a pre-sign readiness check: does the wallet
+// hold enough USDT for the requested amount and enough BNB to cover gas?
+type DepositCheck struct {
+	WalletAddress  string  `json:"wallet_address"`
+	DepositAddress string  `json:"deposit_address"`
+	Amount         float64 `json:"amount"`
+	USDTBalance    float64 `json:"usdt_balance"`
+	BNBBalance     float64 `json:"bnb_balance"`
+	GasCostBNB     float64 `json:"gas_cost_bnb"`
+	HasEnoughUSDT  bool    `json:"has_enough_usdt"`
+	HasEnoughBNB   bool    `json:"has_enough_bnb"`
 }
 
 type usdtService struct {
@@ -429,6 +443,93 @@ func (s *usdtService) getWalletBalance(ctx context.Context, address string) (*Ma
 		BNB:     bnb,
 		USDT:    usdt,
 	}, nil
+}
+
+// CheckDepositReadiness verifies on-chain that the wallet has enough USDT for
+// the requested deposit and enough BNB to cover the estimated transfer gas cost.
+// It is a pre-sign safety check; the actual transfer is signed by the client.
+func (s *usdtService) CheckDepositReadiness(ctx context.Context, walletAddress string, amountUSD float64) (*DepositCheck, error) {
+	if !gethcommon.IsHexAddress(walletAddress) {
+		return nil, fmt.Errorf("invalid wallet address")
+	}
+	if s.depositAddress == "" {
+		return nil, fmt.Errorf("DEPOSIT_ADDRESS not configured in environment")
+	}
+	if amountUSD <= 0 {
+		return nil, fmt.Errorf("amount must be greater than zero")
+	}
+
+	rpcURL := os.Getenv("BSC_RPC_URL")
+	if rpcURL == "" {
+		return nil, fmt.Errorf("BSC_RPC_URL not configured")
+	}
+
+	bal, err := s.getWalletBalance(ctx, walletAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	// Estimate gas for the ERC-20 transfer(wallet -> depositAddress, amount).
+	contract := os.Getenv("USDT_CONTRACT_ADDRESS")
+	if contract == "" {
+		return nil, fmt.Errorf("USDT_CONTRACT_ADDRESS not configured")
+	}
+	decimals := 18
+	if raw := os.Getenv("USDT_DECIMALS"); raw != "" {
+		if parsed, parseErr := strconv.Atoi(raw); parseErr == nil && parsed >= 2 && parsed <= 36 {
+			decimals = parsed
+		}
+	}
+	amountUnits, err := usdToUnits(amountUSD, decimals)
+	if err != nil {
+		return nil, fmt.Errorf("invalid deposit amount")
+	}
+
+	methodID := keccak256([]byte("transfer(address,uint256)"))[:4]
+	toBytes := commonAddressBytes(s.depositAddress)
+	data := append([]byte{}, methodID...)
+	data = append(data, make([]byte, 12)...)
+	data = append(data, toBytes...)
+	amountBytes := make([]byte, 32)
+	amountUnits.FillBytes(amountBytes)
+	data = append(data, amountBytes...)
+
+	gasLimitHex, err := callBSC(ctx, rpcURL, "eth_estimateGas", []interface{}{map[string]interface{}{
+		"from": walletAddress,
+		"to":   contract,
+		"data": "0x" + hex.EncodeToString(data),
+	}})
+	if err != nil {
+		return nil, err
+	}
+	gasLimit, ok := new(big.Int).SetString(strings.TrimPrefix(gasLimitHex, "0x"), 16)
+	if !ok {
+		return nil, fmt.Errorf("invalid gas estimate returned by BSC")
+	}
+	gasPriceHex, err := callBSC(ctx, rpcURL, "eth_gasPrice", []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	gasPrice, ok := new(big.Int).SetString(strings.TrimPrefix(gasPriceHex, "0x"), 16)
+	if !ok {
+		return nil, fmt.Errorf("invalid gas price returned by BSC")
+	}
+
+	gasCostWei := new(big.Int).Mul(gasLimit, gasPrice)
+	gasCostBNB, _ := new(big.Float).Quo(new(big.Float).SetInt(gasCostWei), big.NewFloat(1e18)).Float64()
+
+	check := &DepositCheck{
+		WalletAddress:  walletAddress,
+		DepositAddress: s.depositAddress,
+		Amount:         amountUSD,
+		USDTBalance:    bal.USDT,
+		BNBBalance:     bal.BNB,
+		GasCostBNB:     gasCostBNB,
+		HasEnoughUSDT:  bal.USDT >= amountUSD,
+		HasEnoughBNB:   bal.BNB >= gasCostBNB,
+	}
+	_ = s.auditService.Log(ctx, nil, "DEPOSIT_READINESS_CHECK", amountUSD, 0, "", "SUCCESS", fmt.Sprintf(`{"wallet":"%s","usdt":%.4f,"bnb":%.8f,"gas":%.8f}`, walletAddress, bal.USDT, bal.BNB, gasCostBNB))
+	return check, nil
 }
 
 // bscHTTPClient carries a hard timeout so a slow RPC node can never hang a

@@ -113,16 +113,6 @@ export const USDT = {
   DECIMALS: 18,
   NETWORK_ID: 56,
   NETWORK_NAME: "Binance Smart Chain",
-  // Read-only queries (balance, gas) run against these public BSC nodes instead
-  // of the wallet provider, whose RPC can reject eth_call with "missing revert
-  // data". Only the actual transfer is signed through the connected wallet.
-  RPC_URLS: [
-    "https://bsc-dataseed.binance.org",
-    "https://bsc-dataseed1.binance.org",
-    "https://rpc.ankr.com/bsc",
-    "https://bsc.publicnode.com",
-    "https://1rpc.io/bnb",
-  ],
 } as const;
 
 // ============================================================

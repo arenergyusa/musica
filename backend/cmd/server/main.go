@@ -190,6 +190,7 @@ func main() {
 			user.PUT("/password", userH.ChangePassword)
 			user.GET("/dashboard", userH.GetDashboard)
 			user.GET("/deposit-address", usdtH.GetDepositAddress)
+			user.GET("/deposit-check", usdtH.CheckDepositReadiness)
 			user.GET("/audit-logs", usdtH.GetAuditLogs)
 		}
 

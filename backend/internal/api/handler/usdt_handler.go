@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/arenergyusa/musica/backend/internal/service"
 	"github.com/arenergyusa/musica/backend/pkg/response"
@@ -29,6 +30,23 @@ func (h *USDTHandler) GetDepositAddress(c *gin.Context) {
 	}
 
 	response.Success(c, http.StatusOK, "Deposit address retrieved", gin.H{"address": addr})
+}
+
+func (h *USDTHandler) CheckDepositReadiness(c *gin.Context) {
+	wallet := strings.TrimSpace(c.Query("wallet"))
+	amount, err := strconv.ParseFloat(c.DefaultQuery("amount", "0"), 64)
+	if err != nil || amount <= 0 {
+		response.Error(c, http.StatusBadRequest, "Invalid amount", nil)
+		return
+	}
+
+	check, err := h.usdtService.CheckDepositReadiness(c.Request.Context(), wallet, amount)
+	if err != nil {
+		response.Error(c, http.StatusBadGateway, "Failed to check deposit readiness", err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Deposit readiness checked", check)
 }
 
 func (h *USDTHandler) GetAuditLogs(c *gin.Context) {

@@ -12,7 +12,7 @@ import {
   useAppKitProvider,
   useDisconnect,
 } from "@reown/appkit/react";
-import { BrowserProvider, Contract, JsonRpcProvider, formatUnits, parseUnits, type Eip1193Provider } from "ethers";
+import { BrowserProvider, Contract, parseUnits, type Eip1193Provider } from "ethers";
 
 import { investSchema, type InvestInput } from "@/lib/validators";
 import { formatCurrency, shortenAddress } from "@/lib/utils";
@@ -28,8 +28,6 @@ const STEP_AMOUNT = 1;
 
 const ERC20_TRANSFER_ABI = [
   "function transfer(address to, uint256 amount) returns (bool)",
-  "function decimals() view returns (uint8)",
-  "function balanceOf(address owner) view returns (uint256)",
 ];
 
 interface InvestFormProps {
@@ -91,45 +89,38 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
     const signerAddress = await signer.getAddress();
     const units = parseUnits(amount.toFixed(2), USDT.DECIMALS);
 
-    // Balance and gas queries run against a reliable public BSC RPC rather than
-    // the wallet provider, which can reject eth_call with "missing revert data".
-    let readProvider: JsonRpcProvider | null = null;
-    for (const url of USDT.RPC_URLS) {
-      try {
-        const candidate = new JsonRpcProvider(url, USDT.NETWORK_ID, { staticNetwork: true });
-        await candidate.getBlockNumber();
-        readProvider = candidate;
-        break;
-      } catch {
-        // try next public RPC
+    // Pre-sign readiness check runs server-side against the backend's own BSC
+    // RPC, so the browser never has to reach an external node (CSP / CORS
+    // proof). The backend verifies USDT + BNB balances and gas cost.
+    let readiness: {
+      usdt_balance: number;
+      bnb_balance: number;
+      gas_cost_bnb: number;
+      has_enough_usdt: boolean;
+      has_enough_bnb: boolean;
+    } | null = null;
+    try {
+      const res = await api.get("/user/deposit-check", {
+        params: { wallet: signerAddress, amount },
+      });
+      readiness = res.data?.data ?? null;
+    } catch (error) {
+      if (axios.isAxiosError(error) && typeof error.response?.data?.message === "string") {
+        throw new Error(error.response.data.message);
       }
+      throw new Error("Unable to check your wallet. Please try again.");
     }
-    if (!readProvider) throw new Error("Unable to reach the BSC network. Please try again.");
 
-    const readContract = new Contract(USDT.CONTRACT_ADDRESS, ERC20_TRANSFER_ABI, readProvider);
+    if (!readiness) throw new Error("Unable to verify your wallet balance. Please try again.");
 
-    // Ensure the wallet actually holds enough USDT before opening the sign flow.
-    const balanceUnits = await readContract.balanceOf(signerAddress);
-    const balance = formatUnits(balanceUnits, USDT.DECIMALS);
-    if (balanceUnits < units) {
+    if (!readiness.has_enough_usdt) {
       throw new Error(
-        `Insufficient USDT balance. You have ${balance} USDT but need ${amount.toFixed(2)} USDT.`,
+        `Insufficient USDT balance. You have ${readiness.usdt_balance.toFixed(2)} USDT but need ${amount.toFixed(2)} USDT.`,
       );
     }
-
-    // Estimate the gas the transfer will consume and make sure the wallet can
-    // cover it with BNB (BEP-20 tx fees are paid in BNB), otherwise the sign
-    // prompt would just fail on broadcast.
-    const [estimatedGas, feeData, bnbBalance] = await Promise.all([
-      readContract.transfer.estimateGas(depositAddress, units, { from: signerAddress }),
-      readProvider.getFeeData(),
-      readProvider.getBalance(signerAddress),
-    ]);
-    const gasPrice = feeData.gasPrice ?? BigInt(0);
-    const gasCost = estimatedGas * gasPrice;
-    if (bnbBalance < gasCost) {
+    if (!readiness.has_enough_bnb) {
       throw new Error(
-        `Insufficient BNB for gas. Your wallet needs at least ${formatUnits(gasCost, 18)} BNB to process this transfer.`,
+        `Insufficient BNB for gas. Your wallet needs at least ${readiness.gas_cost_bnb.toFixed(8)} BNB to process this transfer.`,
       );
     }
 
