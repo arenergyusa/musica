@@ -105,6 +105,17 @@ export const INCOME_TYPE = {
 } as const;
 
 // ============================================================
+// USDT (BEP-20) On-Chain Config
+// ============================================================
+export const USDT = {
+  CONTRACT_ADDRESS:
+    process.env.NEXT_PUBLIC_USDT_CONTRACT || "0x55d398326f99059fF775485246999027B3197955",
+  DECIMALS: 18,
+  NETWORK_ID: 56,
+  NETWORK_NAME: "Binance Smart Chain",
+} as const;
+
+// ============================================================
 // App Constants
 // ============================================================
 export const APP = {

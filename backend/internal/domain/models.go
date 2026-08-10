@@ -109,14 +109,6 @@ type PlatformSettings struct {
 	UpdatedAt               time.Time `json:"updated_at" db:"updated_at"`
 }
 
-type UserDepositAddress struct {
-	ID              uuid.UUID `json:"id" db:"id"`
-	UserID          uuid.UUID `json:"user_id" db:"user_id"`
-	Address         string    `json:"address" db:"address"`
-	DerivationIndex int       `json:"derivation_index" db:"derivation_index"`
-	CreatedAt       time.Time `json:"created_at" db:"created_at"`
-}
-
 type TeamLevelSummary struct {
 	Level           int     `json:"level"`
 	TotalMembers    int     `json:"total_members"`

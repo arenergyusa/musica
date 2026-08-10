@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -18,19 +17,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/arenergyusa/musica/backend/internal/domain"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/sha3"
 )
 
 type USDTService interface {
-	GetOrCreateDepositAddress(ctx context.Context, userID uuid.UUID) (*domain.UserDepositAddress, error)
-	GetDepositWalletBalance(ctx context.Context, userID uuid.UUID) (*MasterWalletBalance, error)
+	GetDepositAddress(ctx context.Context) (string, error)
 	VerifyDeposit(ctx context.Context, userID uuid.UUID, txHash string, expectedAmount float64) error
 	ProcessAutoWithdrawal(ctx context.Context, withdrawalID, userID uuid.UUID, recipientAddress string, amountUSD float64) (string, error)
 	IsTransactionMined(ctx context.Context, txHash string) (bool, error)
@@ -42,10 +38,6 @@ type USDTService interface {
 }
 
 const transferTopic = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-
-// depositAddressLockKey serializes deposit-address derivation index allocation
-// so two concurrent requests can never compute the same next index (H7).
-const depositAddressLockKey int64 = 739123450
 
 // payoutLockKey derives a stable Postgres advisory lock id from the sender
 // address and chain ID so concurrent payouts that share a master wallet are
@@ -93,10 +85,13 @@ func (s *usdtService) VerifyDeposit(ctx context.Context, userID uuid.UUID, txHas
 	if !strings.HasPrefix(txHash, "0x") || len(txHash) != 66 {
 		return fmt.Errorf("invalid BSC transaction hash")
 	}
-	var depositAddress string
-	if err := s.db.QueryRow(ctx, `SELECT address FROM user_deposit_addresses WHERE user_id = $1`, userID).Scan(&depositAddress); err != nil {
-		return fmt.Errorf("deposit address not found")
+	if s.depositAddress == "" {
+		return fmt.Errorf("DEPOSIT_ADDRESS not configured in environment")
 	}
+	if !gethcommon.IsHexAddress(s.depositAddress) {
+		return fmt.Errorf("DEPOSIT_ADDRESS is not a valid BEP-20 address")
+	}
+	depositAddress := s.depositAddress
 	rpcURL := os.Getenv("BSC_RPC_URL")
 	if rpcURL == "" {
 		return fmt.Errorf("BSC_RPC_URL not configured")
@@ -150,9 +145,10 @@ type MasterWalletBalance struct {
 }
 
 type usdtService struct {
-	db           *pgxpool.Pool
-	auditService AuditService
-	masterKeyPresent bool // true if MASTER_PRIVATE_KEY is set in environment
+	db                *pgxpool.Pool
+	auditService      AuditService
+	masterKeyPresent  bool // true if MASTER_PRIVATE_KEY is set in environment
+	depositAddress    string
 }
 
 func NewUSDTService(db *pgxpool.Pool, auditService AuditService) USDTService {
@@ -162,6 +158,7 @@ func NewUSDTService(db *pgxpool.Pool, auditService AuditService) USDTService {
 		db:               db,
 		auditService:     auditService,
 		masterKeyPresent: present,
+		depositAddress:   strings.TrimSpace(os.Getenv("DEPOSIT_ADDRESS")),
 	}
 }
 
@@ -195,93 +192,17 @@ func hexToPrivateKey(hexKey string) (*ecdsa.PrivateKey, error) {
 	return gethcrypto.HexToECDSA(hexKey)
 }
 
-// GetOrCreateDepositAddress returns an existing derived BEP20 address or derives a new one on demand.
-func (s *usdtService) GetOrCreateDepositAddress(ctx context.Context, userID uuid.UUID) (*domain.UserDepositAddress, error) {
-	// Fast path: check existing address
-	var addr domain.UserDepositAddress
-	query := `SELECT id, user_id, address, derivation_index, created_at FROM user_deposit_addresses WHERE user_id = $1`
-	err := s.db.QueryRow(ctx, query, userID).Scan(&addr.ID, &addr.UserID, &addr.Address, &addr.DerivationIndex, &addr.CreatedAt)
-	if err == nil {
-		return &addr, nil
+// GetDepositAddress returns the single shared BEP-20 deposit address
+// configured via DEPOSIT_ADDRESS (env). All users deposit to this one address;
+// per-user HD-wallet derivation has been removed.
+func (s *usdtService) GetDepositAddress(ctx context.Context) (string, error) {
+	if s.depositAddress == "" {
+		return "", fmt.Errorf("DEPOSIT_ADDRESS not configured in environment; cannot provide deposit address")
 	}
-
-	if !s.masterKeyPresent {
-		return nil, fmt.Errorf("MASTER_PRIVATE_KEY not configured in environment; cannot generate deposit address")
+	if !gethcommon.IsHexAddress(s.depositAddress) {
+		return "", fmt.Errorf("DEPOSIT_ADDRESS is not a valid BEP-20 address")
 	}
-
-	tx, err := s.db.Begin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback(ctx)
-
-	// Serialize index allocation with a transaction-scoped advisory lock so two
-	// concurrent requests can never derive the same index and trip the UNIQUE
-	// constraint (H7). The lock is released on commit.
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, depositAddressLockKey); err != nil {
-		return nil, err
-	}
-
-	// Re-check inside the lock: another request may have created it meanwhile.
-	var existing domain.UserDepositAddress
-	err = tx.QueryRow(ctx, query, userID).Scan(&existing.ID, &existing.UserID, &existing.Address, &existing.DerivationIndex, &existing.CreatedAt)
-	if err == nil {
-		if err := tx.Commit(ctx); err != nil {
-			return nil, err
-		}
-		return &existing, nil
-	}
-
-	// Calculate next index
-	var nextIndex int
-	if err := tx.QueryRow(ctx, `SELECT COALESCE(MAX(derivation_index), 0) + 1 FROM user_deposit_addresses`).Scan(&nextIndex); err != nil || nextIndex < 1 {
-		nextIndex = 1
-	}
-
-	masterHex := strings.TrimPrefix(os.Getenv("MASTER_PRIVATE_KEY"), "0x")
-	var derivedAddress string
-
-	// Derive child bytes deterministically using keccak256
-	childSeed := keccak256([]byte(masterHex), []byte(fmt.Sprintf("_user_%s_idx_%d", userID.String(), nextIndex)))
-	childKey, err := hexToPrivateKey(hex.EncodeToString(childSeed))
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive child key: %w", err)
-	}
-	derivedAddress = pubkeyToAddress(&childKey.PublicKey)
-
-	// Save to DB
-	insertQuery := `
-		INSERT INTO user_deposit_addresses (id, user_id, address, derivation_index, created_at)
-		VALUES (uuid_generate_v4(), $1, $2, $3, CURRENT_TIMESTAMP)
-		RETURNING id, user_id, address, derivation_index, created_at
-	`
-	var newAddr domain.UserDepositAddress
-	err = tx.QueryRow(ctx, insertQuery, userID, derivedAddress, nextIndex).Scan(
-		&newAddr.ID, &newAddr.UserID, &newAddr.Address, &newAddr.DerivationIndex, &newAddr.CreatedAt,
-	)
-	if err != nil {
-		// L1: even with the advisory lock, treat a UNIQUE-violation on insert as
-		// a benign collision and return whatever address already exists for the
-		// user rather than surfacing an opaque error.
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			var existing domain.UserDepositAddress
-			if err2 := s.db.QueryRow(ctx, query, userID).Scan(&existing.ID, &existing.UserID, &existing.Address, &existing.DerivationIndex, &existing.CreatedAt); err2 == nil {
-				_ = tx.Rollback(ctx)
-				return &existing, nil
-			}
-		}
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
-	}
-
-	// Audit Log
-	_ = s.auditService.Log(ctx, &userID, "GENERATE_DEPOSIT_ADDRESS", 0, 0, "", "SUCCESS", fmt.Sprintf(`{"address":"%s"}`, derivedAddress))
-
-	return &newAddr, nil
+	return s.depositAddress, nil
 }
 
 // ProcessAutoWithdrawal executes automatic USDT transfer on BSC network using master private key from .env
@@ -464,15 +385,6 @@ func (s *usdtService) GetMasterWalletBalance(ctx context.Context) (*MasterWallet
 		return nil, fmt.Errorf("failed to parse master private key: %v", err)
 	}
 	address := pubkeyToAddress(&privKey.PublicKey)
-	return s.getWalletBalance(ctx, address)
-}
-
-func (s *usdtService) GetDepositWalletBalance(ctx context.Context, userID uuid.UUID) (*MasterWalletBalance, error) {
-	var address string
-	err := s.db.QueryRow(ctx, `SELECT address FROM user_deposit_addresses WHERE user_id = $1`, userID).Scan(&address)
-	if err != nil {
-		return nil, fmt.Errorf("deposit wallet not found for user")
-	}
 	return s.getWalletBalance(ctx, address)
 }
 

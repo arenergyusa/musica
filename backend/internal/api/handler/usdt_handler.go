@@ -22,19 +22,13 @@ func NewUSDTHandler(usdtService service.USDTService, auditService service.AuditS
 }
 
 func (h *USDTHandler) GetDepositAddress(c *gin.Context) {
-	userID, err := GetUserID(c)
-	if err != nil {
-		response.Error(c, http.StatusUnauthorized, "Invalid user token", nil)
-		return
-	}
-
-	addr, err := h.usdtService.GetOrCreateDepositAddress(c.Request.Context(), userID)
+	addr, err := h.usdtService.GetDepositAddress(c.Request.Context())
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to get deposit address", err)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "Deposit address retrieved", addr)
+	response.Success(c, http.StatusOK, "Deposit address retrieved", gin.H{"address": addr})
 }
 
 func (h *USDTHandler) GetAuditLogs(c *gin.Context) {

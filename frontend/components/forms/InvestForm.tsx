@@ -7,9 +7,17 @@ import axios from "axios";
 import { toast } from "sonner";
 import { Loader2, Copy, Wallet, Minus, Plus } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import {
+  useAppKit,
+  useAppKitAccount,
+  useAppKitProvider,
+  useDisconnect,
+} from "@reown/appkit/react";
+import { BrowserProvider, Contract, parseUnits, type Eip1193Provider } from "ethers";
 
 import { investSchema, type InvestInput } from "@/lib/validators";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, shortenAddress } from "@/lib/utils";
+import { USDT } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +29,11 @@ const MIN_AMOUNT = 100;
 const MAX_AMOUNT = 10000;
 const STEP_AMOUNT = 100;
 
+const ERC20_TRANSFER_ABI = [
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function decimals() view returns (uint8)",
+];
+
 interface InvestFormProps {
   amount?: number;
   onSuccess?: () => void;
@@ -29,10 +42,14 @@ interface InvestFormProps {
 export function InvestForm({ amount, onSuccess }: InvestFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingAddress, setIsFetchingAddress] = useState(true);
-  const [copiedText, setCopiedText] = useState<string | null>(null);
   const [depositAddress, setDepositAddress] = useState<string>("");
   const [txHash, setTxHash] = useState("");
   const [investmentId, setInvestmentId] = useState<string | null>(null);
+
+  const { open } = useAppKit();
+  const { address, isConnected } = useAppKitAccount();
+  const { walletProvider } = useAppKitProvider<Eip1193Provider>("eip155");
+  const { disconnect } = useDisconnect();
 
   useEffect(() => {
     api.get("/user/deposit-address")
@@ -67,12 +84,41 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedText(label);
     toast.success(`${label} copied to clipboard`);
-    setTimeout(() => setCopiedText(null), 2000);
   };
 
+  // Signs and broadcasts the USDT (BEP-20) transfer from the connected wallet
+  // to the shared deposit address, then returns the mined transaction hash.
+  async function sendUsdtPayment(amount: number): Promise<string> {
+    if (!walletProvider) throw new Error("Wallet not connected");
+    if (!depositAddress) throw new Error("Deposit address not loaded yet");
+
+    const ethersProvider = new BrowserProvider(walletProvider);
+    const network = await ethersProvider.getNetwork();
+    if (Number(network.chainId) !== USDT.NETWORK_ID) {
+      throw new Error(`Please switch your wallet to ${USDT.NETWORK_NAME} (BEP-20)`);
+    }
+
+    const signer = await ethersProvider.getSigner();
+    const contract = new Contract(USDT.CONTRACT_ADDRESS, ERC20_TRANSFER_ABI, signer);
+    const units = parseUnits(amount.toFixed(2), USDT.DECIMALS);
+
+    toast.info("Confirm the USDT transfer in your wallet...");
+    const tx = await contract.transfer(depositAddress, units);
+    setTxHash(tx.hash);
+    toast.info("USDT transfer submitted. Waiting for on-chain confirmation...");
+    await tx.wait();
+    return tx.hash;
+  }
+
   async function onSubmit(data: InvestInput) {
+    // Wallet is the primary path. If it isn't connected and no manual hash has
+    // been pasted, open the wallet modal so the user can sign and auto-verify.
+    if (!isConnected && !txHash.trim()) {
+      await open();
+      return;
+    }
+
     setIsLoading(true);
     try {
       let pendingInvestmentId = investmentId;
@@ -87,10 +133,15 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
         if (!pendingInvestmentId) throw new Error("Investment ID missing from server response");
         setInvestmentId(pendingInvestmentId);
       }
-      await api.post(`/investment/${pendingInvestmentId}/confirm-deposit`, { tx_hash: txHash.trim() });
+
+      let confirmHash = txHash.trim();
+      if (isConnected) {
+        confirmHash = await sendUsdtPayment(data.amount);
+      }
+      await api.post(`/investment/${pendingInvestmentId}/confirm-deposit`, { tx_hash: confirmHash });
 
       toast.success("Investment request submitted!", {
-        description: "Your USDT deposit will be credited automatically upon confirmation on the BSC network.",
+        description: "Your USDT deposit has been verified and your investment is now active.",
       });
 
       if (onSuccess) onSuccess();
@@ -100,6 +151,8 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
     } catch (error: unknown) {
       if (axios.isAxiosError(error) && typeof error.response?.data?.message === "string") {
         toast.error(error.response.data.message);
+      } else if (error instanceof Error) {
+        toast.error(error.message);
       } else {
         toast.error("Failed to submit investment request. Please try again.");
       }
@@ -107,6 +160,8 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
       setIsLoading(false);
     }
   }
+
+  const connectButtonLabel = !isConnected ? "Connect Wallet & Pay" : "Send & Activate";
 
   return (
     <Form {...form}>
@@ -174,6 +229,35 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
           </div>
         </div>
 
+        {/* Wallet Connect Box */}
+        <div className="bg-slate-50 dark:bg-slate-900/70 rounded-xl p-4 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Pay with Wallet</p>
+            <p className="text-[11px] text-slate-400">
+              Connect your BSC wallet to sign the USDT transfer in one click and verify automatically.
+            </p>
+          </div>
+          {isConnected && address ? (
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-mono font-bold">
+                {shortenAddress(address)}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => disconnect()}
+              >
+                Disconnect
+              </Button>
+            </div>
+          ) : (
+            <Button type="button" variant="outline" size="sm" onClick={() => open()}>
+              Connect Wallet
+            </Button>
+          )}
+        </div>
+
         {/* USDT BEP20 Deposit Box */}
         {isFetchingAddress ? (
           <div className="p-8 text-center text-xs text-slate-400 font-medium flex items-center justify-center gap-2">
@@ -211,9 +295,10 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
           </div>
         )}
 
+        {/* Manual fallback: transaction hash */}
         <div className="space-y-2">
           <label htmlFor="deposit-tx-hash" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-            BSC transaction hash
+            BSC transaction hash <span className="text-slate-400 font-medium">(manual, optional when wallet is connected)</span>
           </label>
           <Input
             id="deposit-tx-hash"
@@ -246,7 +331,7 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
 
         <Button
           type="submit"
-          disabled={isLoading || isFetchingAddress || !txHash.trim()}
+          disabled={isLoading || isFetchingAddress}
           className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm rounded-xl shadow-md transition-all"
         >
           {isLoading ? (
@@ -255,7 +340,7 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
               Verifying Deposit...
             </>
           ) : (
-            `Submit ${selectedAmount === undefined ? "$0.00" : formatCurrency(selectedAmount)} Investment`
+            `${connectButtonLabel} ${selectedAmount === undefined ? "$0.00" : formatCurrency(selectedAmount)}`
           )}
         </Button>
 

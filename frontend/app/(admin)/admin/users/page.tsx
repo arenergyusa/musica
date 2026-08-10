@@ -32,14 +32,8 @@ import {
   CheckCircle2, 
   Eye,
   User,
-  Phone,
-  Mail,
-  Calendar,
-  Wallet,
-  TrendingUp,
   Loader2,
   RefreshCw,
-  Copy,
   Zap
 } from "lucide-react";
 import {
@@ -72,8 +66,6 @@ export default function AdminUsersPage() {
     status?: "INACTIVE" | "ACTIVE" | "WORKING";
   } | null>(null);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
-  const [subWalletBalance, setSubWalletBalance] = useState<{ address: string; bnb: number; usdt: number } | null>(null);
-  const [isSubWalletLoading, setIsSubWalletLoading] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -110,7 +102,6 @@ export default function AdminUsersPage() {
   const handleFetchUserSummary = async (userId: string, userName: string) => {
     setSelectedUser({ id: userId, name: userName });
     setIsSummaryLoading(true);
-    setSubWalletBalance(null);
     try {
       const res = await api.get(`/admin/users/${userId}/summary`);
       if (res.data.data) {
@@ -121,20 +112,6 @@ export default function AdminUsersPage() {
       toast.error("Failed to load user detail summary");
     } finally {
       setIsSummaryLoading(false);
-    }
-  };
-
-  const handleCheckSubWallet = async () => {
-    if (!selectedUser) return;
-    setIsSubWalletLoading(true);
-    try {
-      const res = await api.get(`/admin/users/${selectedUser.id}/wallet/balance`);
-      setSubWalletBalance(res.data.data || null);
-    } catch (error) {
-      console.error("Failed to fetch sub-wallet balance", error);
-      toast.error("Sub-wallet balance unavailable");
-    } finally {
-      setIsSubWalletLoading(false);
     }
   };
 
@@ -371,14 +348,6 @@ export default function AdminUsersPage() {
                     {formatCurrency(userSummary.wallet?.total_credited || 0)}
                   </p>
                 </div>
-              </div>
-
-              <div className="bg-indigo-50/50 dark:bg-indigo-950/30 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div><p className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Sub-wallet On-chain Balance</p><p className="text-[10px] text-slate-500 mt-1">Derived BEP-20 deposit wallet</p></div>
-                  <Button onClick={handleCheckSubWallet} disabled={isSubWalletLoading} size="sm" variant="outline" className="h-8 text-xs rounded-lg">{isSubWalletLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Check Balance"}</Button>
-                </div>
-                {subWalletBalance && <><p className="text-[10px] font-mono text-slate-500 break-all">{subWalletBalance.address}</p><div className="grid grid-cols-2 gap-2"><div className="bg-white dark:bg-slate-950 p-2 rounded-lg"><p className="text-[10px] text-slate-500">USDT</p><p className="font-black text-sm">{subWalletBalance.usdt.toFixed(2)}</p></div><div className="bg-white dark:bg-slate-950 p-2 rounded-lg"><p className="text-[10px] text-slate-500">BNB</p><p className="font-black text-sm">{subWalletBalance.bnb.toFixed(6)}</p></div></div></>}
               </div>
 
               {/* Investments List */}

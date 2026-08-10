@@ -21,7 +21,6 @@ type AdminService interface {
 	ChangeInvestmentStatus(ctx context.Context, invID uuid.UUID, status string) error
 	GetInvestments(ctx context.Context, limit, offset int, status string) ([]*domain.Sponsorship, error)
 	GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error)
-	GetDepositWalletBalance(ctx context.Context, userID uuid.UUID) (*MasterWalletBalance, error)
 	ApproveWithdrawal(ctx context.Context, wdID uuid.UUID, adminNote string) error
 	RejectWithdrawal(ctx context.Context, wdID uuid.UUID, adminNote string) error
 	BlockUser(ctx context.Context, userID uuid.UUID) error
@@ -80,10 +79,6 @@ func (s *adminService) GetInvestments(ctx context.Context, limit, offset int, st
 
 func (s *adminService) GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error) {
 	return s.usdtService.GetMasterWalletBalance(ctx)
-}
-
-func (s *adminService) GetDepositWalletBalance(ctx context.Context, userID uuid.UUID) (*MasterWalletBalance, error) {
-	return s.usdtService.GetDepositWalletBalance(ctx, userID)
 }
 
 // referralRewardPct is the one-time percentage paid to each upline level on investment activation.

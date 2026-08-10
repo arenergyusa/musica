@@ -70,16 +70,8 @@ func (h *AdminHandler) ChangeInvestmentStatus(c *gin.Context) {
 
 func (h *AdminHandler) GetMasterWalletBalance(c *gin.Context) {
 	balance, err := h.adminService.GetMasterWalletBalance(c.Request.Context())
-	if err != nil { response.Error(c, http.StatusBadGateway, "Failed to fetch HD wallet balance", err); return }
-	response.Success(c, http.StatusOK, "HD wallet balance retrieved", balance)
-}
-
-func (h *AdminHandler) GetDepositWalletBalance(c *gin.Context) {
-	userID, err := uuid.Parse(c.Param("id"))
-	if err != nil { response.Error(c, http.StatusBadRequest, "Invalid user ID", nil); return }
-	balance, err := h.adminService.GetDepositWalletBalance(c.Request.Context(), userID)
-	if err != nil { handleServiceError(c, err, "Failed to fetch sub-wallet balance"); return }
-	response.Success(c, http.StatusOK, "Sub-wallet balance retrieved", balance)
+	if err != nil { response.Error(c, http.StatusBadGateway, "Failed to fetch master wallet balance", err); return }
+	response.Success(c, http.StatusOK, "Master wallet balance retrieved", balance)
 }
 
 func (h *AdminHandler) ApproveWithdrawal(c *gin.Context) {

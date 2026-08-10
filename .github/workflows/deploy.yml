@@ -25,7 +25,7 @@ jobs:
             # Pull the latest changes from the main branch
             git pull origin main
             
-            # Rebuild and restart the Docker containers without using cache
+            
             docker compose up -d --build
             
             # Optional: Clean up unused docker images to save space

@@ -260,7 +260,6 @@ func main() {
 			admin.GET("/investments", adminH.GetInvestments)
 			admin.PUT("/investments/:id/status", adminH.ChangeInvestmentStatus)
 			admin.GET("/wallet/balance", adminH.GetMasterWalletBalance)
-			admin.GET("/users/:id/wallet/balance", adminH.GetDepositWalletBalance)
 			admin.PUT("/users/:id/block", adminH.BlockUser)
 			admin.PUT("/users/:id/unblock", adminH.UnblockUser)
 			admin.POST("/investments/:id/activate", adminH.ActivateInvestment)

@@ -5,6 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function shortenAddress(address: string, chars: number = 6): string {
+  if (!address) return "";
+  if (address.length <= chars * 2 + 2) return address;
+  return `${address.slice(0, chars)}...${address.slice(-4)}`;
+}
+
 export function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

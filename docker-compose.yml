@@ -8,6 +8,8 @@ services:
       args:
         - NEXT_PUBLIC_API_URL=/api/v1
         - API_URL_INTERNAL=http://backend:8080
+        - NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID}
+        - NEXT_PUBLIC_USDT_CONTRACT=${USDT_CONTRACT_ADDRESS:-0x55d398326f99059fF775485246999027B3197955}
     ports:
       - "127.0.0.1:3000:3000"
     environment:
@@ -49,6 +51,7 @@ services:
       - MASTER_PRIVATE_KEY=${MASTER_PRIVATE_KEY:?MASTER_PRIVATE_KEY is required}
       - BSC_RPC_URL=${BSC_RPC_URL:?BSC_RPC_URL is required}
       - USDT_CONTRACT_ADDRESS=${USDT_CONTRACT_ADDRESS:?USDT_CONTRACT_ADDRESS is required}
+      - DEPOSIT_ADDRESS=${DEPOSIT_ADDRESS:?DEPOSIT_ADDRESS is required}
     depends_on:
       db:
         condition: service_healthy
