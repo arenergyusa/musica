@@ -6,9 +6,9 @@ import { bsc } from "@reown/appkit/networks";
 import { defineChain } from "viem";
 import { APP } from "@/lib/constants";
 
-const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "build-placeholder";
 
-if (!projectId) {
+if (!process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID && typeof window !== "undefined") {
   throw new Error("NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not defined");
 }
 

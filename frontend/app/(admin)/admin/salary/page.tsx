@@ -72,7 +72,7 @@ export default function AdminSalaryPage() {
       const res = await api.post("/admin/salary/trigger-payout");
       toast.success(`Salary Payout Triggered! Payouts: ${res.data.payout_count}, Total: $${res.data.total_amount}`);
       load();
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.response?.data?.error || "Failed to trigger salary payout");
     } finally {
       setTriggering(false);
