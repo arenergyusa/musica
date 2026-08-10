@@ -79,6 +79,8 @@ export default function AdminWithdrawalsPage() {
         const mapped = res.data.data.map((w: Withdrawal) => ({
           id: w.id,
           user: w.user_id,
+          user_name: (w as any).user_name || "",
+          user_email: (w as any).user_email || "",
           amount: w.amount_requested ?? w.amount ?? 0,
           requested: w.created_at ? new Date(w.created_at).toLocaleString() : "N/A",
           status: w.status,
@@ -260,6 +262,7 @@ export default function AdminWithdrawalsPage() {
                     onCheckedChange={handleSelectAll}
                   />
                 </TableHead>
+                <TableHead className="text-xs font-bold text-slate-500">Member</TableHead>
                 <TableHead className="text-xs font-bold text-slate-500">Amount ($)</TableHead>
                 <TableHead className="text-xs font-bold text-slate-500">USDT (BEP-20) Address</TableHead>
                 <TableHead className="text-xs font-bold text-slate-500">Requested At</TableHead>
@@ -270,7 +273,7 @@ export default function AdminWithdrawalsPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-slate-400">
+                  <TableCell colSpan={7} className="h-32 text-center text-slate-400">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-blue-600" />
                     <span className="text-xs font-medium">Loading withdrawal queue...</span>
                   </TableCell>
@@ -283,6 +286,12 @@ export default function AdminWithdrawalsPage() {
                         checked={selectedIds.includes(wx.id)}
                         onCheckedChange={(checked) => handleSelectOne(wx.id, !!checked)}
                       />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-extrabold text-xs text-slate-900 dark:text-white">{wx.user_name || "N/A"}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">{wx.user_email || ""}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="font-extrabold font-mono text-xs text-slate-900 dark:text-white">
                       {formatCurrency(wx.amount)}
@@ -329,7 +338,7 @@ export default function AdminWithdrawalsPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-28 text-center text-slate-400 text-xs font-medium">
+                  <TableCell colSpan={7} className="h-28 text-center text-slate-400 text-xs font-medium">
                     No withdrawal requests found
                   </TableCell>
                 </TableRow>

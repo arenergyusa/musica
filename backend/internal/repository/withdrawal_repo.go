@@ -139,12 +139,12 @@ func (r *withdrawalRepository) GetPendingCount(ctx context.Context) (int, error)
 }
 
 func (r *withdrawalRepository) GetAll(ctx context.Context, limit, offset int) ([]*domain.Withdrawal, error) {
-	// Join the user's USDT address so admins can see the payout destination
-	// alongside the requested/net amounts (M18).
+	// Join the user's USDT address and identity so admins can see the payout
+	// destination and the member who requested it (M18).
 	query := `
 		SELECT w.id, w.user_id, w.amount_requested, w.tds_amount, w.net_amount,
 		       w.status, COALESCE(w.payment_ref, ''), COALESCE(w.admin_note, ''), w.created_at,
-		       COALESCE(u.usdt_address, '')
+		       COALESCE(u.usdt_address, ''), COALESCE(u.name, ''), COALESCE(u.email, '')
 		FROM withdrawals w
 		LEFT JOIN users u ON u.id = w.user_id
 		ORDER BY w.created_at DESC LIMIT $1 OFFSET $2
@@ -158,7 +158,7 @@ func (r *withdrawalRepository) GetAll(ctx context.Context, limit, offset int) ([
 	var wds []*domain.Withdrawal
 	for rows.Next() {
 		w := &domain.Withdrawal{}
-		err := rows.Scan(&w.ID, &w.UserID, &w.AmountRequested, &w.TDSAmount, &w.NetAmount, &w.Status, &w.PaymentRef, &w.AdminNote, &w.CreatedAt, &w.UsdtAddress)
+		err := rows.Scan(&w.ID, &w.UserID, &w.AmountRequested, &w.TDSAmount, &w.NetAmount, &w.Status, &w.PaymentRef, &w.AdminNote, &w.CreatedAt, &w.UsdtAddress, &w.UserName, &w.UserEmail)
 		if err != nil {
 			return nil, err
 		}

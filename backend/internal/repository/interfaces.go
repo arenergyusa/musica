@@ -54,7 +54,7 @@ type InvestmentRepository interface {
 	// HasActiveInvestment reports whether the user owns at least one ACTIVE sponsorship.
 	HasActiveInvestment(ctx context.Context, userID uuid.UUID) (bool, error)
 	// Search by user for admin
-	GetAllWithFilters(ctx context.Context, limit, offset int, status string) ([]*domain.Sponsorship, error)
+	GetAllWithFilters(ctx context.Context, limit, offset int, status, search string) ([]*domain.Sponsorship, error)
 }
 
 // WalletRepository handles wallet balances and transaction logs atomically

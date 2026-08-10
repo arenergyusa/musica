@@ -15,42 +15,52 @@ import {
   ShieldCheck,
   UserPlus,
   TrendingUp,
+  ReceiptText,
+  Wallet,
+  Award,
+  ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { Badge } from "@/components/ui/badge";
 
-const navItems = [
+const navGroups: Array<{
+  label: string;
+  items: Array<{
+    title: string;
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badge?: string;
+  }>;
+}> = [
   {
-    title: "Overview",
-    href: "/admin/dashboard",
-    icon: LayoutDashboard,
-    badge: "Live",
+    label: "Overview",
+    items: [
+      { title: "Overview", href: "/admin/dashboard", icon: LayoutDashboard, badge: "Live" },
+    ],
   },
   {
-    title: "User Management",
-    href: "/admin/users",
-    icon: Users,
+    label: "Operations",
+    items: [
+      { title: "User Management", href: "/admin/users", icon: Users },
+      { title: "Manual Investment", href: "/admin/manual-investment", icon: UserPlus },
+      { title: "Investment Queue", href: "/admin/investments", icon: TrendingUp },
+      { title: "Withdrawal Payouts", href: "/admin/withdrawals", icon: ArrowUpRight },
+    ],
   },
   {
-    title: "Manual Investment",
-    href: "/admin/manual-investment",
-    icon: UserPlus,
+    label: "Finance & Audit",
+    items: [
+      { title: "Transactions", href: "/admin/transactions", icon: ReceiptText },
+      { title: "Salary Dashboard", href: "/admin/salary", icon: Award },
+      { title: "Audit Logs", href: "/admin/audit-logs", icon: ScrollText },
+    ],
   },
   {
-    title: "Investment Queue",
-    href: "/admin/investments",
-    icon: TrendingUp,
-  },
-  {
-    title: "Withdrawal Payouts",
-    href: "/admin/withdrawals",
-    icon: ArrowUpRight,
-  },
-  {
-    title: "Platform Settings",
-    href: "/admin/settings",
-    icon: Settings,
+    label: "Configuration",
+    items: [
+      { title: "Platform Settings", href: "/admin/settings", icon: Settings },
+    ],
   },
 ];
 
@@ -84,44 +94,49 @@ export function AdminSidebar() {
       </div>
 
       {/* Navigation Links */}
-      <div className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-        <div className="px-3 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-          Management Console
-        </div>
-
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(`${item.href}`));
-          return (
-            <Link key={item.href} href={item.href}>
-              <div
-                className={cn(
-                  "group flex items-center justify-between px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer",
-                  isActive
-                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 font-extrabold"
-                    : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon
-                    className={cn(
-                      "h-4 w-4 shrink-0 transition-transform group-hover:scale-110",
-                      isActive ? "text-white" : "text-slate-400 group-hover:text-white"
-                    )}
-                  />
-                  <span>{item.title}</span>
-                </div>
-                {item.badge && (
-                  <span className={cn(
-                    "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider",
-                    isActive ? "bg-white/20 text-white" : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                  )}>
-                    {item.badge}
-                  </span>
-                )}
-              </div>
-            </Link>
-          );
-        })}
+      <div className="flex-1 px-4 py-6 space-y-5 overflow-y-auto">
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            <div className="px-3 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              {group.label}
+            </div>
+            <div className="space-y-1.5">
+              {group.items.map((item) => {
+                const isActive = pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(`${item.href}`));
+                return (
+                  <Link key={item.href} href={item.href}>
+                    <div
+                      className={cn(
+                        "group flex items-center justify-between px-3.5 py-2.5 text-xs font-bold rounded-xl transition-all duration-200 cursor-pointer",
+                        isActive
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 font-extrabold"
+                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-transform group-hover:scale-110",
+                            isActive ? "text-white" : "text-slate-400 group-hover:text-white"
+                          )}
+                        />
+                        <span>{item.title}</span>
+                      </div>
+                      {item.badge && (
+                        <span className={cn(
+                          "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider",
+                          isActive ? "bg-white/20 text-white" : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                        )}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* System Status Card */}

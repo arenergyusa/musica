@@ -48,7 +48,7 @@ func (h *AdminHandler) ActivateInvestment(c *gin.Context) {
 
 func (h *AdminHandler) GetInvestments(c *gin.Context) {
 	limit, offset := ParsePagination(c)
-	investments, err := h.adminService.GetInvestments(c.Request.Context(), limit, offset, c.Query("status"))
+	investments, err := h.adminService.GetInvestments(c.Request.Context(), limit, offset, c.Query("status"), c.Query("search"))
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Failed to get investments", err)
 		return
@@ -308,5 +308,81 @@ func (h *AdminHandler) CreateManualInvestment(c *gin.Context) {
 	}
 
 	response.Success(c, http.StatusOK, "Manual investment created and referral rewards distributed successfully", inv)
+}
+
+func (h *AdminHandler) ChangeUserRole(c *gin.Context) {
+	userIDStr := c.Param("id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid user ID", nil)
+		return
+	}
+
+	var req struct {
+		Role string `json:"role" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid request payload", err)
+		return
+	}
+
+	// Only a super_admin may grant/revoke the super_admin role.
+	if req.Role == "super_admin" && c.GetString("role") != "super_admin" {
+		response.Error(c, http.StatusForbidden, "Only a super admin can manage the super_admin role", nil)
+		return
+	}
+
+	if err := h.adminService.ChangeUserRole(c.Request.Context(), userID, req.Role); err != nil {
+		handleServiceError(c, err, "Failed to update user role")
+		return
+	}
+	log.Printf("ADMIN AUDIT: role updated by actor=%s target=%s role=%s", c.GetString("user_id"), userID, req.Role)
+	response.Success(c, http.StatusOK, "User role updated successfully", nil)
+}
+
+func (h *AdminHandler) GetAllTransactions(c *gin.Context) {
+	limit, offset := ParsePagination(c)
+	var userID *uuid.UUID
+	if raw := c.Query("user_id"); raw != "" {
+		if parsed, err := uuid.Parse(raw); err == nil {
+			userID = &parsed
+		}
+	}
+	txs, err := h.adminService.GetAllTransactions(c.Request.Context(), limit, offset, userID, c.Query("source"), c.Query("type"))
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Failed to get transactions", err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Transactions retrieved", txs)
+}
+
+func (h *AdminHandler) GetSalaryQualifications(c *gin.Context) {
+	limit, offset := ParsePagination(c)
+	quals, err := h.adminService.GetSalaryQualifications(c.Request.Context(), limit, offset)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Failed to get salary qualifications", err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Salary qualifications retrieved", quals)
+}
+
+func (h *AdminHandler) GetSalaryPayoutLogs(c *gin.Context) {
+	limit, offset := ParsePagination(c)
+	logs, err := h.adminService.GetSalaryPayoutLogs(c.Request.Context(), limit, offset)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Failed to get salary payout logs", err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Salary payout logs retrieved", logs)
+}
+
+func (h *AdminHandler) GetAuditLogs(c *gin.Context) {
+	limit, offset := ParsePagination(c)
+	logs, err := h.adminService.GetAuditLogs(c.Request.Context(), limit, offset)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Failed to get audit logs", err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Audit logs retrieved", logs)
 }
 

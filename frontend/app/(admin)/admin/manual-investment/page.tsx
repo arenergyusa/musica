@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -19,7 +19,6 @@ import {
   UserPlus,
   Loader2,
   CheckCircle2,
-  AlertCircle,
   Zap,
   TrendingUp,
   Layers,
@@ -31,6 +30,7 @@ export default function AdminManualInvestmentPage() {
   const [email, setEmail] = useState("");
   const [amount, setAmount] = useState<string>("100");
   const [isLoading, setIsLoading] = useState(false);
+  const [rates, setRates] = useState<{ l1: number; l2: number; l3: number }>({ l1: 4, l2: 1, l3: 1 });
   const [lastSuccess, setLastSuccess] = useState<{
     id: string;
     email: string;
@@ -38,12 +38,29 @@ export default function AdminManualInvestmentPage() {
     created_at: string;
   } | null>(null);
 
+  // Load live invite-reward rates from platform settings so the commission
+  // preview always matches what the backend actually credits (B7).
+  useEffect(() => {
+    api.get("/admin/settings")
+      .then((res) => {
+        if (res.data.data) {
+          const s = res.data.data;
+          setRates({
+            l1: Number(s.invite_reward_l1_pct) || 0,
+            l2: Number(s.invite_reward_l2_pct) || 0,
+            l3: Number(s.invite_reward_l3_pct) || 0,
+          });
+        }
+      })
+      .catch(() => { /* keep defaults on settings failure */ });
+  }, []);
+
   const numAmount = parseFloat(amount) || 0;
 
-  // Real-time calculation based on platform defaults (L1: 4%, L2: 1%, L3: 1%)
-  const l1Reward = numAmount * 0.04;
-  const l2Reward = numAmount * 0.01;
-  const l3Reward = numAmount * 0.01;
+  // Real-time calculation using live platform rates
+  const l1Reward = numAmount * (rates.l1 / 100);
+  const l2Reward = numAmount * (rates.l2 / 100);
+  const l3Reward = numAmount * (rates.l3 / 100);
   const totalReward = l1Reward + l2Reward + l3Reward;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -200,19 +217,19 @@ export default function AdminManualInvestmentPage() {
 
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
                   <div className="bg-white dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 block font-medium">Level 1 (4%)</span>
+                    <span className="text-[10px] text-slate-400 block font-medium">Level 1 ({rates.l1}%)</span>
                     <span className="font-extrabold text-slate-900 dark:text-white">
                       {formatCurrency(l1Reward)}
                     </span>
                   </div>
                   <div className="bg-white dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 block font-medium">Level 2 (1%)</span>
+                    <span className="text-[10px] text-slate-400 block font-medium">Level 2 ({rates.l2}%)</span>
                     <span className="font-extrabold text-slate-900 dark:text-white">
                       {formatCurrency(l2Reward)}
                     </span>
                   </div>
                   <div className="bg-white dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800">
-                    <span className="text-[10px] text-slate-400 block font-medium">Level 3 (1%)</span>
+                    <span className="text-[10px] text-slate-400 block font-medium">Level 3 ({rates.l3}%)</span>
                     <span className="font-extrabold text-slate-900 dark:text-white">
                       {formatCurrency(l3Reward)}
                     </span>

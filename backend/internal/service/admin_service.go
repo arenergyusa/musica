@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/arenergyusa/musica/backend/internal/domain"
 	"github.com/arenergyusa/musica/backend/internal/repository"
@@ -19,12 +20,13 @@ type AdminService interface {
 	ActivateInvestment(ctx context.Context, invID uuid.UUID) error
 	ConfirmDeposit(ctx context.Context, userID, invID uuid.UUID, txHash string) error
 	ChangeInvestmentStatus(ctx context.Context, invID uuid.UUID, status string) error
-	GetInvestments(ctx context.Context, limit, offset int, status string) ([]*domain.Sponsorship, error)
+	GetInvestments(ctx context.Context, limit, offset int, status, search string) ([]*domain.Sponsorship, error)
 	GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error)
 	ApproveWithdrawal(ctx context.Context, wdID uuid.UUID, adminNote string) error
 	RejectWithdrawal(ctx context.Context, wdID uuid.UUID, adminNote string) error
 	BlockUser(ctx context.Context, userID uuid.UUID) error
 	UnblockUser(ctx context.Context, userID uuid.UUID) error
+	ChangeUserRole(ctx context.Context, userID uuid.UUID, role string) error
 	GetDashboardStats(ctx context.Context) (map[string]interface{}, error)
 	GetUsers(ctx context.Context, limit, offset int, search, status string) ([]*domain.User, error)
 	GetAllWithdrawals(ctx context.Context, limit, offset int) ([]*domain.Withdrawal, error)
@@ -33,6 +35,10 @@ type AdminService interface {
 	GetUserSummary(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error)
 	GetAnalytics(ctx context.Context) (map[string]interface{}, error)
 	CreateManualInvestment(ctx context.Context, email string, amount float64) (*domain.Sponsorship, error)
+	GetAllTransactions(ctx context.Context, limit, offset int, userID *uuid.UUID, source, txType string) ([]*TransactionWithUser, error)
+	GetSalaryQualifications(ctx context.Context, limit, offset int) ([]*SalaryQualificationView, error)
+	GetSalaryPayoutLogs(ctx context.Context, limit, offset int) ([]*SalaryPayoutLogView, error)
+	GetAuditLogs(ctx context.Context, limit, offset int) ([]*domain.TransactionAuditLog, error)
 }
 
 type adminService struct {
@@ -73,8 +79,8 @@ func (s *adminService) ChangeInvestmentStatus(ctx context.Context, invID uuid.UU
 	}
 }
 
-func (s *adminService) GetInvestments(ctx context.Context, limit, offset int, status string) ([]*domain.Sponsorship, error) {
-	return s.invRepo.GetAllWithFilters(ctx, limit, offset, status)
+func (s *adminService) GetInvestments(ctx context.Context, limit, offset int, status, search string) ([]*domain.Sponsorship, error) {
+	return s.invRepo.GetAllWithFilters(ctx, limit, offset, status, search)
 }
 
 func (s *adminService) GetMasterWalletBalance(ctx context.Context) (*MasterWalletBalance, error) {
@@ -434,6 +440,173 @@ func (s *adminService) UnblockUser(ctx context.Context, userID uuid.UUID) error 
 		user.Status = "ACTIVE"
 	}
 	return s.userRepo.Update(ctx, user)
+}
+
+// ChangeUserRole promotes/demotes a user's role. Only "user", "admin" and
+// "super_admin" are allowed; super_admin is a reserved escalation that the
+// frontend hides unless the actor is already a super_admin.
+func (s *adminService) ChangeUserRole(ctx context.Context, userID uuid.UUID, role string) error {
+	switch role {
+	case "user", "admin", "super_admin":
+	default:
+		return errors.New("invalid role")
+	}
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+	user.Role = role
+	return s.userRepo.Update(ctx, user)
+}
+
+// TransactionWithUser joins a wallet transaction with the owner's identity.
+type TransactionWithUser struct {
+	ID          uuid.UUID `json:"id"`
+	UserID      uuid.UUID `json:"user_id"`
+	UserName    string    `json:"user_name,omitempty"`
+	UserEmail   string    `json:"user_email,omitempty"`
+	Type        string    `json:"type"`
+	Amount      float64   `json:"amount"`
+	Source      string    `json:"source"`
+	ReferenceID string    `json:"reference_id,omitempty"`
+	Description string    `json:"description,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func (s *adminService) GetAllTransactions(ctx context.Context, limit, offset int, userID *uuid.UUID, source, txType string) ([]*TransactionWithUser, error) {
+	query := `
+		SELECT t.id, t.user_id, COALESCE(u.name, ''), COALESCE(u.email, ''),
+		       t.type, t.amount, t.source, COALESCE(t.reference_id, '')::text, COALESCE(t.description, ''), t.created_at
+		FROM transactions t
+		LEFT JOIN users u ON u.id = t.user_id
+		WHERE ($1::uuid IS NULL OR t.user_id = $1)
+		  AND ($2 = '' OR t.source = $2)
+		  AND ($3 = '' OR t.type = $3)
+		ORDER BY t.created_at DESC
+		LIMIT $4 OFFSET $5
+	`
+	rows, err := s.dbPool.Query(ctx, query, userID, source, txType, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*TransactionWithUser
+	for rows.Next() {
+		t := &TransactionWithUser{}
+		if err := rows.Scan(&t.ID, &t.UserID, &t.UserName, &t.UserEmail, &t.Type, &t.Amount, &t.Source, &t.ReferenceID, &t.Description, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// SalaryQualificationView joins a salary qualification with member identity.
+type SalaryQualificationView struct {
+	UserID         uuid.UUID  `json:"user_id"`
+	UserName       string     `json:"user_name,omitempty"`
+	UserEmail      string     `json:"user_email,omitempty"`
+	Tier           int        `json:"tier"`
+	LeftLegVolume  float64    `json:"left_leg_volume"`
+	RightLegVolume float64    `json:"right_leg_volume"`
+	TotalVolume    float64    `json:"total_volume"`
+	Status         string     `json:"status"`
+	LastPayoutAt   *time.Time `json:"last_payout_at,omitempty"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+func (s *adminService) GetSalaryQualifications(ctx context.Context, limit, offset int) ([]*SalaryQualificationView, error) {
+	query := `
+		SELECT sq.user_id, COALESCE(u.name, ''), COALESCE(u.email, ''),
+		       sq.tier, sq.left_leg_volume, sq.right_leg_volume, sq.total_volume,
+		       sq.status, sq.last_payout_at, sq.updated_at
+		FROM salary_qualifications sq
+		LEFT JOIN users u ON u.id = sq.user_id
+		ORDER BY sq.total_volume DESC
+		LIMIT $1 OFFSET $2
+	`
+	rows, err := s.dbPool.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*SalaryQualificationView
+	for rows.Next() {
+		q := &SalaryQualificationView{}
+		if err := rows.Scan(&q.UserID, &q.UserName, &q.UserEmail, &q.Tier, &q.LeftLegVolume, &q.RightLegVolume, &q.TotalVolume, &q.Status, &q.LastPayoutAt, &q.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, q)
+	}
+	return out, rows.Err()
+}
+
+// SalaryPayoutLogView joins a salary payout log with member identity.
+type SalaryPayoutLogView struct {
+	UserID       uuid.UUID `json:"user_id"`
+	UserName     string    `json:"user_name,omitempty"`
+	UserEmail    string    `json:"user_email,omitempty"`
+	Tier         int       `json:"tier"`
+	AmountUSD    float64   `json:"amount_usd"`
+	TotalVolume  float64   `json:"total_volume"`
+	CycleMonth   string    `json:"cycle_month,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+func (s *adminService) GetSalaryPayoutLogs(ctx context.Context, limit, offset int) ([]*SalaryPayoutLogView, error) {
+	query := `
+		SELECT spl.user_id, COALESCE(u.name, ''), COALESCE(u.email, ''),
+		       spl.tier, spl.amount_usd, spl.total_volume,
+		       TO_CHAR(spl.cycle_month, 'YYYY-MM'), spl.created_at
+		FROM salary_payout_logs spl
+		LEFT JOIN users u ON u.id = spl.user_id
+		ORDER BY spl.created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+	rows, err := s.dbPool.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*SalaryPayoutLogView
+	for rows.Next() {
+		l := &SalaryPayoutLogView{}
+		if err := rows.Scan(&l.UserID, &l.UserName, &l.UserEmail, &l.Tier, &l.AmountUSD, &l.TotalVolume, &l.CycleMonth, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
+}
+
+func (s *adminService) GetAuditLogs(ctx context.Context, limit, offset int) ([]*domain.TransactionAuditLog, error) {
+	query := `
+		SELECT id, user_id, action, amount_usd, usdt_amount, tx_hash, status, details, created_at
+		FROM transaction_audit_logs
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+	rows, err := s.dbPool.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*domain.TransactionAuditLog
+	for rows.Next() {
+		a := &domain.TransactionAuditLog{}
+		if err := rows.Scan(&a.ID, &a.UserID, &a.Action, &a.AmountUSD, &a.UsdtAmount, &a.TxHash, &a.Status, &a.Details, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
 }
 
 func (s *adminService) GetDashboardStats(ctx context.Context) (map[string]interface{}, error) {

@@ -38,6 +38,8 @@ type SponsorshipPlan struct {
 type Sponsorship struct {
 	ID                   uuid.UUID  `json:"id" db:"id"`
 	UserID               uuid.UUID  `json:"user_id" db:"user_id"`
+	UserName             string     `json:"user_name,omitempty" db:"user_name"`
+	UserEmail            string     `json:"user_email,omitempty" db:"user_email"`
 	Amount               float64    `json:"amount" db:"amount"`
 	DailyRatePct         float64    `json:"daily_rate_pct" db:"daily_rate_pct"`
 	Status               string     `json:"status" db:"status"` // PENDING, ACTIVE, CLOSED, CAPPED
@@ -73,6 +75,8 @@ type Transaction struct {
 type Withdrawal struct {
 	ID              uuid.UUID  `json:"id" db:"id"`
 	UserID          uuid.UUID  `json:"user_id" db:"user_id"`
+	UserName        string     `json:"user_name,omitempty" db:"user_name"`
+	UserEmail       string     `json:"user_email,omitempty" db:"user_email"`
 	AmountRequested float64    `json:"amount_requested" db:"amount_requested"`
 	TDSAmount       float64    `json:"tds_amount" db:"tds_amount"`
 	NetAmount       float64    `json:"net_amount" db:"net_amount"`

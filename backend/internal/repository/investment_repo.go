@@ -247,15 +247,17 @@ func (r *investmentRepository) GetActiveInvestmentsByUserID(ctx context.Context,
 }
 
 // GetAllWithFilters returns sponsorships with optional status filter for admin views.
-func (r *investmentRepository) GetAllWithFilters(ctx context.Context, limit, offset int, status string) ([]*domain.Sponsorship, error) {
+func (r *investmentRepository) GetAllWithFilters(ctx context.Context, limit, offset int, status, search string) ([]*domain.Sponsorship, error) {
 	query := `
-		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, deposit_tx_hash, deposit_confirmed_at, created_at, closed_at
-		FROM sponsorships
-		WHERE ($1 = '' OR status = NULLIF($1, '')::investment_status)
-		ORDER BY created_at DESC
+		SELECT s.id, s.user_id, COALESCE(u.name, ''), COALESCE(u.email, ''), s.amount, s.daily_rate_pct, s.status, s.total_reward_earned, s.cap_limit, s.working_cap_at_creation, s.deposit_tx_hash, s.deposit_confirmed_at, s.created_at, s.closed_at
+		FROM sponsorships s
+		JOIN users u ON u.id = s.user_id
+		WHERE ($1 = '' OR s.status = NULLIF($1, '')::investment_status)
+		  AND ($4 = '' OR s.user_id::text LIKE '%' || $4 || '%' OR u.name ILIKE '%' || $4 || '%' OR u.email ILIKE '%' || $4 || '%')
+		ORDER BY s.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
-	rows, err := r.db.Query(ctx, query, status, limit, offset)
+	rows, err := r.db.Query(ctx, query, status, limit, offset, search)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +266,7 @@ func (r *investmentRepository) GetAllWithFilters(ctx context.Context, limit, off
 	var invs []*domain.Sponsorship
 	for rows.Next() {
 		i := &domain.Sponsorship{}
-		if err := rows.Scan(&i.ID, &i.UserID, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.DepositTxHash, &i.DepositConfirmedAt, &i.CreatedAt, &i.ClosedAt); err != nil {
+		if err := rows.Scan(&i.ID, &i.UserID, &i.UserName, &i.UserEmail, &i.Amount, &i.DailyRatePct, &i.Status, &i.TotalRewardEarned, &i.CapLimit, &i.WorkingCapAtCreation, &i.DepositTxHash, &i.DepositConfirmedAt, &i.CreatedAt, &i.ClosedAt); err != nil {
 			return nil, err
 		}
 		invs = append(invs, i)

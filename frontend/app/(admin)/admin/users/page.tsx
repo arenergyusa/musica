@@ -34,7 +34,10 @@ import {
   User,
   Loader2,
   RefreshCw,
-  Zap
+  Zap,
+  Shield,
+  ShieldCheck,
+  UserCog
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -45,6 +48,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const ROLE_LABELS: Record<string, { label: string; cls: string }> = {
+  super_admin: { label: "Super Admin", cls: "bg-violet-50 text-violet-600 border-violet-200 dark:bg-violet-950/40 dark:text-violet-400" },
+  admin: { label: "Admin", cls: "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400" },
+  user: { label: "User", cls: "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400" },
+};
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<Array<{
     id: string;
@@ -54,6 +63,7 @@ export default function AdminUsersPage() {
     referralCode: string;
     joinDate: string;
     status: string;
+    role: string;
   }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,7 +97,8 @@ export default function AdminUsersPage() {
           phone: u.phone || "",
           referralCode: (u.referralCode as string) || (u.referral_code as string) || "",
           joinDate: new Date((u.createdAt as string) || (u.created_at as string) || '').toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }),
-          status: u.status || "ACTIVE"
+          status: u.status || "ACTIVE",
+          role: u.role || "user"
         }));
         setUsers(mappedUsers);
       }
@@ -131,6 +142,16 @@ export default function AdminUsersPage() {
       }
     } catch (error) {
       console.error("Failed to update status", error);
+    }
+  };
+
+  const handleChangeRole = async (userId: string, role: string) => {
+    try {
+      await api.put(`/admin/users/${userId}/role`, { role });
+      toast.success(`Role updated to ${role}`);
+      fetchUsers();
+    } catch (error) {
+      console.error("Failed to update role", error);
     }
   };
 
@@ -203,6 +224,7 @@ export default function AdminUsersPage() {
               <TableRow>
                 <TableHead className="pl-6 text-xs font-bold text-slate-500">Member</TableHead>
                 <TableHead className="text-xs font-bold text-slate-500">Phone</TableHead>
+                <TableHead className="text-xs font-bold text-slate-500">Role</TableHead>
                 <TableHead className="text-xs font-bold text-slate-500">Invite Code</TableHead>
                 <TableHead className="text-xs font-bold text-slate-500">Joined</TableHead>
                 <TableHead className="text-xs font-bold text-slate-500">Status</TableHead>
@@ -212,7 +234,7 @@ export default function AdminUsersPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-slate-400">
+                  <TableCell colSpan={7} className="h-32 text-center text-slate-400">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-blue-600" />
                     <span className="text-xs font-medium">Loading user directory...</span>
                   </TableCell>
@@ -228,6 +250,11 @@ export default function AdminUsersPage() {
                     </TableCell>
                     <TableCell className="text-xs text-slate-600 dark:text-slate-300 font-mono">
                       {u.phone || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={`text-[10px] font-bold ${ROLE_LABELS[u.role]?.cls || ROLE_LABELS.user.cls}`}>
+                        {ROLE_LABELS[u.role]?.label || u.role}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="font-mono text-[10px] font-bold bg-blue-50/50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border-blue-200/60">
@@ -254,6 +281,15 @@ export default function AdminUsersPage() {
                             View Detail Summary
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleChangeRole(u.id, "admin")} disabled={u.role === "admin"} className="cursor-pointer text-xs font-semibold">
+                            <Shield className="mr-2 h-3.5 w-3.5 text-blue-600" />
+                            Make Admin
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleChangeRole(u.id, "user")} disabled={u.role === "user"} className="cursor-pointer text-xs font-semibold">
+                            <UserCog className="mr-2 h-3.5 w-3.5 text-slate-500" />
+                            Make Regular User
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             onClick={() => handleToggleStatus(u.id, u.status)} 
                             className={`cursor-pointer text-xs font-semibold ${u.status === "BLOCKED" ? "text-emerald-600 focus:text-emerald-600" : "text-rose-600 focus:text-rose-600"}`}
@@ -277,7 +313,7 @@ export default function AdminUsersPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-28 text-center text-slate-400 text-xs font-medium">
+                  <TableCell colSpan={7} className="h-28 text-center text-slate-400 text-xs font-medium">
                     No users found matching filter
                   </TableCell>
                 </TableRow>
