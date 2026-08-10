@@ -477,18 +477,22 @@ type TransactionWithUser struct {
 }
 
 func (s *adminService) GetAllTransactions(ctx context.Context, limit, offset int, userID *uuid.UUID, source, txType string) ([]*TransactionWithUser, error) {
+	var userIDStr string
+	if userID != nil {
+		userIDStr = userID.String()
+	}
 	query := `
 		SELECT t.id, t.user_id, COALESCE(u.name, ''), COALESCE(u.email, ''),
 		       t.type, t.amount, t.source, COALESCE(t.reference_id, '')::text, COALESCE(t.description, ''), t.created_at
 		FROM transactions t
 		LEFT JOIN users u ON u.id = t.user_id
-		WHERE ($1::uuid IS NULL OR t.user_id = $1)
+		WHERE ($1 = '' OR t.user_id = NULLIF($1, '')::uuid)
 		  AND ($2 = '' OR t.source = $2)
 		  AND ($3 = '' OR t.type = $3)
 		ORDER BY t.created_at DESC
 		LIMIT $4 OFFSET $5
 	`
-	rows, err := s.dbPool.Query(ctx, query, userID, source, txType, limit, offset)
+	rows, err := s.dbPool.Query(ctx, query, userIDStr, source, txType, limit, offset)
 	if err != nil {
 		return nil, err
 	}
