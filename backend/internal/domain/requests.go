@@ -17,7 +17,7 @@ type LoginRequest struct {
 }
 
 type InvestRequest struct {
-	Amount        float64 `json:"amount" binding:"required,min=1"`
+	Amount        float64 `json:"amount" binding:"required,min=100"`
 	PaymentMethod string  `json:"payment_method"`
 	PaymentRef    string  `json:"payment_ref"`
 }

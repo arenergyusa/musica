@@ -46,8 +46,8 @@ func (s *investmentService) GetPlans(ctx context.Context) ([]*domain.Sponsorship
 	dailyRate := settings.MonthlyRewardPct / 30.0
 
 	for _, p := range plans {
-		p.MinAmount = 1
-		p.Description = "USDT BEP-20 investment"
+		p.MinAmount = 100
+		p.Description = "USDT BEP-20 investment in multiples of $100 USD"
 		p.DailyRatePct = dailyRate
 		p.NonWorkingCapMultiplier = settings.NonWorkingCapMultiplier
 		p.WorkingCapMultiplier = settings.WorkingCapMultiplier
@@ -69,8 +69,8 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 	}
 
 	// Validate amount at the API boundary as well as in the client.
-	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount < 1 || req.Amount > 10000 {
-		return nil, errors.New("investment amount must be between $1 and $10,000")
+	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount < 100 || req.Amount > 10000 || math.Mod(req.Amount, 100) != 0 {
+		return nil, errors.New("investment amount must be a multiple of $100 USD")
 	}
 
 	// Check working vs non-working based on 15-level unlock rule
