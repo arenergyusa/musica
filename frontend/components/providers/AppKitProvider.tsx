@@ -24,6 +24,8 @@ createAppKit({
   },
   features: {
     analytics: false,
+    email: false,
+    socials: [],
   },
   themeMode: "dark",
 });

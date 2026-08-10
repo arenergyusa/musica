@@ -12,7 +12,7 @@ import {
   useAppKitProvider,
   useDisconnect,
 } from "@reown/appkit/react";
-import { BrowserProvider, Contract, parseUnits, type Eip1193Provider } from "ethers";
+import { BrowserProvider, Contract, formatUnits, parseUnits, type Eip1193Provider } from "ethers";
 
 import { investSchema, type InvestInput } from "@/lib/validators";
 import { formatCurrency, shortenAddress } from "@/lib/utils";
@@ -29,6 +29,7 @@ const STEP_AMOUNT = 100;
 const ERC20_TRANSFER_ABI = [
   "function transfer(address to, uint256 amount) returns (bool)",
   "function decimals() view returns (uint8)",
+  "function balanceOf(address owner) view returns (uint256)",
 ];
 
 interface InvestFormProps {
@@ -87,8 +88,34 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
     }
 
     const signer = await ethersProvider.getSigner();
+    const signerAddress = await signer.getAddress();
     const contract = new Contract(USDT.CONTRACT_ADDRESS, ERC20_TRANSFER_ABI, signer);
     const units = parseUnits(amount.toFixed(2), USDT.DECIMALS);
+
+    // Ensure the wallet actually holds enough USDT before opening the sign flow.
+    const balanceUnits = await contract.balanceOf(signerAddress);
+    const balance = formatUnits(balanceUnits, USDT.DECIMALS);
+    if (balanceUnits < units) {
+      throw new Error(
+        `Insufficient USDT balance. You have ${balance} USDT but need ${amount.toFixed(2)} USDT.`,
+      );
+    }
+
+    // Estimate the gas the transfer will consume and make sure the wallet can
+    // cover it with BNB (BEP-20 tx fees are paid in BNB), otherwise the sign
+    // prompt would just fail on broadcast.
+    const [estimatedGas, feeData, bnbBalance] = await Promise.all([
+      contract.transfer.estimateGas(depositAddress, units),
+      ethersProvider.getFeeData(),
+      ethersProvider.getBalance(signerAddress),
+    ]);
+    const gasPrice = feeData.gasPrice ?? BigInt(0);
+    const gasCost = estimatedGas * gasPrice;
+    if (bnbBalance < gasCost) {
+      throw new Error(
+        `Insufficient BNB for gas. Your wallet needs at least ${formatUnits(gasCost, 18)} BNB to process this transfer.`,
+      );
+    }
 
     toast.info("Confirm the USDT transfer in your wallet...");
     const tx = await contract.transfer(depositAddress, units);
