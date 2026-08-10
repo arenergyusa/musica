@@ -80,8 +80,13 @@ export function InvestForm({ amount, onSuccess }: InvestFormProps) {
     if (!depositAddress) throw new Error("Deposit address not loaded yet");
 
     const ethersProvider = new BrowserProvider(walletProvider);
-    const network = await ethersProvider.getNetwork();
-    if (Number(network.chainId) !== USDT.NETWORK_ID) {
+    let chainId: bigint | null = null;
+    try {
+      chainId = await ethersProvider.getNetwork().then((n) => n.chainId);
+    } catch (error) {
+      console.warn("Could not read network from wallet provider", error);
+    }
+    if (chainId !== null && Number(chainId) !== USDT.NETWORK_ID) {
       throw new Error(`Please switch your wallet to ${USDT.NETWORK_NAME} (BEP-20)`);
     }
 

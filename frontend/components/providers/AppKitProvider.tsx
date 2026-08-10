@@ -3,6 +3,7 @@
 import { createAppKit } from "@reown/appkit/react";
 import { EthersAdapter } from "@reown/appkit-adapter-ethers";
 import { bsc } from "@reown/appkit/networks";
+import { defineChain } from "viem";
 import { APP } from "@/lib/constants";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
@@ -11,10 +12,25 @@ if (!projectId) {
   throw new Error("NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not defined");
 }
 
+const musicaBsc = defineChain({
+  ...bsc,
+  rpcUrls: {
+    default: {
+      http: [
+        "https://bsc-dataseed.binance.org",
+        "https://bsc-dataseed1.binance.org",
+        "https://bsc-dataseed2.binance.org",
+        "https://bsc.publicnode.com",
+        "https://1rpc.io/bnb",
+      ],
+    },
+  },
+});
+
 createAppKit({
   adapters: [new EthersAdapter()],
-  networks: [bsc],
-  defaultNetwork: bsc,
+  networks: [musicaBsc],
+  defaultNetwork: musicaBsc,
   projectId,
   metadata: {
     name: APP.NAME,
