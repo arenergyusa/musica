@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import type { User as UserType } from "@/lib/types";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -165,9 +165,6 @@ export default function AdminUsersPage() {
             <User className="h-3.5 w-3.5" /> User Directory
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">User Management</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            View user profiles, USDT settlement addresses, active portfolios, and manage access controls.
-          </p>
         </div>
 
         <Button 
@@ -199,15 +196,15 @@ export default function AdminUsersPage() {
 
             {/* Status Filter Dropdown */}
             <div className="flex items-center gap-2 w-full md:w-auto">
-              <span className="text-xs font-bold text-slate-500 shrink-0">Account Status:</span>
+              <span className="text-xs font-bold text-slate-500 shrink-0">Status:</span>
               <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || "ALL")}>
                 <SelectTrigger className="h-9 w-36 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 font-bold">
-                  <SelectValue placeholder="All Status" />
+                  <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  <SelectItem value="ALL">All Users</SelectItem>
-                  <SelectItem value="ACTIVE">Active Only</SelectItem>
-                  <SelectItem value="BLOCKED">Blocked Only</SelectItem>
+                  <SelectItem value="ALL">All</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="BLOCKED">Blocked</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -327,10 +324,7 @@ export default function AdminUsersPage() {
       <Sheet open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
         <SheetContent side="right" className="sm:max-w-md w-full overflow-y-auto p-6">
           <SheetHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
-            <SheetTitle className="text-lg font-black text-slate-900 dark:text-white">User Financial Overview</SheetTitle>
-            <SheetDescription className="text-xs text-slate-500">
-              Detailed account snapshot for {selectedUser?.name}
-            </SheetDescription>
+            <SheetTitle className="text-lg font-black text-slate-900 dark:text-white">User Overview</SheetTitle>
           </SheetHeader>
 
           {isSummaryLoading ? (

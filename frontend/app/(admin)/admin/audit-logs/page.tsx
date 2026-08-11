@@ -55,9 +55,6 @@ export default function AdminAuditLogsPage() {
             <ScrollText className="h-3.5 w-3.5" /> Transaction Audit Trail
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Audit Logs</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            On-chain payout and deposit reconciliation history.
-          </p>
         </div>
         <Button onClick={() => { setIsLoading(true); load(); }} variant="outline" size="sm" className="bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700 text-xs font-bold rounded-xl h-9">
           <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />

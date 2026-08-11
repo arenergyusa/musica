@@ -5,7 +5,7 @@ import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { User, Withdrawal } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -138,9 +138,6 @@ export default function AdminDashboardPage() {
             <Sparkles className="h-3.5 w-3.5" /> Platform Intelligence
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Admin Overview</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Monitor overall volume, active investments, user growth, and payout queues.
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -168,8 +165,7 @@ export default function AdminDashboardPage() {
                 <div className="flex items-center gap-3 text-amber-700 dark:text-amber-400">
                   <Clock className="h-5 w-5 shrink-0" />
                   <div>
-                    <p className="font-extrabold text-xs uppercase tracking-wider">{stats.pendingWithdrawals} Pending Payout Requests</p>
-                    <p className="text-xs opacity-80 font-medium">Review and process automated USDT BEP-20 payouts</p>
+                    <p className="font-extrabold text-xs uppercase tracking-wider">{stats.pendingWithdrawals} Pending Payouts</p>
                   </div>
                 </div>
                 <Link href="/admin/withdrawals">
@@ -187,8 +183,7 @@ export default function AdminDashboardPage() {
                 <div className="flex items-center gap-3 text-emerald-700 dark:text-emerald-400">
                   <TrendingUp className="h-5 w-5 shrink-0" />
                   <div>
-                    <p className="font-extrabold text-xs uppercase tracking-wider">{stats.pendingInvestments} Active Subscriptions Pending</p>
-                    <p className="text-xs opacity-80 font-medium">Check transaction hashes on BSC network</p>
+                    <p className="font-extrabold text-xs uppercase tracking-wider">{stats.pendingInvestments} Pending Investments</p>
                   </div>
                 </div>
                 <Link href="/admin/investments">
@@ -276,7 +271,7 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
                 <Users className="h-4 w-4 text-blue-600" />
-                30-Day User Registrations
+                30-Day Registrations
               </CardTitle>
               <Badge variant="outline" className="text-xs font-mono font-bold text-blue-600 border-blue-500/30">
                 +{signupData.reduce((a, c) => a + (c.count || 0), 0)} users
@@ -314,7 +309,7 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
                 <TrendingUp className="h-4 w-4 text-emerald-500" />
-                30-Day Daily Rewards Distributed
+                30-Day Rewards
               </CardTitle>
               <Badge variant="outline" className="text-xs font-mono font-bold text-emerald-600 border-emerald-500/30">
                 {formatCurrency(roiData.reduce((a, c) => a + (c.amount || 0), 0))}
@@ -348,10 +343,7 @@ export default function AdminDashboardPage() {
         {/* Recent Payout Requests */}
         <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
-            <div>
-              <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white">Recent Payout Requests</CardTitle>
-              <CardDescription className="text-xs text-slate-500">Latest withdrawal requests</CardDescription>
-            </div>
+            <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white">Recent Payouts</CardTitle>
             <Link href="/admin/withdrawals">
               <Button variant="ghost" size="sm" className="text-xs font-bold text-blue-600 hover:text-blue-700">
                 View All <ArrowRight className="ml-1 h-3.5 w-3.5" />
@@ -399,10 +391,7 @@ export default function AdminDashboardPage() {
         {/* Recent Registrations */}
         <Card className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
-            <div>
-              <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white">Recent User Registrations</CardTitle>
-              <CardDescription className="text-xs text-slate-500">Newly onboarded members</CardDescription>
-            </div>
+            <CardTitle className="text-sm font-extrabold text-slate-900 dark:text-white">Recent Users</CardTitle>
             <Link href="/admin/users">
               <Button variant="ghost" size="sm" className="text-xs font-bold text-blue-600 hover:text-blue-700">
                 View All <ArrowRight className="ml-1 h-3.5 w-3.5" />

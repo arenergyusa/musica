@@ -87,9 +87,6 @@ export default function AdminSalaryPage() {
             <Award className="h-3.5 w-3.5" /> Binary Salary System
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Salary Dashboard</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Qualified members, leg volumes, and monthly salary payout history.
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => { setLoading(true); load(); }} variant="outline" size="sm" className="bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700 text-xs font-bold rounded-xl h-9">

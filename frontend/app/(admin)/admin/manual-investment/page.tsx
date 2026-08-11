@@ -8,7 +8,6 @@ import axios from "axios";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -118,9 +117,6 @@ export default function AdminManualInvestmentPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Direct Investment & Reward Distribution
           </h1>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-            Grant an investment directly to a user using their registered email address. This immediately activates the user investment and distributes 3-level upline invite bonuses.
-          </p>
         </div>
         <Badge
           variant="outline"
@@ -138,9 +134,6 @@ export default function AdminManualInvestmentPage() {
               <TrendingUp className="h-4 w-4 text-blue-600" />
               Manual Investment Form
             </CardTitle>
-            <CardDescription className="text-xs">
-              Enter user email and amount to activate investment instantly.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -157,9 +150,6 @@ export default function AdminManualInvestmentPage() {
                   required
                   className="h-11 rounded-xl text-sm bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 focus-visible:ring-blue-600 font-medium"
                 />
-                <p className="text-[11px] text-slate-400">
-                  Must match an existing registered account email in the system.
-                </p>
               </div>
 
               <div className="space-y-2">

@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { PlatformSettings } from "@/lib/types";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -127,9 +127,6 @@ export default function AdminSettingsPage() {
             <Sparkles className="h-3.5 w-3.5" /> Platform Configuration
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Platform Settings</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Configure global monthly ROI rates, cap multipliers, minimum withdrawal limit ($), and referral percentages.
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -165,7 +162,6 @@ export default function AdminSettingsPage() {
               </CardTitle>
               <Badge variant="outline" className="text-[10px] font-bold text-blue-600 border-blue-200 bg-blue-50">USD ($)</Badge>
             </div>
-            <CardDescription className="text-xs text-slate-500">Core system ROI distribution rates and payout limits</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 space-y-4">
             
@@ -184,7 +180,6 @@ export default function AdminSettingsPage() {
                 onChange={(e) => handleChange('monthly_reward_pct', parseFloat(e.target.value) || 0)}
                 className="h-10 text-xs font-mono font-bold bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
               />
-              <p className="text-[10px] text-slate-500">Daily ROI is computed automatically as <code className="font-bold">Monthly % / 30</code>.</p>
             </div>
 
             {/* Minimum Withdrawal */}
@@ -197,7 +192,6 @@ export default function AdminSettingsPage() {
                 onChange={(e) => handleChange('withdrawal_min_amount', parseFloat(e.target.value) || 0)}
                 className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
               />
-              <p className="text-[10px] text-slate-400">Minimum USD threshold required for users to submit a payout request.</p>
             </div>
 
             {/* Cap Multipliers */}
@@ -233,7 +227,6 @@ export default function AdminSettingsPage() {
             <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
               <Award className="h-4 w-4 text-emerald-500" /> Level Unlock Requirements ($)
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">Business volume thresholds to unlock team levels</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 space-y-4">
             
@@ -246,7 +239,6 @@ export default function AdminSettingsPage() {
                 onChange={(e) => handleChange('level1_to_5_business', parseFloat(e.target.value) || 0)}
                 className="h-9 text-xs font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
               />
-              <p className="text-[10px] text-slate-400">Total volume required across team line ($1,000 default).</p>
             </div>
 
             <div className="space-y-1.5">
@@ -280,7 +272,6 @@ export default function AdminSettingsPage() {
             <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
               <Zap className="h-4 w-4 text-blue-600" /> Invite Income Rates (%)
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">One-time percentage reward credited upon direct invite investment</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
             <div className="space-y-1">
@@ -322,7 +313,6 @@ export default function AdminSettingsPage() {
             <CardTitle className="text-sm font-extrabold flex items-center gap-2 text-slate-900 dark:text-white">
               <Layers className="h-4 w-4 text-indigo-500" /> Level Income Rates (%)
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">Daily recurring percentage calculated on team ROI</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -388,9 +378,6 @@ export default function AdminSettingsPage() {
                 <Award className="h-4 w-4 text-purple-600" />
                 Dynamic Monthly Salary Tiers Config ($ USD)
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500">
-                100% Database-Driven: Manage downline business volume requirements, 60:40 leg balance, and 25% monthly maintenance increment
-              </CardDescription>
             </div>
             <Button
               variant="outline"

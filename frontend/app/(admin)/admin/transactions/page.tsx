@@ -92,9 +92,6 @@ export default function AdminTransactionsPage() {
             <ReceiptText className="h-3.5 w-3.5" /> Wallet Ledger
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Transaction Ledger</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Audit all reward credits and withdrawal debits across the platform.
-          </p>
         </div>
         <Button onClick={() => { setIsLoading(true); load(0); }} variant="outline" size="sm" className="bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700 text-xs font-bold rounded-xl h-9">
           <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />

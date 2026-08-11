@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { Withdrawal } from "@/lib/types";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -180,9 +179,6 @@ export default function AdminWithdrawalsPage() {
             <ArrowUpRight className="h-3.5 w-3.5" /> Automated Payout Monitor
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Withdrawal Payouts</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Monitor and process automated USDT (BEP-20) payout requests via master key.
-          </p>
         </div>
 
         <Button 
@@ -366,10 +362,7 @@ export default function AdminWithdrawalsPage() {
       <Dialog open={approveModalOpen} onOpenChange={setApproveModalOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900 dark:text-white">Approve Payout Request</DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
-              Confirm automated USDT (BEP-20) transfer authorization from master private key.
-            </DialogDescription>
+            <DialogTitle className="text-base font-bold text-slate-900 dark:text-white">Approve Payout</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-1 font-mono">
@@ -403,10 +396,7 @@ export default function AdminWithdrawalsPage() {
       <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900 dark:text-white">Reject Payout Request</DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
-              The requested amount will be refunded back to the user's wallet.
-            </DialogDescription>
+            <DialogTitle className="text-base font-bold text-slate-900 dark:text-white">Reject Payout</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
