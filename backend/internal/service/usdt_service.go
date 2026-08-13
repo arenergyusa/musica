@@ -469,7 +469,6 @@ func (s *usdtService) CheckDepositReadiness(ctx context.Context, walletAddress s
 		return nil, err
 	}
 
-	// Estimate gas for the ERC-20 transfer(wallet -> depositAddress, amount).
 	contract := os.Getenv("USDT_CONTRACT_ADDRESS")
 	if contract == "" {
 		return nil, fmt.Errorf("USDT_CONTRACT_ADDRESS not configured")
@@ -494,17 +493,20 @@ func (s *usdtService) CheckDepositReadiness(ctx context.Context, walletAddress s
 	amountUnits.FillBytes(amountBytes)
 	data = append(data, amountBytes...)
 
+	// Estimate the gas for the ERC-20 transfer(wallet -> depositAddress, amount).
+	// A wallet with no USDT (or no BNB for gas) makes eth_estimateGas revert, so
+	// the simulation error is a signal to fall back to a default gas limit for a
+	// standard ERC-20 transfer instead of failing the whole readiness check.
+	gasLimit := big.NewInt(60000)
 	gasLimitHex, err := callBSC(ctx, rpcURL, "eth_estimateGas", []interface{}{map[string]interface{}{
 		"from": walletAddress,
 		"to":   contract,
 		"data": "0x" + hex.EncodeToString(data),
 	}})
-	if err != nil {
-		return nil, err
-	}
-	gasLimit, ok := new(big.Int).SetString(strings.TrimPrefix(gasLimitHex, "0x"), 16)
-	if !ok {
-		return nil, fmt.Errorf("invalid gas estimate returned by BSC")
+	if err == nil {
+		if parsed, ok := new(big.Int).SetString(strings.TrimPrefix(gasLimitHex, "0x"), 16); ok && parsed.Uint64() > 0 {
+			gasLimit = parsed
+		}
 	}
 	gasPriceHex, err := callBSC(ctx, rpcURL, "eth_gasPrice", []interface{}{})
 	if err != nil {

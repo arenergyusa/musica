@@ -34,6 +34,10 @@ func (h *USDTHandler) GetDepositAddress(c *gin.Context) {
 
 func (h *USDTHandler) CheckDepositReadiness(c *gin.Context) {
 	wallet := strings.TrimSpace(c.Query("wallet"))
+	if wallet == "" {
+		response.Error(c, http.StatusBadRequest, "Wallet address is required", nil)
+		return
+	}
 	amount, err := strconv.ParseFloat(c.DefaultQuery("amount", "0"), 64)
 	if err != nil || amount <= 0 {
 		response.Error(c, http.StatusBadRequest, "Invalid amount", nil)
