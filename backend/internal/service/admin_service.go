@@ -514,7 +514,7 @@ type TransactionWithUser struct {
 func (s *adminService) GetAllTransactions(ctx context.Context, limit, offset int, userID *uuid.UUID, source, txType string) ([]*TransactionWithUser, error) {
 	query := `
 		SELECT t.id, t.user_id, COALESCE(u.name, ''), COALESCE(u.email, ''),
-		       t.type, t.amount, t.source, COALESCE(t.reference_id, '')::text, COALESCE(t.description, ''), t.created_at
+		       t.type, t.amount, t.source, COALESCE(t.reference_id::text, ''), COALESCE(t.description, ''), t.created_at
 		FROM transactions t
 		LEFT JOIN users u ON u.id = t.user_id
 		WHERE (t.user_id = $1 OR $1 = '00000000-0000-0000-0000-000000000000')
