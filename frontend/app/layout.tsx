@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { APP } from "@/lib/constants";
 
 import { AuthProvider } from "@/components/providers/AuthProvider";
-import { AppKitProvider } from "@/components/providers/AppKitProvider";
 import { AutoLogout } from "@/components/AutoLogout";
 
 export const metadata: Metadata = {
@@ -84,10 +83,8 @@ export default function RootLayout({
               Skip to main content
             </a>
             <AuthProvider>
-              <AppKitProvider>
-                <AutoLogout />
-                {children}
-              </AppKitProvider>
+              <AutoLogout />
+              {children}
             </AuthProvider>
             <Toaster
               position="top-right"
