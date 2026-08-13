@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
@@ -70,12 +71,31 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [selectedUser, setSelectedUser] = useState<{ id: string; name?: string } | null>(null);
   const [userSummary, setUserSummary] = useState<{
-    user?: { id: string; name: string; email: string; phone: string; status: string; created_at: string; usdt_address?: string };
+    user?: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      username: string;
+      invite_code: string;
+      leg: string;
+      status: string;
+      role: string;
+      usdt_address?: string;
+      created_at: string;
+    };
     wallet?: { balance: number; total_credited: number };
     investments?: Array<{ id: string; amount: number; total_reward_earned: number; cap_limit: number; status: string }>;
     status?: "INACTIVE" | "ACTIVE" | "WORKING";
   } | null>(null);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    name: string;
+    phone: string;
+    email: string;
+    usdt_address: string;
+  }>({ name: "", phone: "", email: "", usdt_address: "" });
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -117,6 +137,15 @@ export default function AdminUsersPage() {
       const res = await api.get(`/admin/users/${userId}/summary`);
       if (res.data.data) {
         setUserSummary(res.data.data);
+        const u = res.data.data.user;
+        if (u) {
+          setEditForm({
+            name: u.name || "",
+            phone: u.phone || "",
+            email: u.email || "",
+            usdt_address: u.usdt_address || "",
+          });
+        }
       }
     } catch (error) {
       console.error("Failed to fetch user summary", error);
@@ -152,6 +181,31 @@ export default function AdminUsersPage() {
       fetchUsers();
     } catch (error) {
       console.error("Failed to update role", error);
+    }
+  };
+
+  const handleSaveUserDetails = async () => {
+    if (!selectedUser) return;
+    if (!editForm.name.trim() || !editForm.email.trim()) {
+      toast.error("Name and email are required");
+      return;
+    }
+    try {
+      setIsSaving(true);
+      await api.put(`/admin/users/${selectedUser.id}`, editForm);
+      toast.success("User details updated");
+      fetchUsers();
+      if (userSummary?.user) {
+        setUserSummary({
+          ...userSummary,
+          user: { ...userSummary.user, ...editForm },
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to update user details", error);
+      toast.error(error.response?.data?.error || "Failed to update user details");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -356,12 +410,80 @@ export default function AdminUsersPage() {
                 </div>
               </div>
 
-              {/* USDT Address */}
-              <div className="bg-blue-50/50 dark:bg-blue-950/30 p-4 rounded-xl border border-blue-100 dark:border-blue-900/50 space-y-1.5">
-                <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">USDT (BEP-20) Address</p>
-                <p className="text-xs font-mono text-slate-800 dark:text-slate-200 break-all bg-white dark:bg-slate-950 p-2 rounded-lg border border-blue-200/60 dark:border-blue-900/40">
-                  {userSummary.user?.usdt_address || "Not saved yet"}
-                </p>
+              {/* All Account Details */}
+              <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-2">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Account Details</p>
+                <div className="grid grid-cols-1 gap-1.5 text-xs">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Username</span>
+                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{userSummary.user?.username || "—"}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Invite Code</span>
+                    <span className="font-mono font-bold text-blue-600">{userSummary.user?.invite_code || "—"}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Leg</span>
+                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{userSummary.user?.leg || "—"}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Role</span>
+                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{userSummary.user?.role || "user"}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-slate-400">Joined</span>
+                    <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                      {userSummary.user?.created_at ? new Date(userSummary.user.created_at).toLocaleString("en-US", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Editable Details */}
+              <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-3">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Edit Details</p>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Full Name</Label>
+                  <Input
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="h-9 text-xs rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Email</Label>
+                  <Input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="h-9 text-xs rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">Phone</Label>
+                  <Input
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="h-9 text-xs rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700 dark:text-slate-300">USDT (BEP-20) Address</Label>
+                  <Input
+                    value={editForm.usdt_address}
+                    onChange={(e) => setEditForm({ ...editForm, usdt_address: e.target.value })}
+                    placeholder="0x..."
+                    className="h-9 text-xs font-mono rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                  />
+                </div>
+                <Button
+                  onClick={handleSaveUserDetails}
+                  disabled={isSaving}
+                  className="w-full h-9 text-xs font-extrabold rounded-lg bg-blue-600 hover:bg-blue-700"
+                >
+                  {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
               </div>
 
               {/* Wallet Summary */}

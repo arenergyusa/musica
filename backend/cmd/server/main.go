@@ -258,6 +258,7 @@ func main() {
 			admin.GET("/analytics", adminH.GetAnalytics)
 			admin.GET("/users", adminH.GetUsers)
 			admin.GET("/users/:id/summary", adminH.GetUserSummary)
+			admin.PUT("/users/:id", adminH.UpdateUserDetails)
 			admin.PUT("/users/:id/role", adminH.ChangeUserRole)
 			admin.GET("/investments", adminH.GetInvestments)
 			admin.PUT("/investments/:id/status", adminH.ChangeInvestmentStatus)

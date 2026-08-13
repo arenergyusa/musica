@@ -15,6 +15,10 @@ type UserRepository interface {
 	GetByPhone(ctx context.Context, phone string) (*domain.User, error)
 	GetByInviteCode(ctx context.Context, code string) (*domain.User, error)
 	Update(ctx context.Context, user *domain.User) error
+	// UpdateAdminFields updates admin-editable profile fields for a user
+	// (name, phone, email, usdt_address). Returns ErrEmailTaken when email
+	// already belongs to another account.
+	UpdateAdminFields(ctx context.Context, id uuid.UUID, name, phone, email, usdtAddress string) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	GetTotalCount(ctx context.Context) (int, error)
 	GetAll(ctx context.Context, limit, offset int) ([]*domain.User, error)

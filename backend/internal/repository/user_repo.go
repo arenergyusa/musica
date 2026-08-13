@@ -186,6 +186,20 @@ func (r *userRepository) Update(ctx context.Context, user *domain.User) error {
 	return err
 }
 
+// UpdateAdminFields updates profile fields controlled by admins. The email
+// uniqueness check must happen in the caller (transactionally if needed) so we
+// can raise a targeted ErrEmailTaken instead of a generic unique violation.
+func (r *userRepository) UpdateAdminFields(ctx context.Context, id uuid.UUID, name, phone, email, usdtAddress string) error {
+	query := `
+		UPDATE users
+		SET name = $1, phone = $2, email = $3, usdt_address = $4, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $5
+		RETURNING updated_at
+	`
+	_, err := r.db.Exec(ctx, query, name, phone, email, usdtAddress, id)
+	return err
+}
+
 func (r *userRepository) GetTotalCount(ctx context.Context) (int, error) {
 	var count int
 	err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&count)

@@ -155,6 +155,33 @@ func (h *AdminHandler) UnblockUser(c *gin.Context) {
 	response.Success(c, http.StatusOK, "User unblocked successfully", nil)
 }
 
+// UpdateUserDetails allows admins to edit profile fields for a user.
+func (h *AdminHandler) UpdateUserDetails(c *gin.Context) {
+	userIDStr := c.Param("id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid user ID", nil)
+		return
+	}
+
+	var req struct {
+		Name        string `json:"name"`
+		Phone       string `json:"phone"`
+		Email       string `json:"email"`
+		UsdtAddress string `json:"usdt_address"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "Invalid request payload", err)
+		return
+	}
+
+	if err := h.adminService.UpdateUserDetails(c.Request.Context(), userID, req.Name, req.Phone, req.Email, req.UsdtAddress); err != nil {
+		handleServiceError(c, err, "Failed to update user details")
+		return
+	}
+	response.Success(c, http.StatusOK, "User details updated successfully", nil)
+}
+
 func (h *AdminHandler) GetUserSummary(c *gin.Context) {
 	userIDStr := c.Param("id")
 	userID, err := uuid.Parse(userIDStr)

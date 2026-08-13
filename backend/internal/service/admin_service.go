@@ -26,6 +26,7 @@ type AdminService interface {
 	RejectWithdrawal(ctx context.Context, wdID uuid.UUID, adminNote string) error
 	BlockUser(ctx context.Context, userID uuid.UUID) error
 	UnblockUser(ctx context.Context, userID uuid.UUID) error
+	UpdateUserDetails(ctx context.Context, userID uuid.UUID, name, phone, email, usdtAddress string) error
 	ChangeUserRole(ctx context.Context, userID uuid.UUID, role string) error
 	GetDashboardStats(ctx context.Context) (map[string]interface{}, error)
 	GetUsers(ctx context.Context, limit, offset int, search, status string) ([]*domain.User, error)
@@ -460,6 +461,40 @@ func (s *adminService) ChangeUserRole(ctx context.Context, userID uuid.UUID, rol
 	}
 	user.Role = role
 	return s.userRepo.Update(ctx, user)
+}
+
+// UpdateUserDetails updates admin-editable profile fields for a user (name,
+// phone, email, USDT address). The email must be unique system-wide and all
+// fields are trimmed before persisting.
+func (s *adminService) UpdateUserDetails(ctx context.Context, userID uuid.UUID, name, phone, email, usdtAddress string) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+
+	cleanName := strings.TrimSpace(name)
+	cleanEmail := strings.ToLower(strings.TrimSpace(email))
+	cleanPhone := strings.TrimSpace(phone)
+	cleanUsdt := strings.TrimSpace(usdtAddress)
+
+	if cleanName == "" {
+		return errors.New("name cannot be empty")
+	}
+	if cleanEmail == "" {
+		return errors.New("email cannot be empty")
+	}
+
+	// Email must be unique system-wide, excluding this user.
+	if existing, err := s.userRepo.GetByEmail(ctx, cleanEmail); err != nil {
+		return err
+	} else if existing != nil && existing.ID != userID {
+		return errors.New("email already belongs to another account")
+	}
+
+	return s.userRepo.UpdateAdminFields(ctx, userID, cleanName, cleanPhone, cleanEmail, cleanUsdt)
 }
 
 // TransactionWithUser joins a wallet transaction with the owner's identity.
