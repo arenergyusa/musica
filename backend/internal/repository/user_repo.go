@@ -207,7 +207,7 @@ func (r *userRepository) GetTotalCount(ctx context.Context) (int, error) {
 }
 
 func (r *userRepository) GetAll(ctx context.Context, limit, offset int) ([]*domain.User, error) {
-	query := "SELECT id, name, email, phone, username, invite_code, invited_by, COALESCE(usdt_address, ''), status, created_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+	query := "SELECT id, name, email, phone, username, invite_code, invited_by, COALESCE(usdt_address, ''), role, status, created_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2"
 	rows, err := r.db.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, err
@@ -217,7 +217,7 @@ func (r *userRepository) GetAll(ctx context.Context, limit, offset int) ([]*doma
 	var users []*domain.User
 	for rows.Next() {
 		var u domain.User
-		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.InviteCode, &u.InvitedBy, &u.UsdtAddress, &u.Status, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.InviteCode, &u.InvitedBy, &u.UsdtAddress, &u.Role, &u.Status, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, &u)
@@ -228,7 +228,7 @@ func (r *userRepository) GetAll(ctx context.Context, limit, offset int) ([]*doma
 // SearchUsers searches users by name/email and optionally filters by status.
 func (r *userRepository) SearchUsers(ctx context.Context, limit, offset int, search, status string) ([]*domain.User, error) {
 	query := `
-		SELECT id, name, email, phone, username, invite_code, invited_by, COALESCE(usdt_address, ''), status, created_at
+		SELECT id, name, email, phone, username, invite_code, invited_by, COALESCE(usdt_address, ''), role, status, created_at
 		FROM users
 		WHERE 
 			($1 = '' OR name ILIKE '%' || $1 || '%' OR email ILIKE '%' || $1 || '%')
@@ -245,7 +245,7 @@ func (r *userRepository) SearchUsers(ctx context.Context, limit, offset int, sea
 	var users []*domain.User
 	for rows.Next() {
 		u := &domain.User{}
-		err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.InviteCode, &u.InvitedBy, &u.UsdtAddress, &u.Status, &u.CreatedAt)
+		err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Phone, &u.Username, &u.InviteCode, &u.InvitedBy, &u.UsdtAddress, &u.Role, &u.Status, &u.CreatedAt)
 		if err != nil {
 			return nil, err
 		}

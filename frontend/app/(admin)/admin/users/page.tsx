@@ -277,16 +277,14 @@ export default function AdminUsersPage() {
                 <TableHead className="pl-6 text-xs font-bold text-slate-500">Member</TableHead>
                 <TableHead className="text-xs font-bold text-slate-500">Phone</TableHead>
                 <TableHead className="text-xs font-bold text-slate-500">Role</TableHead>
-                <TableHead className="text-xs font-bold text-slate-500">Invite Code</TableHead>
                 <TableHead className="text-xs font-bold text-slate-500">Joined</TableHead>
-                <TableHead className="text-xs font-bold text-slate-500">Status</TableHead>
                 <TableHead className="text-right pr-6 text-xs font-bold text-slate-500">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-slate-400">
+                  <TableCell colSpan={5} className="h-32 text-center text-slate-400">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-blue-600" />
                     <span className="text-xs font-medium">Loading user directory...</span>
                   </TableCell>
@@ -308,18 +306,8 @@ export default function AdminUsersPage() {
                         {ROLE_LABELS[u.role]?.label || u.role}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-mono text-[10px] font-bold bg-blue-50/50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 border-blue-200/60">
-                        {u.referralCode || "N/A"}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="text-xs text-slate-500 font-mono">
                       {u.joinDate}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={`text-[10px] font-bold ${u.status === "BLOCKED" ? "bg-rose-50 text-rose-600 border-rose-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"}`}>
-                        {u.status}
-                      </Badge>
                     </TableCell>
                     <TableCell className="text-right pr-6">
                       <DropdownMenu>
@@ -367,7 +355,7 @@ export default function AdminUsersPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-28 text-center text-slate-400 text-xs font-medium">
+                  <TableCell colSpan={5} className="h-28 text-center text-slate-400 text-xs font-medium">
                     No users found matching filter
                   </TableCell>
                 </TableRow>
