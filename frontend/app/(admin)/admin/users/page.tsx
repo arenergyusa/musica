@@ -45,6 +45,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuGroup,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -326,7 +327,9 @@ export default function AdminUsersPage() {
                           <MoreHorizontal className="h-4 w-4 text-slate-500" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48 rounded-xl">
-                          <DropdownMenuLabel className="text-[11px] font-bold text-slate-400">Actions</DropdownMenuLabel>
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel className="text-[11px] font-bold text-slate-400">Actions</DropdownMenuLabel>
+                          </DropdownMenuGroup>
                           <DropdownMenuItem onClick={() => handleFetchUserSummary(u.id, u.name)} className="cursor-pointer text-xs font-semibold">
                             <Eye className="mr-2 h-3.5 w-3.5 text-blue-600" />
                             View Detail Summary

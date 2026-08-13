@@ -15,6 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuGroup,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -113,12 +114,14 @@ export function AdminHeader() {
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 rounded-xl">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1 p-1">
-                  <p className="text-xs font-bold leading-none text-slate-900 dark:text-white">{user?.name || "Administrator"}</p>
-                  <p className="text-[11px] leading-none text-slate-400 font-normal">{user?.email || "admin@musica.com"}</p>
-                </div>
-              </DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1 p-1">
+                    <p className="text-xs font-bold leading-none text-slate-900 dark:text-white">{user?.name || "Administrator"}</p>
+                    <p className="text-[11px] leading-none text-slate-400 font-normal">{user?.email || "admin@musica.com"}</p>
+                  </div>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => window.location.assign("/dashboard")} className="cursor-pointer text-xs font-medium">
                 <Sparkles className="mr-2 h-3.5 w-3.5 text-blue-600" />
