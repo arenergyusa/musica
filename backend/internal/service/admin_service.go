@@ -519,7 +519,7 @@ func (s *adminService) GetAllTransactions(ctx context.Context, limit, offset int
 		LEFT JOIN users u ON u.id = t.user_id
 		WHERE (t.user_id = $1 OR $1 = '00000000-0000-0000-0000-000000000000')
 		  AND ($2 = '' OR t.source = $2)
-		  AND ($3 IS NULL OR t.type = $3::transaction_type)
+		  AND ($3::transaction_type IS NULL OR t.type = $3::transaction_type)
 		ORDER BY t.created_at DESC
 		LIMIT $4 OFFSET $5
 	`
