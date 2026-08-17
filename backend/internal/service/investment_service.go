@@ -14,6 +14,7 @@ type InvestmentService interface {
 	GetPlans(ctx context.Context) ([]*domain.SponsorshipPlan, error)
 	CreateInvestment(ctx context.Context, userID uuid.UUID, req *domain.InvestRequest) (*domain.Sponsorship, error)
 	GetMyInvestments(ctx context.Context, userID uuid.UUID) ([]*domain.Sponsorship, error)
+	HasActiveInvestment(ctx context.Context, userID uuid.UUID) (bool, error)
 }
 
 type investmentService struct {
@@ -107,4 +108,8 @@ func (s *investmentService) CreateInvestment(ctx context.Context, userID uuid.UU
 
 func (s *investmentService) GetMyInvestments(ctx context.Context, userID uuid.UUID) ([]*domain.Sponsorship, error) {
 	return s.invRepo.GetInvestmentsByUserID(ctx, userID)
+}
+
+func (s *investmentService) HasActiveInvestment(ctx context.Context, userID uuid.UUID) (bool, error) {
+	return s.invRepo.HasActiveInvestment(ctx, userID)
 }

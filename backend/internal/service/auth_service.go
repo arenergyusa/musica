@@ -47,22 +47,24 @@ type AuthService interface {
 }
 
 type authService struct {
-	userRepo    repository.UserRepository
-	mlmRepo     repository.MLMRepository
-	otpRepo     repository.OTPRepository
-	emailSender emailpkg.EmailSender
-	redis       *redis.Client
-	jwtSecret   string
+	userRepo       repository.UserRepository
+	mlmRepo        repository.MLMRepository
+	otpRepo        repository.OTPRepository
+	emailSender    emailpkg.EmailSender
+	redis          *redis.Client
+	jwtSecret      string
+	investmentSvc  service.InvestmentService
 }
 
-func NewAuthService(userRepo repository.UserRepository, mlmRepo repository.MLMRepository, otpRepo repository.OTPRepository, emailSender emailpkg.EmailSender, jwtSecret string, redis *redis.Client) AuthService {
+func NewAuthService(userRepo repository.UserRepository, mlmRepo repository.MLMRepository, otpRepo repository.OTPRepository, emailSender emailpkg.EmailSender, jwtSecret string, redis *redis.Client, investmentSvc service.InvestmentService) AuthService {
 	return &authService{
-		userRepo:    userRepo,
-		mlmRepo:     mlmRepo,
-		otpRepo:     otpRepo,
-		emailSender: emailSender,
-		jwtSecret:   jwtSecret,
-		redis:       redis,
+		userRepo:       userRepo,
+		mlmRepo:        mlmRepo,
+		otpRepo:        otpRepo,
+		emailSender:    emailSender,
+		jwtSecret:      jwtSecret,
+		redis:          redis,
+		investmentSvc:  investmentSvc,
 	}
 }
 
@@ -123,6 +125,14 @@ func (s *authService) Register(ctx context.Context, req *domain.RegisterRequest)
 	}
 	if upline == nil {
 		return nil, errors.New("invalid invite code")
+	}
+
+	hasActive, err := s.investmentSvc.HasActiveInvestment(ctx, upline.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !hasActive {
+		return nil, errors.New("invite code belongs to a user without active investments")
 	}
 
 	// Check if email exists and is active

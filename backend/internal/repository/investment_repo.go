@@ -108,6 +108,13 @@ func (r *investmentRepository) GetInvestmentsByUserID(ctx context.Context, userI
 	return invs, nil
 }
 
+func (r *investmentRepository) HasActiveInvestment(ctx context.Context, userID uuid.UUID) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM sponsorships WHERE user_id = $1 AND status = 'ACTIVE')`
+	var exists bool
+	err := r.db.QueryRow(ctx, query, userID).Scan(&exists)
+	return exists, err
+}
+
 func (r *investmentRepository) GetActiveInvestments(ctx context.Context) ([]*domain.Sponsorship, error) {
 	query := `
 		SELECT id, user_id, amount, daily_rate_pct, status, total_reward_earned, cap_limit, working_cap_at_creation, deposit_tx_hash, deposit_confirmed_at, created_at, closed_at
@@ -207,12 +214,6 @@ func (r *investmentRepository) GetPendingCount(ctx context.Context) (int, error)
 	var count int
 	err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM sponsorships WHERE status = 'PENDING'").Scan(&count)
 	return count, err
-}
-
-func (r *investmentRepository) HasActiveInvestment(ctx context.Context, userID uuid.UUID) (bool, error) {
-	var exists bool
-	err := r.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM sponsorships WHERE user_id = $1 AND status = 'ACTIVE')`, userID).Scan(&exists)
-	return exists, err
 }
 
 func (r *investmentRepository) GetTotalActiveInvested(ctx context.Context) (float64, error) {

@@ -78,8 +78,8 @@ func main() {
 	emailSender := email.NewEmailSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass)
 
 	// Initialize Services
-	authSvc := service.NewAuthService(userRepo, mlmRepo, otpRepo, emailSender, cfg.JWTSecret, redisClient)
 	invSvc := service.NewInvestmentService(invRepo, userRepo, mlmRepo, settingsRepo)
+	authSvc := service.NewAuthService(userRepo, mlmRepo, otpRepo, emailSender, cfg.JWTSecret, redisClient, invSvc)
 	walletSvc := service.NewWalletService(walletRepo)
 	auditSvc := service.NewAuditService(dbPool)
 	usdtSvc := service.NewUSDTService(dbPool, auditSvc)
