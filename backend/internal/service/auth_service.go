@@ -53,10 +53,10 @@ type authService struct {
 	emailSender    emailpkg.EmailSender
 	redis          *redis.Client
 	jwtSecret      string
-	investmentSvc  service.InvestmentService
+	investmentSvc  InvestmentService
 }
 
-func NewAuthService(userRepo repository.UserRepository, mlmRepo repository.MLMRepository, otpRepo repository.OTPRepository, emailSender emailpkg.EmailSender, jwtSecret string, redis *redis.Client, investmentSvc service.InvestmentService) AuthService {
+func NewAuthService(userRepo repository.UserRepository, mlmRepo repository.MLMRepository, otpRepo repository.OTPRepository, emailSender emailpkg.EmailSender, jwtSecret string, redis *redis.Client, investmentSvc InvestmentService) AuthService {
 	return &authService{
 		userRepo:       userRepo,
 		mlmRepo:        mlmRepo,
